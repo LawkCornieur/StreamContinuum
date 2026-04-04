@@ -64,11 +64,14 @@ async function generateRepo() {
                 zip.writeZip(zipPath);
                 console.log(`Created ${zipPath}`);
                 
-                // If it's a repository, copy to root
-                if (addonId.startsWith('repository.')) {
-                    fs.copyFileSync(zipPath, zipName);
-                    console.log(`Copied ${zipName} to root.`);
+                // Copy current version to root and clean up old root versions for this addon
+                const rootZipName = zipName;
+                const oldRootZips = fs.readdirSync('.').filter(f => f.startsWith(addonId) && f.endsWith('.zip') && f !== rootZipName);
+                for (const oldRootZip of oldRootZips) {
+                    fs.unlinkSync(oldRootZip);
                 }
+                fs.copyFileSync(zipPath, rootZipName);
+                console.log(`Copied ${rootZipName} to root.`);
                 
             } catch (err) {
                 console.error(`Error processing ${addonId}:`, err);
@@ -96,23 +99,25 @@ async function generateRepo() {
         let newListing = '\n        <a href="addons.xml">addons.xml</a>\n';
         newListing += '        <a href="addons.xml.md5">addons.xml.md5</a>\n';
         
-        // Add all ZIPs found in root and addon directories
-        const rootZips = fs.readdirSync('.').filter(f => f.endsWith('.zip'));
+        // ONLY add ZIPs found in root directory for a clean view in Kodi
+        const rootZips = fs.readdirSync('.').filter(f => f.endsWith('.zip')).sort();
         for (const zip of rootZips) {
             newListing += `        <a href="${zip}">${zip}</a>\n`;
         }
         
-        const dirs = fs.readdirSync('.').filter(f => fs.statSync(f).isDirectory() && !f.startsWith('.') && f !== 'node_modules' && f !== 'src');
-        for (const dir of dirs) {
-            const zips = fs.readdirSync(dir).filter(f => f.endsWith('.zip'));
-            for (const zip of zips) {
-                newListing += `        <a href="${dir}/${zip}">${dir}/${zip}</a>\n`;
-            }
+        indexContent = indexContent.replace(listingRegex, `<div id="kodi-listing" style="display:none">${newListing}      </div>`);
+        
+        // Update human-visible version strings in index.html
+        const repoZip = rootZips.find(z => z.startsWith('repository.streamcontinuum'));
+        const pluginZip = rootZips.find(z => z.startsWith('plugin.video.streamcontinuum'));
+        
+        if (repoZip) {
+            // Update the specific line in the instructions
+            indexContent = indexContent.replace(/repository\.streamcontinuum-[\d.]+\.zip/g, repoZip);
         }
         
-        indexContent = indexContent.replace(listingRegex, `<div id="kodi-listing" style="display:none">${newListing}      </div>`);
         fs.writeFileSync(indexPath, indexContent);
-        console.log('Updated index.html kodi-listing section.');
+        console.log('Updated index.html kodi-listing section and version strings.');
     }
 }
 
