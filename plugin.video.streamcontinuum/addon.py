@@ -32,35 +32,102 @@ def list_categories():
     
     xbmcplugin.endOfDirectory(HANDLE)
 
-def search():
-    keyboard = xbmc.Keyboard('', 'Hledat na Webshare')
-    keyboard.doModal()
-    if keyboard.isConfirmed():
-        query = keyboard.getText()
-        if query:
-            results = webshare.search(query)
-            if not results:
-                xbmcgui.Dialog().notification("StreamContinuum", "Nebyly nalezeny žádné výsledky", xbmcgui.NOTIFICATION_INFO, 3000)
-                return
-            
-            for item in results:
-                url = f"{sys.argv[0]}?action=play&ident={item['ident']}"
-                size_mb = round(item['size'] / (1024 * 1024), 2)
-                label = f"{item['name']} ({size_mb} MB)"
-                list_item = xbmcgui.ListItem(label=label)
-                list_item.setInfo('video', {'title': item['name']})
-                list_item.setProperty('IsPlayable', 'true')
-                xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=False)
-            
-            xbmcplugin.endOfDirectory(HANDLE)
+def search(query=None):
+    if not query:
+        keyboard = xbmc.Keyboard('', 'Hledat na Webshare')
+        keyboard.doModal()
+        if keyboard.isConfirmed():
+            query = keyboard.getText()
+        else:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            return
 
-def play(ident):
+    if query:
+        results = webshare.search(query)
+        if not results:
+            xbmcgui.Dialog().notification("StreamContinuum", "Nebyly nalezeny žádné výsledky", xbmcgui.NOTIFICATION_INFO, 3000)
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            return
+        
+        for item in results:
+            url = f"{sys.argv[0]}?action=play&ident={item['ident']}&query={urllib.parse.quote(query)}&title={urllib.parse.quote(item['name'])}"
+            size_mb = round(item['size'] / (1024 * 1024), 2)
+            label = f"{item['name']} ({size_mb} MB)"
+            list_item = xbmcgui.ListItem(label=label)
+            list_item.setInfo('video', {'title': item['name']})
+            list_item.setProperty('IsPlayable', 'true')
+            xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=False)
+        
+        xbmcplugin.endOfDirectory(HANDLE)
+
+class PlayerMonitor(xbmc.Player):
+    def __init__(self):
+        super(PlayerMonitor, self).__init__()
+        self.ended = False
+    def onPlayBackEnded(self):
+        self.ended = True
+    def onPlayBackStopped(self):
+        self.ended = True
+
+def play(ident, query=None, title=None):
     link = webshare.get_link(ident)
     if link:
         list_item = xbmcgui.ListItem(path=link)
         xbmcplugin.setResolvedUrl(HANDLE, True, list_item)
+        
+        if query and title:
+            import history
+            history.add_to_history(query, title)
+            
+            monitor = PlayerMonitor()
+            # Wait for playback to start
+            for _ in range(20):
+                if monitor.isPlaying():
+                    break
+                xbmc.sleep(500)
+            
+            if monitor.isPlaying():
+                while monitor.isPlaying() and not monitor.ended:
+                    xbmc.sleep(1000)
+                
+                # Playback finished, move to history
+                xbmc.executebuiltin('Container.Update(plugin://plugin.video.streamcontinuum/?action=history)')
     else:
         xbmcgui.Dialog().notification("StreamContinuum", "Nepodařilo se získat odkaz k přehrání", xbmcgui.NOTIFICATION_ERROR, 3000)
+
+def show_history():
+    import history
+    items = history.get_history()
+    
+    if not items:
+        xbmcgui.Dialog().notification("StreamContinuum", "Historie je prázdná", xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+        
+    for item in items:
+        query = item.get('query', '')
+        title = item.get('title', '')
+        
+        label = f"{title} [COLOR gray](Hledáno: {query})[/COLOR]"
+        url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
+        
+        list_item = xbmcgui.ListItem(label=label)
+        list_item.setArt({'icon': 'DefaultHistory.png'})
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+        
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def search_prefill(query):
+    keyboard = xbmc.Keyboard(query, 'Hledat další díl')
+    keyboard.doModal()
+    if keyboard.isConfirmed():
+        new_query = keyboard.getText()
+        if new_query:
+            search(new_query)
+        else:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+    else:
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
 def run():
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:]))
@@ -74,8 +141,10 @@ def run():
         ADDON.openSettings()
     elif action == 'search':
         search()
+    elif action == 'search_prefill':
+        search_prefill(params.get('query', ''))
     elif action == 'play':
-        play(params.get('ident'))
+        play(params.get('ident'), params.get('query'), params.get('title'))
     elif action == 'trending_movies':
         xbmcgui.Dialog().ok("StreamContinuum", "Zde budou populární filmy (připravujeme)")
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -83,8 +152,7 @@ def run():
         xbmcgui.Dialog().ok("StreamContinuum", "Zde budou populární seriály (připravujeme)")
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
     elif action == 'history':
-        xbmcgui.Dialog().ok("StreamContinuum", "Historie bude brzy dostupná")
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        show_history()
     else:
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
