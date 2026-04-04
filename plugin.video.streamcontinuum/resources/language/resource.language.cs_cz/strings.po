@@ -1,0 +1,46 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "30000"
+msgstr "Trakt.tv"
+
+msgid "30001"
+msgstr "Účet"
+
+msgid "30002"
+msgstr "Token"
+
+msgid "30003"
+msgstr "Uživatel"
+
+msgid "30004"
+msgstr "Aktivovat zařízení"
+
+msgid "30010"
+msgstr "Webshare"
+
+msgid "30011"
+msgstr "Přihlašovací údaje"
+
+msgid "30012"
+msgstr "Uživatelské jméno"
+
+msgid "30013"
+msgstr "Heslo"
+
+msgid "30014"
+msgstr "Token"
+
+msgid "30020"
+msgstr "Obecné"
+
+msgid "30021"
+msgstr "Přehrávání"
+
+msgid "30022"
+msgstr "Automaticky přehrát další"
+
+msgid "30023"
+msgstr "Maximální rozlišení"

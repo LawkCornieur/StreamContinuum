@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.streamcontinuum" name="StreamContinuum" version="1.0.0" provider-name="LawkCornieur">
+    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+        <import addon="script.module.requests" version="2.25.1"/>
+        <import addon="inputstream.adaptive" version="2.6.0"/>
+    </requires>
+    <extension point="xbmc.python.pluginsource" library="addon.py">
+        <provides>video</provides>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en_GB">Simple stream addon with Trakt.tv and Webshare integration.</summary>
+        <summary lang="cs_CZ">Jednoduchý stream doplněk s integrací Trakt.tv a Webshare.</summary>
+        <description lang="en_GB">StreamContinuum allows you to browse and play content from Webshare.cz with full Trakt.tv synchronization and local history.</description>
+        <description lang="cs_CZ">StreamContinuum umožňuje prohlížet a přehrávat obsah z Webshare.cz s plnou synchronizací Trakt.tv a lokální historií.</description>
+        <disclaimer lang="en_GB">This addon does not host any content. It is a tool to access third-party services.</disclaimer>
+        <platform>all</platform>
+        <assets>
+            <icon>icon.png</icon>
+            <fanart>fanart.jpg</fanart>
+        </assets>
+    </extension>
+</addon>
