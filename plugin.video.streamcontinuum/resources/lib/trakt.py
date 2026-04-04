@@ -4,18 +4,23 @@ import requests
 import time
 
 ADDON = xbmcaddon.Addon()
-CLIENT_ID = "YOUR_TRAKT_CLIENT_ID" # Hardcoded for the addon
-CLIENT_SECRET = "YOUR_TRAKT_CLIENT_SECRET"
 
 def authenticate():
+    client_id = ADDON.getSetting('trakt_client_id')
+    client_secret = ADDON.getSetting('trakt_client_secret')
+    
+    if not client_id or not client_secret:
+        xbmcgui.Dialog().ok("Trakt.tv Error", "Chybí Client ID nebo Client Secret v nastavení API.")
+        return
+
     # 1. Generate Device Code
     url = "https://api.trakt.tv/oauth/device/code"
-    payload = {"client_id": CLIENT_ID}
+    payload = {"client_id": client_id}
     
     try:
         res = requests.post(url, json=payload)
         if res.status_code != 200:
-            xbmcgui.Dialog().ok("Trakt.tv Error", f"Chyba při komunikaci s Trakt.tv (Status: {res.status_code})")
+            xbmcgui.Dialog().ok("Trakt.tv Error", f"Chyba při komunikaci s Trakt.tv (Status: {res.status_code})\nZkontrolujte Client ID.")
             return
         response = res.json()
     except Exception as e:
@@ -45,8 +50,8 @@ def authenticate():
         token_url = "https://api.trakt.tv/oauth/device/token"
         token_payload = {
             "code": device_code,
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET
+            "client_id": client_id,
+            "client_secret": client_secret
         }
         
         token_res = requests.post(token_url, json=token_payload)

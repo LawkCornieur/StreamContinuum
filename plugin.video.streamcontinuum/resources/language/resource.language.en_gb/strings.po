@@ -58,3 +58,15 @@ msgstr "Autoplay next"
 msgctxt "#30023"
 msgid "Max resolution"
 msgstr "Max resolution"
+
+msgctxt "#30030"
+msgid "API Settings"
+msgstr "API Settings"
+
+msgctxt "#30031"
+msgid "Client ID"
+msgstr "Client ID"
+
+msgctxt "#30032"
+msgid "Client Secret"
+msgstr "Client Secret"

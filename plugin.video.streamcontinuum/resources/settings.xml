@@ -21,6 +21,18 @@
                     <control type="button" format="action"/>
                 </setting>
             </group>
+            <group id="trakt_api" label="30030">
+                <setting id="trakt_client_id" type="string" label="30031">
+                    <level>1</level>
+                    <default></default>
+                    <control type="edit" format="string"/>
+                </setting>
+                <setting id="trakt_client_secret" type="string" label="30032">
+                    <level>1</level>
+                    <default></default>
+                    <control type="edit" format="string" option="hidden"/>
+                </setting>
+            </group>
         </category>
         <category id="webshare" label="30010">
             <group id="webshare_creds" label="30011">
