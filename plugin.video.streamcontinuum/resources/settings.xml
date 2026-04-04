@@ -3,11 +3,17 @@
     <section id="main">
         <category id="trakt" label="30000">
             <group id="trakt_account" label="30001">
-                <setting id="trakt_token" type="string" label="30002" default="" visible="false">
+                <setting id="trakt_token" type="string" label="30002" visible="false">
+                    <level>0</level>
+                    <default></default>
                     <control type="edit" format="string"/>
                 </setting>
-                <setting id="trakt_username" type="string" label="30003" default="Nepřipojeno">
-                    <control type="edit" format="string" enable="false"/>
+                <setting id="trakt_username" type="string" label="30003">
+                    <level>0</level>
+                    <default>Nepřipojeno</default>
+                    <control type="edit" format="string">
+                        <enable>false</enable>
+                    </control>
                 </setting>
                 <setting id="trakt_auth_btn" type="action" label="30004">
                     <level>0</level>
@@ -18,23 +24,33 @@
         </category>
         <category id="webshare" label="30010">
             <group id="webshare_creds" label="30011">
-                <setting id="ws_username" type="string" label="30012" default="">
+                <setting id="ws_username" type="string" label="30012">
+                    <level>0</level>
+                    <default></default>
                     <control type="edit" format="string"/>
                 </setting>
-                <setting id="ws_password" type="string" label="30013" default="">
+                <setting id="ws_password" type="string" label="30013">
+                    <level>0</level>
+                    <default></default>
                     <control type="edit" format="string" option="hidden"/>
                 </setting>
-                <setting id="ws_token" type="string" label="30014" default="" visible="false">
+                <setting id="ws_token" type="string" label="30014" visible="false">
+                    <level>0</level>
+                    <default></default>
                     <control type="edit" format="string"/>
                 </setting>
             </group>
         </category>
         <category id="general" label="30020">
             <group id="playback" label="30021">
-                <setting id="autoplay_next" type="boolean" label="30022" default="true">
+                <setting id="autoplay_next" type="boolean" label="30022">
+                    <level>0</level>
+                    <default>true</default>
                     <control type="button" format="boolean"/>
                 </setting>
-                <setting id="max_resolution" type="integer" label="30023" default="1">
+                <setting id="max_resolution" type="integer" label="30023">
+                    <level>0</level>
+                    <default>1</default>
                     <control type="list" format="string">
                         <values>
                             <value>4K</value>

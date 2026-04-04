@@ -3,44 +3,58 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "30000"
+msgctxt "#30000"
+msgid "Trakt.tv"
 msgstr "Trakt.tv"
 
-msgid "30001"
+msgctxt "#30001"
+msgid "Account"
 msgstr "Account"
 
-msgid "30002"
+msgctxt "#30002"
+msgid "Token"
 msgstr "Token"
 
-msgid "30003"
+msgctxt "#30003"
+msgid "User"
 msgstr "User"
 
-msgid "30004"
+msgctxt "#30004"
+msgid "Activate Device"
 msgstr "Activate Device"
 
-msgid "30010"
+msgctxt "#30010"
+msgid "Webshare"
 msgstr "Webshare"
 
-msgid "30011"
+msgctxt "#30011"
+msgid "Credentials"
 msgstr "Credentials"
 
-msgid "30012"
+msgctxt "#30012"
+msgid "Username"
 msgstr "Username"
 
-msgid "30013"
+msgctxt "#30013"
+msgid "Password"
 msgstr "Password"
 
-msgid "30014"
+msgctxt "#30014"
+msgid "Token"
 msgstr "Token"
 
-msgid "30020"
+msgctxt "#30020"
+msgid "General"
 msgstr "General"
 
-msgid "30021"
+msgctxt "#30021"
+msgid "Playback"
 msgstr "Playback"
 
-msgid "30022"
+msgctxt "#30022"
+msgid "Autoplay next"
 msgstr "Autoplay next"
 
-msgid "30023"
+msgctxt "#30023"
+msgid "Max resolution"
 msgstr "Max resolution"
