@@ -3,34 +3,28 @@
     <section id="main">
         <category id="trakt" label="30000">
             <group id="trakt_account" label="30001">
-                <setting id="trakt_token" type="string" label="30002" visible="false">
-                    <level>0</level>
-                    <default></default>
-                    <control type="edit" format="string"/>
-                </setting>
                 <setting id="trakt_username" type="string" label="30003">
                     <level>0</level>
                     <default>Nepřipojeno</default>
-                    <control type="edit" format="string">
-                        <enable>false</enable>
-                    </control>
+                    <control type="edit" format="string" />
+                    <enable>false</enable>
                 </setting>
                 <setting id="trakt_auth_btn" type="action" label="30004">
                     <level>0</level>
                     <data>RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_auth)</data>
-                    <control type="button" format="action"/>
+                    <control type="button" format="action" />
                 </setting>
             </group>
             <group id="trakt_api" label="30030">
                 <setting id="trakt_client_id" type="string" label="30031">
-                    <level>1</level>
+                    <level>0</level>
                     <default></default>
-                    <control type="edit" format="string"/>
+                    <control type="edit" format="string" />
                 </setting>
                 <setting id="trakt_client_secret" type="string" label="30032">
-                    <level>1</level>
+                    <level>0</level>
                     <default></default>
-                    <control type="edit" format="string" option="hidden"/>
+                    <control type="edit" format="string" option="hidden" />
                 </setting>
             </group>
         </category>
@@ -39,17 +33,12 @@
                 <setting id="ws_username" type="string" label="30012">
                     <level>0</level>
                     <default></default>
-                    <control type="edit" format="string"/>
+                    <control type="edit" format="string" />
                 </setting>
                 <setting id="ws_password" type="string" label="30013">
                     <level>0</level>
                     <default></default>
-                    <control type="edit" format="string" option="hidden"/>
-                </setting>
-                <setting id="ws_token" type="string" label="30014" visible="false">
-                    <level>0</level>
-                    <default></default>
-                    <control type="edit" format="string"/>
+                    <control type="edit" format="string" option="hidden" />
                 </setting>
             </group>
         </category>
@@ -58,7 +47,7 @@
                 <setting id="autoplay_next" type="boolean" label="30022">
                     <level>0</level>
                     <default>true</default>
-                    <control type="button" format="boolean"/>
+                    <control type="button" format="boolean" />
                 </setting>
                 <setting id="max_resolution" type="integer" label="30023">
                     <level>0</level>
@@ -75,4 +64,6 @@
             </group>
         </category>
     </section>
+    <setting id="trakt_token" type="string" label="" visible="false" />
+    <setting id="ws_token" type="string" label="" visible="false" />
 </settings>

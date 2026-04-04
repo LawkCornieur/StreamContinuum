@@ -1,0 +1,55 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "30000"
+msgstr "Trakt.tv"
+
+msgid "30001"
+msgstr "Account"
+
+msgid "30002"
+msgstr "Token"
+
+msgid "30003"
+msgstr "User"
+
+msgid "30004"
+msgstr "Activate Device"
+
+msgid "30010"
+msgstr "Webshare"
+
+msgid "30011"
+msgstr "Credentials"
+
+msgid "30012"
+msgstr "Username"
+
+msgid "30013"
+msgstr "Password"
+
+msgid "30014"
+msgstr "Token"
+
+msgid "30020"
+msgstr "General"
+
+msgid "30021"
+msgstr "Playback"
+
+msgid "30022"
+msgstr "Autoplay next"
+
+msgid "30023"
+msgstr "Max resolution"
+
+msgid "30030"
+msgstr "API Settings"
+
+msgid "30031"
+msgstr "Client ID"
+
+msgid "30032"
+msgstr "Client Secret"
