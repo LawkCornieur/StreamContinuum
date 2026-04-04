@@ -11,12 +11,25 @@ def authenticate():
     # 1. Generate Device Code
     url = "https://api.trakt.tv/oauth/device/code"
     payload = {"client_id": CLIENT_ID}
-    response = requests.post(url, json=payload).json()
     
-    user_code = response['user_code']
-    device_code = response['device_code']
-    interval = response['interval']
-    expires_in = response['expires_in']
+    try:
+        res = requests.post(url, json=payload)
+        if res.status_code != 200:
+            xbmcgui.Dialog().ok("Trakt.tv Error", f"Chyba při komunikaci s Trakt.tv (Status: {res.status_code})")
+            return
+        response = res.json()
+    except Exception as e:
+        xbmcgui.Dialog().ok("Trakt.tv Error", f"Nepodařilo se připojit k Trakt.tv: {str(e)}")
+        return
+    
+    user_code = response.get('user_code')
+    device_code = response.get('device_code')
+    interval = response.get('interval', 5)
+    expires_in = response.get('expires_in', 600)
+    
+    if not user_code or not device_code:
+        xbmcgui.Dialog().ok("Trakt.tv Error", "API nevrátilo aktivační kódy.")
+        return
     
     # 2. Show Dialog to User
     progress = xbmcgui.DialogProgress()

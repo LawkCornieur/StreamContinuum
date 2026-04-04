@@ -3,7 +3,9 @@
     <section id="main">
         <category id="trakt" label="30000">
             <group id="trakt_account" label="30001">
-                <setting id="trakt_token" type="string" label="30002" default="" visible="false"/>
+                <setting id="trakt_token" type="string" label="30002" default="" visible="false">
+                    <control type="edit" format="string"/>
+                </setting>
                 <setting id="trakt_username" type="string" label="30003" default="Nepřipojeno">
                     <control type="edit" format="string" enable="false"/>
                 </setting>
@@ -16,17 +18,23 @@
         </category>
         <category id="webshare" label="30010">
             <group id="webshare_creds" label="30011">
-                <setting id="ws_username" type="string" label="30012" default=""/>
+                <setting id="ws_username" type="string" label="30012" default="">
+                    <control type="edit" format="string"/>
+                </setting>
                 <setting id="ws_password" type="string" label="30013" default="">
                     <control type="edit" format="string" option="hidden"/>
                 </setting>
-                <setting id="ws_token" type="string" label="30014" default="" visible="false"/>
+                <setting id="ws_token" type="string" label="30014" default="" visible="false">
+                    <control type="edit" format="string"/>
+                </setting>
             </group>
         </category>
         <category id="general" label="30020">
             <group id="playback" label="30021">
-                <setting id="autoplay_next" type="boolean" label="30022" default="true"/>
-                <setting id="max_resolution" type="enum" label="30023" default="1">
+                <setting id="autoplay_next" type="boolean" label="30022" default="true">
+                    <control type="button" format="boolean"/>
+                </setting>
+                <setting id="max_resolution" type="integer" label="30023" default="1">
                     <control type="list" format="string">
                         <values>
                             <value>4K</value>

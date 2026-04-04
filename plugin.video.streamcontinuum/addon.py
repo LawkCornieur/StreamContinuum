@@ -42,7 +42,24 @@ def run():
         trakt.authenticate()
     elif action == 'settings':
         ADDON.openSettings()
-    # Add more actions as needed...
+    elif action == 'trending_movies':
+        # Placeholder for trending movies
+        xbmcgui.Dialog().ok("StreamContinuum", "Zde budou populární filmy (připravujeme)")
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+    elif action == 'trending_shows':
+        # Placeholder for trending shows
+        xbmcgui.Dialog().ok("StreamContinuum", "Zde budou populární seriály (připravujeme)")
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+    elif action == 'search':
+        # Placeholder for search
+        xbmcgui.Dialog().ok("StreamContinuum", "Vyhledávání bude brzy dostupné")
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+    elif action == 'history':
+        # Placeholder for history
+        xbmcgui.Dialog().ok("StreamContinuum", "Historie bude brzy dostupná")
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+    else:
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
 if __name__ == '__main__':
     run()
