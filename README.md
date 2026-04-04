@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# StreamContinuum Kodi Addon
 
-# Run and deploy your AI Studio app
+Jednoduchý stream doplněk pro Kodi s integrací Trakt.tv a Webshare.cz.
 
-This contains everything you need to run your app locally.
+## Instalace
 
-View your app in AI Studio: https://ai.studio/apps/0271f45a-31de-4374-ae29-0eac4087536e
+### 1. Přidejte si zdroj repozitáře do Správce souborů
+1. Otevřete Kodi a přejděte do **Nastavení** (ikona ozubeného kola).
+2. Přejděte do **Správce souborů**.
+3. Klikněte na **Přidat zdroj**.
+4. Do pole "Cesta k médiu" zadejte: `https://lawkcornieur.github.io/StreamContinuum/`
+5. Pojmenujte zdroj (např. `StreamContinuum Repo`) a potvrďte **OK**.
 
-## Run Locally
+### 2. Nainstalujte repozitář
+1. Vraťte se na hlavní obrazovku Kodi a přejděte do **Doplňky**.
+2. Klikněte na ikonu **Instalátoru balíčků** (otevřená krabice vlevo nahoře).
+3. Vyberte **Instalovat ze souboru zip**.
+4. Pokud se zobrazí varování o neznámých zdrojích, povolte je v nastavení.
+5. Najděte přidaný zdroj `StreamContinuum Repo`.
+6. Vyberte soubor `repository.streamcontinuum-1.0.0.zip`.
 
-**Prerequisites:**  Node.js
+### 3. Nainstalujte doplněk StreamContinuum
+1. Vyberte **Instalovat z repozitáře**.
+2. Vyberte **StreamContinuum Repository**.
+3. Přejděte do **Doplňky videí**.
+4. Vyberte **StreamContinuum** a klikněte na **Instalovat**.
 
+## Konfigurace
+1. Po instalaci přejděte do nastavení doplňku.
+2. V sekci **Webshare** zadejte své uživatelské jméno a heslo.
+3. V sekci **Trakt.tv** klikněte na tlačítko pro autorizaci a postupujte podle pokynů na obrazovce (zadání kódu na trakt.tv/activate).
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+---
+Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
