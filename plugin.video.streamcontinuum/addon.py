@@ -54,7 +54,47 @@ def search(query=None):
             size_mb = round(item['size'] / (1024 * 1024), 2)
             label = f"{item['name']} ({size_mb} MB)"
             list_item = xbmcgui.ListItem(label=label)
-            list_item.setInfo('video', {'title': item['name']})
+            
+            # Set video info
+            info = {
+                'title': item['name'],
+                'plot': item['description'],
+                'size': item['size']
+            }
+            
+            # Simple parsing of resolution and quality from name
+            name_lower = item['name'].lower()
+            if '2160p' in name_lower or '4k' in name_lower:
+                info['video_resolution'] = '2160'
+            elif '1080p' in name_lower:
+                info['video_resolution'] = '1080'
+            elif '720p' in name_lower:
+                info['video_resolution'] = '720'
+            elif '480p' in name_lower:
+                info['video_resolution'] = '480'
+            
+            # Parse audio tracks
+            audio_info = []
+            if 'cz' in name_lower or 'dabing' in name_lower:
+                audio_info.append('CZ')
+            if 'en' in name_lower or 'english' in name_lower:
+                audio_info.append('EN')
+            if 'sk' in name_lower or 'slovensky' in name_lower:
+                audio_info.append('SK')
+            
+            if audio_info:
+                info['plot'] = f"[COLOR orange][{', '.join(audio_info)}][/COLOR] " + info['plot']
+            
+            list_item.setInfo('video', info)
+            
+            # Set art (thumbnail)
+            if item.get('img'):
+                list_item.setArt({
+                    'thumb': item['img'],
+                    'icon': item['img'],
+                    'poster': item['img']
+                })
+            
             list_item.setProperty('IsPlayable', 'true')
             xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=False)
         

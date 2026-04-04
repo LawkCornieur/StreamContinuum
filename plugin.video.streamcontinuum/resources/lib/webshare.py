@@ -81,11 +81,15 @@ def search(query):
                 ident = file_elem.find('ident')
                 name = file_elem.find('name')
                 size = file_elem.find('size')
+                img = file_elem.find('img')
+                description = file_elem.find('description')
                 if ident is not None and name is not None:
                     files.append({
                         'ident': ident.text,
                         'name': name.text,
-                        'size': int(size.text) if size is not None and size.text else 0
+                        'size': int(size.text) if size is not None and size.text else 0,
+                        'img': img.text if img is not None else None,
+                        'description': description.text if description is not None else ""
                     })
             return files
     except Exception as e:
