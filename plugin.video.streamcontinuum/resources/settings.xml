@@ -14,6 +14,11 @@
                     <data>RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_auth)</data>
                     <control type="button" format="action" />
                 </setting>
+                <setting id="trakt_token" type="string" label="" visible="false">
+                    <level>0</level>
+                    <default></default>
+                    <control type="edit" format="string" />
+                </setting>
             </group>
             <group id="trakt_api" label="30030">
                 <setting id="trakt_client_id" type="string" label="30031">
@@ -40,6 +45,11 @@
                     <default></default>
                     <control type="edit" format="string" option="hidden" />
                 </setting>
+                <setting id="ws_token" type="string" label="" visible="false">
+                    <level>0</level>
+                    <default></default>
+                    <control type="edit" format="string" />
+                </setting>
             </group>
         </category>
         <category id="general" label="30020">
@@ -64,6 +74,4 @@
             </group>
         </category>
     </section>
-    <setting id="trakt_token" type="string" label="" visible="false" />
-    <setting id="ws_token" type="string" label="" visible="false" />
 </settings>

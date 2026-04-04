@@ -1,0 +1,72 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgctxt "#30000"
+msgid "Trakt.tv"
+msgstr "Trakt.tv"
+
+msgctxt "#30001"
+msgid "Account"
+msgstr "Účet"
+
+msgctxt "#30002"
+msgid "Token"
+msgstr "Token"
+
+msgctxt "#30003"
+msgid "User"
+msgstr "Uživatel"
+
+msgctxt "#30004"
+msgid "Activate Device"
+msgstr "Aktivovat zařízení"
+
+msgctxt "#30010"
+msgid "Webshare"
+msgstr "Webshare"
+
+msgctxt "#30011"
+msgid "Credentials"
+msgstr "Přihlašovací údaje"
+
+msgctxt "#30012"
+msgid "Username"
+msgstr "Uživatelské jméno"
+
+msgctxt "#30013"
+msgid "Password"
+msgstr "Heslo"
+
+msgctxt "#30014"
+msgid "Token"
+msgstr "Token"
+
+msgctxt "#30020"
+msgid "General"
+msgstr "Obecné"
+
+msgctxt "#30021"
+msgid "Playback"
+msgstr "Přehrávání"
+
+msgctxt "#30022"
+msgid "Autoplay next"
+msgstr "Automaticky přehrát další"
+
+msgctxt "#30023"
+msgid "Max resolution"
+msgstr "Maximální rozlišení"
+
+msgctxt "#30030"
+msgid "API Settings"
+msgstr "Nastavení API"
+
+msgctxt "#30031"
+msgid "Client ID"
+msgstr "Client ID"
+
+msgctxt "#30032"
+msgid "Client Secret"
+msgstr "Client Secret"
