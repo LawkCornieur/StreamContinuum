@@ -38,6 +38,12 @@ async function generateRepo() {
                 const zipName = `${addonId}-${version}.zip`;
                 const zipPath = path.join(addonId, zipName);
                 
+                // Clean up old ZIPs in the addon directory
+                const existingZips = fs.readdirSync(addonId).filter(f => f.endsWith('.zip'));
+                for (const oldZip of existingZips) {
+                    fs.unlinkSync(path.join(addonId, oldZip));
+                }
+                
                 const zip = new AdmZip();
                 
                 // Add everything in the addon directory to the zip, but under a folder named addonId
@@ -80,6 +86,34 @@ async function generateRepo() {
     fs.writeFileSync(addonsXmlMd5Path, md5);
     
     console.log('Generated addons.xml and addons.xml.md5 successfully.');
+
+    // Update index.html kodi-listing section
+    const indexPath = 'index.html';
+    if (fs.existsSync(indexPath)) {
+        let indexContent = fs.readFileSync(indexPath, 'utf-8');
+        const listingRegex = /<div id="kodi-listing" style="display:none">([\s\S]*?)<\/div>/;
+        
+        let newListing = '\n        <a href="addons.xml">addons.xml</a>\n';
+        newListing += '        <a href="addons.xml.md5">addons.xml.md5</a>\n';
+        
+        // Add all ZIPs found in root and addon directories
+        const rootZips = fs.readdirSync('.').filter(f => f.endsWith('.zip'));
+        for (const zip of rootZips) {
+            newListing += `        <a href="${zip}">${zip}</a>\n`;
+        }
+        
+        const dirs = fs.readdirSync('.').filter(f => fs.statSync(f).isDirectory() && !f.startsWith('.') && f !== 'node_modules' && f !== 'src');
+        for (const dir of dirs) {
+            const zips = fs.readdirSync(dir).filter(f => f.endsWith('.zip'));
+            for (const zip of zips) {
+                newListing += `        <a href="${dir}/${zip}">${dir}/${zip}</a>\n`;
+            }
+        }
+        
+        indexContent = indexContent.replace(listingRegex, `<div id="kodi-listing" style="display:none">${newListing}      </div>`);
+        fs.writeFileSync(indexPath, indexContent);
+        console.log('Updated index.html kodi-listing section.');
+    }
 }
 
 generateRepo();
