@@ -26,6 +26,17 @@
           </h2>
           
           <div class="space-y-8">
+            <div class="bg-blue-900/30 border border-blue-500/30 rounded-xl p-4 mb-6">
+              <p class="text-blue-200 mb-2 flex items-center gap-2">
+                <i class="lucide-info text-blue-400"></i>
+                Rychlá instalace:
+              </p>
+              <a href="repository.streamcontinuum-1.0.0.zip" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors font-medium">
+                <i class="lucide-download"></i>
+                Stáhnout repository.streamcontinuum-1.0.0.zip
+              </a>
+            </div>
+
             <div>
               <h3 class="text-lg font-medium mb-3 text-slate-300">1. Přidejte si zdroj repozitáře do Správce souborů</h3>
               <ul class="list-disc list-inside space-y-2 text-slate-400 ml-4">
@@ -42,7 +53,7 @@
                 <li>Přejděte do <span class="text-slate-200">Doplňků</span></li>
                 <li>Klikněte na ikonu <span class="text-slate-200">instalátoru balíčků</span> (krabice vlevo nahoře)</li>
                 <li>Vyberte <span class="text-slate-200">"Instalovat ze souboru zip"</span></li>
-                <li>Najděte přidaný zdroj a vyberte <span class="text-slate-200">repository.streamcontinuum-1.0.0.zip</span></li>
+                <li>Najděte přidaný zdroj a vyberte <a href="repository.streamcontinuum-1.0.0.zip" class="text-blue-400 hover:underline font-mono">repository.streamcontinuum-1.0.0.zip</a></li>
               </ul>
             </div>
 
@@ -74,6 +85,11 @@
       <footer class="mt-12 text-center text-slate-500 text-sm">
         &copy; 2026 StreamContinuum Repository
       </footer>
+
+      <!-- Hidden file list for Kodi scraper -->
+      <div style="display:none;">
+        <a href="repository.streamcontinuum-1.0.0.zip">repository.streamcontinuum-1.0.0.zip</a>
+      </div>
     </div>
   </body>
 </html>
