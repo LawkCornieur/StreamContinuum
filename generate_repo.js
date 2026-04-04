@@ -10,7 +10,10 @@ const addonsXmlMd5Path = 'addons.xml.md5';
 async function generateRepo() {
     let addonsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<addons>\n';
     
-    const dirs = fs.readdirSync(addonsDir).filter(f => fs.statSync(path.join(addonsDir, f)).isDirectory() && !f.startsWith('.'));
+    const dirs = fs.readdirSync(addonsDir).filter(f => {
+        const fullPath = path.join(addonsDir, f);
+        return fs.statSync(fullPath).isDirectory() && !f.startsWith('.') && f !== 'node_modules';
+    });
     
     for (const addonId of dirs) {
         const addonXmlPath = path.join(addonId, 'addon.xml');
