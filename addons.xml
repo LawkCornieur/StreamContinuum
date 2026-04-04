@@ -25,9 +25,9 @@
 <addon id="repository.streamcontinuum" name="StreamContinuum Repository" version="1.0.0" provider-name="LawkCornieur">
     <extension point="xbmc.addon.repository" name="StreamContinuum Repository">
         <dir>
-            <info compressed="false">https://raw.githubusercontent.com/LawkCornieur/StreamContinuum/main/addons.xml</info>
-            <checksum>https://raw.githubusercontent.com/LawkCornieur/StreamContinuum/main/addons.xml.md5</checksum>
-            <datadir zip="true">https://raw.githubusercontent.com/LawkCornieur/StreamContinuum/main/</datadir>
+            <info compressed="false">https://lawkcornieur.github.io/StreamContinuum/addons.xml</info>
+            <checksum>https://lawkcornieur.github.io/StreamContinuum/addons.xml.md5</checksum>
+            <datadir zip="true">https://lawkcornieur.github.io/StreamContinuum/</datadir>
         </dir>
     </extension>
     <extension point="xbmc.addon.metadata">

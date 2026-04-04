@@ -1,13 +1,76 @@
 <!doctype html>
-<html lang="en">
+<html lang="cs">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <title>StreamContinuum Kodi Repository</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.321.0/font/lucide.min.css">
   </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body class="bg-slate-900 text-slate-100 font-sans min-h-screen">
+    <div class="max-w-4xl mx-auto px-6 py-12">
+      <header class="mb-12 text-center">
+        <h1 class="text-4xl font-bold mb-4 text-blue-400">StreamContinuum</h1>
+        <p class="text-xl text-slate-400">Kodi Addon Repository</p>
+      </header>
+
+      <main class="space-y-12">
+        <section class="bg-slate-800 rounded-2xl p-8 shadow-xl border border-slate-700">
+          <h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
+            <i class="lucide-download text-blue-400"></i>
+            Návod na instalaci
+          </h2>
+          
+          <div class="space-y-8">
+            <div>
+              <h3 class="text-lg font-medium mb-3 text-slate-300">1. Přidejte si zdroj repozitáře do Správce souborů</h3>
+              <ul class="list-disc list-inside space-y-2 text-slate-400 ml-4">
+                <li>Přejděte do <span class="text-slate-200">Správce souborů</span></li>
+                <li>Klikněte na <span class="text-slate-200">"Přidat zdroj"</span></li>
+                <li>Do pole "Cesta k médiu" zadejte: <code class="bg-slate-900 px-2 py-1 rounded text-blue-300">https://lawkcornieur.github.io/StreamContinuum/</code></li>
+                <li>Pojmenujte zdroj (např. <span class="text-slate-200">"StreamContinuum Repo"</span>)</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-medium mb-3 text-slate-300">2. Nainstalujte repozitář</h3>
+              <ul class="list-disc list-inside space-y-2 text-slate-400 ml-4">
+                <li>Přejděte do <span class="text-slate-200">Doplňků</span></li>
+                <li>Klikněte na ikonu <span class="text-slate-200">instalátoru balíčků</span> (krabice vlevo nahoře)</li>
+                <li>Vyberte <span class="text-slate-200">"Instalovat ze souboru zip"</span></li>
+                <li>Najděte přidaný zdroj a vyberte <span class="text-slate-200">repository.streamcontinuum-1.0.0.zip</span></li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-medium mb-3 text-slate-300">3. Nainstalujte plugin</h3>
+              <ul class="list-disc list-inside space-y-2 text-slate-400 ml-4">
+                <li>Jděte do <span class="text-slate-200">"Instalovat z repozitáře"</span></li>
+                <li>Vyberte <span class="text-slate-200">StreamContinuum Repository</span></li>
+                <li>Přejděte do <span class="text-slate-200">Doplňky videí</span></li>
+                <li>Vyberte <span class="text-slate-200">StreamContinuum</span> a klikněte na Instalovat</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="bg-slate-800 rounded-2xl p-8 shadow-xl border border-slate-700">
+          <h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
+            <i class="lucide-settings text-blue-400"></i>
+            Konfigurace
+          </h2>
+          <p class="text-slate-400 mb-4">Po instalaci přejděte do nastavení pluginu a zadejte své údaje:</p>
+          <ul class="list-disc list-inside space-y-2 text-slate-400 ml-4">
+            <li>Uživatelské jméno a heslo pro <span class="text-slate-200">Webshare.cz</span></li>
+            <li>Autorizujte svůj účet <span class="text-slate-200">Trakt.tv</span></li>
+          </ul>
+        </section>
+      </main>
+
+      <footer class="mt-12 text-center text-slate-500 text-sm">
+        &copy; 2026 StreamContinuum Repository
+      </footer>
+    </div>
   </body>
 </html>
 
