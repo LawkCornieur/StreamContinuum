@@ -1,5 +1,6 @@
 import sys
 import os
+import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
@@ -32,7 +33,7 @@ def list_categories():
     xbmcplugin.endOfDirectory(HANDLE)
 
 def search():
-    keyboard = xbmcgui.DialogKeyboard()
+    keyboard = xbmc.Keyboard('', 'Hledat na Webshare')
     keyboard.doModal()
     if keyboard.isConfirmed():
         query = keyboard.getText()

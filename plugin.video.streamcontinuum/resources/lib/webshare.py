@@ -65,7 +65,7 @@ def get_token():
 def search(query):
     url = BASE_URL + 'search/'
     data = {
-        'what': query.encode('utf-8'),
+        'what': query,
         'sort': 'rating',
         'limit': 50,
         'offset': 0,
