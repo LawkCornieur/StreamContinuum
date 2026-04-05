@@ -131,3 +131,37 @@ def get_progress():
     except:
         pass
     return []
+
+def search_trakt(query):
+    url = f"https://api.trakt.tv/search/movie,show?query={urllib.parse.quote(query)}"
+    try:
+        res = requests.get(url, headers=get_headers())
+        if res.status_code == 200:
+            return res.json()
+    except:
+        pass
+    return []
+
+def mark_watched(media_type, trakt_id):
+    url = "https://api.trakt.tv/sync/history"
+    payload = {
+        media_type + "s": [{"ids": {"trakt": trakt_id}}]
+    }
+    try:
+        res = requests.post(url, json=payload, headers=get_headers())
+        return res.status_code == 201
+    except:
+        return False
+
+def mark_unwatched(media_type, trakt_id):
+    url = "https://api.trakt.tv/sync/history/remove"
+    payload = {
+        media_type + "s": [{"ids": {"trakt": trakt_id}}]
+    }
+    try:
+        res = requests.post(url, json=payload, headers=get_headers())
+        return res.status_code == 200
+    except:
+        return False
+
+import urllib.parse

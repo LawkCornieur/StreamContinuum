@@ -42,6 +42,22 @@ def add_to_history(query, title):
     with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=4)
 
+def delete_from_history(title):
+    history = get_history()
+    history = [item for item in history if item.get('title') != title]
+    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        json.dump(history, f, ensure_ascii=False, indent=4)
+
+def update_history_item(old_title, new_query, new_title):
+    history = get_history()
+    for item in history:
+        if item.get('title') == old_title:
+            item['query'] = new_query
+            item['title'] = new_title
+            break
+    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        json.dump(history, f, ensure_ascii=False, indent=4)
+
 def clear_history():
     if os.path.exists(HISTORY_FILE):
         os.remove(HISTORY_FILE)

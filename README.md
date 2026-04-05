@@ -26,9 +26,21 @@ Jednoduchý stream doplněk pro Kodi s integrací Trakt.tv a Webshare.cz.
 4. Vyberte **StreamContinuum** a klikněte na **Instalovat**.
 
 ## Konfigurace
+
+### Webshare.cz
 1. Po instalaci přejděte do nastavení doplňku.
 2. V sekci **Webshare** zadejte své uživatelské jméno a heslo.
-3. V sekci **Trakt.tv** klikněte na tlačítko pro autorizaci a postupujte podle pokynů na obrazovce (zadání kódu na trakt.tv/activate).
+
+### Trakt.tv (API Nastavení)
+Pro fungování Trakt.tv integrace si musí každý uživatel vytvořit vlastní API aplikaci:
+1. Přihlaste se na [trakt.tv](https://trakt.tv).
+2. Přejděte do [Settings -> API Apps](https://trakt.tv/oauth/applications).
+3. Klikněte na **New Application**.
+4. Vyplňte libovolný název (např. `StreamContinuum`).
+5. Do pole **Redirect URI** zadejte: `urn:ietf:wg:oauth:2.0:oob`
+6. Uložte aplikaci a zkopírujte si **Client ID** a **Client Secret**.
+7. V nastavení doplňku StreamContinuum v sekci **Trakt.tv** zadejte tyto údaje.
+8. Poté klikněte na **Aktivovat zařízení** a zadejte kód na [trakt.tv/activate](https://trakt.tv/activate).
 
 ---
 Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).

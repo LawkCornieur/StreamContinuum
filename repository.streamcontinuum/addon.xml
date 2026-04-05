@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="repository.streamcontinuum" name="StreamContinuum Repository" version="1.0.7" provider-name="LawkCornieur">
+<addon id="repository.streamcontinuum" name="StreamContinuum Repository" version="1.0.8" provider-name="LawkCornieur">
     <extension point="xbmc.addon.repository" name="StreamContinuum Repository">
         <dir>
             <info compressed="false">https://lawkcornieur.github.io/StreamContinuum/addons.xml</info>

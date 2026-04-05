@@ -16,4 +16,8 @@
         <setting id="autoplay_next" type="bool" label="30022" default="true" />
         <setting id="max_resolution" type="enum" label="30023" lvalues="4K|1080p|720p|SD" default="1" />
     </category>
+    <category label="30040">
+        <setting id="about_version" type="text" label="30041" default="1.1.2" enable="false" />
+        <setting id="about_changelog" type="action" label="30042" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=show_changelog)" />
+    </category>
 </settings>

@@ -70,3 +70,15 @@ msgstr "Client ID"
 msgctxt "#30032"
 msgid "Client Secret"
 msgstr "Client Secret"
+
+msgctxt "#30040"
+msgid "About"
+msgstr "O doplňku"
+
+msgctxt "#30041"
+msgid "Version"
+msgstr "Verze"
+
+msgctxt "#30042"
+msgid "Changelog"
+msgstr "Seznam změn"

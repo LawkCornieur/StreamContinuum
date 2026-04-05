@@ -18,6 +18,11 @@ HANDLE = int(sys.argv[1])
 def list_categories():
     trakt_token = ADDON.getSetting('trakt_token')
     
+    # Add a header item to show addon name
+    list_item = xbmcgui.ListItem(label='[B][COLOR orange]StreamContinuum[/COLOR][/B]')
+    list_item.setArt({'icon': 'DefaultAddonVideo.png', 'thumb': 'DefaultAddonVideo.png'})
+    xbmcplugin.addDirectoryItem(HANDLE, '', list_item, isFolder=False)
+
     if trakt_token:
         items = [
             ('Pokračovat ve sledování', 'trakt_playback', 'DefaultRecentlyAddedEpisodes.png'),
@@ -41,6 +46,7 @@ def list_categories():
         list_item.setArt({'icon': icon, 'thumb': icon})
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
     
+    xbmcplugin.setContent(HANDLE, 'files')
     xbmcplugin.endOfDirectory(HANDLE)
 
 def search(query=None):
@@ -160,13 +166,87 @@ def show_history():
         title = item.get('title', '')
         
         label = f"{title} [COLOR gray](Hledáno: {query})[/COLOR]"
-        url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
+        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}&title={urllib.parse.quote(title)}"
         
         list_item = xbmcgui.ListItem(label=label)
-        list_item.setArt({'icon': 'DefaultHistory.png'})
+        list_item.setArt({'icon': 'DefaultHistory.png', 'thumb': 'DefaultHistory.png'})
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
     xbmcplugin.endOfDirectory(HANDLE)
+
+def history_menu(query, title):
+    items = [
+        ('Hledat na Webshare', f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
+        ('Upravit', f'history_edit&title={urllib.parse.quote(title)}&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
+        ('Smazat', f'history_delete&title={urllib.parse.quote(title)}', 'DefaultDelete.png'),
+        ('Hledat na Trakt.tv', f'trakt_search&query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
+    ]
+    
+    # Add episode navigation if it looks like a series
+    series_pattern = re.compile(r'^(.*)\s+S(\d{2})E(\d{2})', re.IGNORECASE)
+    match = series_pattern.match(title)
+    if match:
+        base_title = match.group(1).strip()
+        season = int(match.group(2))
+        episode = int(match.group(3))
+        
+        items.extend([
+            (f'Další díl (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'),
+            (f'Předchozí díl (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png') if episode > 1 else None,
+            (f'Další série (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{base_title} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'),
+            (f'Předchozí série (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{base_title} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png') if season > 1 else None,
+        ])
+    
+    for label, action_params, icon in [i for i in items if i]:
+        url = f"{sys.argv[0]}?action={action_params}"
+        list_item = xbmcgui.ListItem(label=label)
+        list_item.setArt({'icon': icon, 'thumb': icon})
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True if 'search' in action_params else False)
+        
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def trakt_search(query):
+    results = trakt.search_trakt(query)
+    if not results:
+        xbmcgui.Dialog().notification("Trakt.tv", "Nebyly nalezeny žádné výsledky", xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+        
+    for item in results:
+        media_type = item.get('type')
+        data = item.get(media_type)
+        title = data.get('title')
+        year = data.get('year')
+        trakt_id = data.get('ids', {}).get('trakt')
+        
+        label = f"{title} ({year})" if year else title
+        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(title)}"
+        
+        list_item = xbmcgui.ListItem(label=label)
+        icon = 'DefaultMovies.png' if media_type == 'movie' else 'DefaultTVShows.png'
+        list_item.setArt({'icon': icon, 'thumb': icon})
+        
+        # Context menu for marking watched/unwatched
+        cm = []
+        cm.append(('Označit jako zhlédnuté', f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
+        cm.append(('Označit jako nezhlédnuté', f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
+        list_item.addContextMenuItems(cm)
+        
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+        
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def show_changelog():
+    changelog = "[B]Verze 1.1.2[/B]\n"
+    changelog += "- Modernizované hlavní menu s názvem doplňku\n"
+    changelog += "- Rozšířené možnosti v historii (E+1, S+1, Trakt search)\n"
+    changelog += "- Možnost označit/odznačit zhlédnuté na Trakt.tv\n"
+    changelog += "- Oprava ikon a vylepšení vizuálu\n"
+    changelog += "- Optimalizace historie (odstranění duplicit seriálů)\n"
+    
+    xbmcgui.Dialog().textviewer("StreamContinuum - Seznam změn", changelog)
+
+import re
 
 def show_trakt_watchlist():
     items = trakt.get_watchlist()
@@ -308,8 +388,41 @@ def run():
         show_trakt_watchlist()
     elif action == 'trakt_playback':
         show_trakt_playback()
+    elif action == 'trakt_search':
+        trakt_search(params.get('query', ''))
+    elif action == 'trakt_mark':
+        media_type = params.get('type')
+        trakt_id = params.get('id')
+        watched = params.get('watched') == '1'
+        if watched:
+            success = trakt.mark_watched(media_type, trakt_id)
+        else:
+            success = trakt.mark_unwatched(media_type, trakt_id)
+        if success:
+            xbmcgui.Dialog().notification("Trakt.tv", "Úspěšně aktualizováno", xbmcgui.NOTIFICATION_INFO, 2000)
+        else:
+            xbmcgui.Dialog().notification("Trakt.tv", "Chyba při aktualizaci", xbmcgui.NOTIFICATION_ERROR, 2000)
     elif action == 'history':
         show_history()
+    elif action == 'history_menu':
+        history_menu(params.get('query'), params.get('title'))
+    elif action == 'history_delete':
+        import history
+        history.delete_from_history(params.get('title'))
+        xbmc.executebuiltin('Container.Refresh')
+    elif action == 'history_edit':
+        old_title = params.get('title')
+        old_query = params.get('query')
+        keyboard = xbmc.Keyboard(old_query, 'Upravit hledání')
+        keyboard.doModal()
+        if keyboard.isConfirmed():
+            new_query = keyboard.getText()
+            if new_query:
+                import history
+                history.update_history_item(old_title, new_query, new_query) # Simple update
+                xbmc.executebuiltin('Container.Refresh')
+    elif action == 'show_changelog':
+        show_changelog()
     else:
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
