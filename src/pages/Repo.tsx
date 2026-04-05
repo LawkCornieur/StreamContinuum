@@ -14,14 +14,17 @@ export default function RepoPage() {
     >
       {/* Hero Section */}
       <div className="relative overflow-hidden py-24 px-6">
-        <div className="absolute inset-0 bg-[url('./fanart.jpg')] bg-cover bg-center opacity-20 grayscale"></div>
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-20 grayscale"
+          style={{ backgroundImage: "url('fanart.jpg')" }}
+        ></div>
         <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/50 via-zinc-950 to-zinc-950"></div>
         
         <div className="relative max-w-5xl mx-auto text-center space-y-8">
           <motion.img 
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            src="./icon.png" 
+            src="icon.png" 
             alt="StreamContinuum Logo" 
             className="w-32 h-32 mx-auto rounded-3xl shadow-2xl border-4 border-blue-500/20"
           />
@@ -86,7 +89,7 @@ export default function RepoPage() {
               {/* Logo & Basic Info */}
               <div className="w-full md:w-1/3 space-y-6">
                 <div className="aspect-square bg-zinc-950 rounded-[2rem] p-8 shadow-inner border border-white/5 relative group">
-                  <img src="./icon.png" alt="Logo" className="w-full h-full object-contain" />
+                  <img src="icon.png" alt="Logo" className="w-full h-full object-contain" />
                   <div className="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2rem]"></div>
                 </div>
                 <div className="text-center md:text-left">
@@ -220,12 +223,16 @@ export default function RepoPage() {
                   <span className="text-sm text-zinc-500">{new Date(repoData.updatedAt).toLocaleDateString('cs-CZ')}</span>
                 </div>
                 <ul className="space-y-3">
-                  {changelogLines.map((line, i) => (
-                    <li key={i} className="flex gap-3 text-zinc-400">
-                      <ChevronRight className="w-4 h-4 text-blue-500 flex-shrink-0 mt-1" />
-                      {line.replace(/^\*\*(.*?)\*\*/, '$1')}
-                    </li>
-                  ))}
+                  {changelogLines.map((line, i) => {
+                    const cleanLine = line.replace(/^[-*•]\s*/, '').replace(/^\*\*(.*?)\*\*/, '$1').trim();
+                    if (!cleanLine) return null;
+                    return (
+                      <li key={i} className="flex gap-3 text-zinc-400">
+                        <ChevronRight className="w-4 h-4 text-blue-500 flex-shrink-0 mt-1" />
+                        <span>{cleanLine}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             </div>
@@ -271,9 +278,23 @@ export default function RepoPage() {
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { icon: PlusCircle, title: 'Vytvořit aplikaci', desc: 'Na Trakt.tv v sekci API Apps vytvořte novou aplikaci.' },
-              { icon: LinkIcon, title: 'Redirect URI', desc: 'Jako Redirect URI použijte:', code: 'urn:ietf:wg:oauth:2.0:oob' },
-              { icon: Key, title: 'Client ID & Secret', desc: 'Zkopírujte údaje do nastavení doplňku a aktivujte zařízení.' }
+              { 
+                icon: PlusCircle, 
+                title: 'Vytvořit aplikaci', 
+                desc: 'Na Trakt.tv v sekci API Apps vytvořte novou aplikaci.',
+                link: 'https://trakt.tv/oauth/applications/new'
+              },
+              { 
+                icon: LinkIcon, 
+                title: 'Redirect URI', 
+                desc: 'Jako Redirect URI použijte:', 
+                code: 'urn:ietf:wg:oauth:2.0:oob' 
+              },
+              { 
+                icon: Key, 
+                title: 'Client ID & Secret', 
+                desc: 'Zkopírujte údaje do nastavení doplňku a aktivujte zařízení.' 
+              }
             ].map((item, i) => (
               <div key={i} className="p-8 bg-zinc-900/50 rounded-3xl border border-white/5 space-y-4 hover:bg-zinc-900 transition-all">
                 <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center">
@@ -281,6 +302,16 @@ export default function RepoPage() {
                 </div>
                 <h3 className="text-xl font-bold">{item.title}</h3>
                 <p className="text-zinc-400 text-sm leading-relaxed">{item.desc}</p>
+                {item.link && (
+                  <a 
+                    href={item.link} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-block text-blue-400 hover:text-blue-300 text-sm font-medium underline underline-offset-4"
+                  >
+                    Otevřít Trakt API →
+                  </a>
+                )}
                 {item.code && (
                   <code className="block bg-black/40 p-2 rounded-lg text-blue-300 text-xs font-mono break-all border border-white/5">
                     {item.code}

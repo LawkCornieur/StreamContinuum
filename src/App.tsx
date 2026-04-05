@@ -6,8 +6,8 @@ import RepoPage from './pages/Repo';
 export default function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">
-        <main className="flex-grow min-h-screen relative">
+      <div className="min-h-screen bg-zinc-950 text-zinc-100">
+        <main className="min-h-screen relative">
           <AnimatePresence mode="wait">
             <Routes>
               <Route path="/" element={<RepoPage />} />

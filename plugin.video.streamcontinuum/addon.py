@@ -398,6 +398,14 @@ def run():
         list_categories()
     elif action == 'trakt_auth':
         trakt.authenticate()
+    elif action == 'trakt_refresh':
+        user_info = trakt.get_user_info()
+        if user_info:
+            username = user_info.get('username', 'Připojeno')
+            ADDON.setSetting('trakt_username', username)
+            xbmcgui.Dialog().notification("Trakt.tv", f"Stav obnoven: {username}", xbmcgui.NOTIFICATION_INFO)
+        else:
+            xbmcgui.Dialog().notification("Trakt.tv", "Nepodařilo se obnovit stav", xbmcgui.NOTIFICATION_ERROR)
     elif action == 'trakt_logout':
         ADDON.setSetting('trakt_token', '')
         ADDON.setSetting('trakt_username', 'Nepřipojeno')

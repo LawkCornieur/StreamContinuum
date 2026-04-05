@@ -3,6 +3,7 @@
     <category label="30000">
         <setting id="trakt_username" type="text" label="30003" default="Nepřipojeno" enable="false" />
         <setting id="trakt_auth_btn" type="action" label="30004" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_auth)" />
+        <setting id="trakt_refresh" type="action" label="Obnovit stav Trakt.tv" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_refresh)" />
         <setting id="trakt_token" type="text" label="" visible="false" default="" />
         <setting id="trakt_client_id" type="text" label="30031" default="" />
         <setting id="trakt_id_paste" type="action" label="Vložit Client ID ze schránky" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=paste_from_clipboard&amp;target=trakt_client_id)" />
