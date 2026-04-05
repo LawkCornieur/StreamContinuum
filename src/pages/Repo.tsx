@@ -43,8 +43,7 @@ export default function RepoPage() {
               transition={{ delay: 0.2 }}
               className="text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto"
             >
-              Moderní doplněk pro Kodi s integrací Trakt.tv a Webshare.cz. 
-              Vše, co potřebujete pro dokonalý filmový zážitek.
+              Jednoduchý stream doplněk pro Kodi s integrací Trakt.tv a Webshare.cz.
             </motion.p>
           </div>
           
@@ -98,34 +97,18 @@ export default function RepoPage() {
                 </div>
               </div>
 
-              {/* Screenshots & Description */}
+              {/* Description */}
               <div className="flex-1 space-y-8">
-                {/* Screenshots Grid */}
-                <div className="grid grid-cols-3 gap-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="aspect-video bg-zinc-200 dark:bg-zinc-950 rounded-2xl border border-black/5 dark:border-white/5 overflow-hidden relative group cursor-zoom-in">
-                      <img 
-                        src={`https://picsum.photos/seed/streamcontinuum-${i}/800/450`} 
-                        alt={`Screenshot ${i}`} 
-                        className="w-full h-full object-cover opacity-80 dark:opacity-60 group-hover:opacity-100 transition-all group-hover:scale-105" 
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
-                        <Play className="w-8 h-8 text-white fill-white" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
                 {/* Description Box */}
                 <div className="flex gap-8">
                   <div className="flex-1 bg-white dark:bg-zinc-950/50 p-8 rounded-3xl border border-black/5 dark:border-white/5 space-y-4">
-                    <h3 className="text-xl font-bold text-blue-600 dark:text-blue-400">Jednoduchý stream doplněk s integrací Trakt.tv a Webshare.</h3>
+                    <h3 className="text-xl font-bold text-blue-600 dark:text-blue-400">Jednoduchý stream doplněk pro Kodi s integrací Trakt.tv a Webshare.cz.</h3>
                     <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
                       StreamContinuum umožňuje prohlížet a přehrávat obsah z Webshare.cz s plnou synchronizací Trakt.tv a lokální historií. 
                       Doplněk je navržen pro maximální rychlost a přehlednost v prostředí Kodi.
                     </p>
                     <p className="text-zinc-500 dark:text-zinc-600 text-xs italic">
-                      This addon does not host any content. It is a tool to access third-party services.
+                      Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
                     </p>
                   </div>
 
@@ -185,9 +168,9 @@ export default function RepoPage() {
             
             <div className="space-y-6">
               {[
-                { step: 1, title: 'Přidat zdroj', desc: 'V Kodi jděte do Správce souborů -> Přidat zdroj a zadejte adresu:', code: 'https://lawkcornieur.github.io/StreamContinuum/' },
-                { step: 2, title: 'Instalovat ze ZIP', desc: 'Jděte do Doplňky -> Instalovat ze souboru zip a vyberte přidaný zdroj.' },
-                { step: 3, title: 'Instalovat doplněk', desc: 'Jděte do Instalovat z repozitáře -> StreamContinuum Repo -> Doplňky videí -> StreamContinuum.' }
+                { step: 1, title: 'Přidat zdroj repozitáře', desc: 'V Kodi jděte do Nastavení -> Správce souborů -> Přidat zdroj. Jako cestu zadejte:', code: 'https://lawkcornieur.github.io/StreamContinuum/' },
+                { step: 2, title: 'Nainstalovat repozitář', desc: 'Jděte do Doplňky -> Instalovat ze souboru zip. Vyberte přidaný zdroj a nainstalujte soubor repository.streamcontinuum.zip.' },
+                { step: 3, title: 'Nainstalovat doplněk', desc: 'Jděte do Instalovat z repozitáře -> StreamContinuum Repository -> Doplňky videí -> StreamContinuum a klikněte na Instalovat.' }
               ].map((item) => (
                 <div key={item.step} className="flex gap-6 p-6 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 hover:border-blue-500/30 transition-all group shadow-sm">
                   <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl flex-shrink-0 shadow-lg shadow-blue-900/20 group-hover:scale-110 transition-transform">
@@ -239,86 +222,51 @@ export default function RepoPage() {
           </section>
         </div>
 
-        {/* Features Section */}
-        <section className="space-y-12">
-          <div className="text-center space-y-4">
-            <div className="inline-flex p-3 bg-blue-500/10 rounded-2xl mb-4">
-              <Layers className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h2 className="text-4xl font-bold">Klíčové vlastnosti</h2>
-            <p className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">Všechny funkce, které očekáváte od moderního doplňku.</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { title: 'Trakt.tv Synchronizace', desc: 'Sledujte svou historii, watchlist a hodnocení napříč všemi zařízeními.' },
-              { title: 'Webshare.cz Integrace', desc: 'Přímý přístup k tisícům streamů ve vysoké kvalitě.' },
-              { title: 'Chytrá Historie', desc: 'Rychlý přístup k naposledy sledovaným dílům s funkcí "Další epizoda".' },
-              { title: 'Moderní UI', desc: 'Čisté a přehledné rozhraní optimalizované pro dálkové ovládání.' },
-              { title: 'Rychlé Hledání', desc: 'Pokročilé vyhledávání s podporou různých oddělovačů a formátů.' },
-              { title: 'Automatické Aktualizace', desc: 'Repozitář se stará o to, abyste měli vždy nejnovější verzi.' }
-            ].map((feature, i) => (
-              <div key={i} className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all shadow-sm">
-                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">{feature.desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Trakt Config */}
+        {/* Configuration Section */}
         <section className="space-y-12">
           <div className="text-center space-y-4">
             <div className="inline-flex p-3 bg-amber-500/10 rounded-2xl mb-4">
               <Settings2 className="w-8 h-8 text-amber-600 dark:text-amber-400" />
             </div>
-            <h2 className="text-4xl font-bold">Konfigurace Trakt.tv</h2>
-            <p className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">Pro plnou funkčnost doplňku je nutné propojit váš Trakt.tv účet.</p>
+            <h2 className="text-4xl font-bold">Konfigurace</h2>
+            <p className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">Pro plnou funkčnost doplňku je nutné nastavit Webshare a Trakt.tv.</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { 
-                icon: PlusCircle, 
-                title: 'Vytvořit aplikaci', 
-                desc: 'Na Trakt.tv v sekci API Apps vytvořte novou aplikaci.',
-                link: 'https://trakt.tv/oauth/applications/new'
-              },
-              { 
-                icon: LinkIcon, 
-                title: 'Redirect URI', 
-                desc: 'Jako Redirect URI použijte:', 
-                code: 'urn:ietf:wg:oauth:2.0:oob' 
-              },
-              { 
-                icon: Key, 
-                title: 'Client ID & Secret', 
-                desc: 'Zkopírujte údaje do nastavení doplňku a aktivujte zařízení.' 
-              }
-            ].map((item, i) => (
-              <div key={i} className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 space-y-4 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all shadow-sm">
-                <div className="w-12 h-12 rounded-2xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
-                  <item.icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                </div>
-                <h3 className="text-xl font-bold">{item.title}</h3>
-                <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">{item.desc}</p>
-                {item.link && (
-                  <a 
-                    href={item.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="inline-block text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium underline underline-offset-4"
-                  >
-                    Otevřít Trakt API →
-                  </a>
-                )}
-                {item.code && (
-                  <code className="block bg-zinc-200 dark:bg-black/40 p-2 rounded-lg text-blue-700 dark:text-blue-300 text-xs font-mono break-all border border-black/5 dark:border-white/5">
-                    {item.code}
-                  </code>
-                )}
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 space-y-4 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                <Key className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
-            ))}
+              <h3 className="text-xl font-bold">1. Webshare.cz</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
+                Po instalaci přejděte do nastavení doplňku. V sekci <strong>Webshare</strong> zadejte své uživatelské jméno a heslo.
+              </p>
+            </div>
+
+            <div className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 space-y-4 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                <LinkIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-xl font-bold">2. Trakt.tv (API Nastavení)</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
+                Pro fungování Trakt.tv integrace si musí každý uživatel vytvořit vlastní API aplikaci na Trakt.tv.
+              </p>
+              <ul className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed list-disc list-inside space-y-1">
+                <li>Přihlaste se na Trakt.tv a přejděte do Settings -&gt; API Apps.</li>
+                <li>Klikněte na New Application a vyplňte libovolný název.</li>
+                <li>Do pole Redirect URI zadejte: <code className="bg-zinc-200 dark:bg-black/40 px-1 rounded">urn:ietf:wg:oauth:2.0:oob</code></li>
+                <li>Uložte aplikaci a zkopírujte si Client ID a Client Secret do nastavení doplňku.</li>
+                <li>Poté klikněte na Aktivovat zařízení a zadejte kód na trakt.tv/activate.</li>
+              </ul>
+              <a 
+                href="https://trakt.tv/oauth/applications/new" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-block text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium underline underline-offset-4 mt-2"
+              >
+                Otevřít Trakt API →
+              </a>
+            </div>
           </div>
         </section>
       </main>
