@@ -17,7 +17,7 @@ Jednoduchý stream doplněk pro Kodi s integrací Trakt.tv a Webshare.cz.
 3. Vyberte **Instalovat ze souboru zip**.
 4. Pokud se zobrazí varování o neznámých zdrojích, povolte je v nastavení.
 5. Najděte přidaný zdroj `StreamContinuum Repo`.
-6. Vyberte soubor `repository.streamcontinuum-1.0.0.zip`.
+6. Vyberte soubor `repository.streamcontinuum-1.0.9.zip`.
 
 ### 3. Nainstalujte doplněk StreamContinuum
 1. Vyberte **Instalovat z repozitáře**.
@@ -44,3 +44,23 @@ Pro fungování Trakt.tv integrace si musí každý uživatel vytvořit vlastní
 
 ---
 Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
+
+
+## Seznam změn
+
+**Verze 1.1.3**
+- Oprava hlavního menu (odstranění nefunkční hlavičky)
+- Přidány navigační drobky (nadpisy sekcí)
+- Vylepšení ikon v menu
+- Oprava zobrazení historie změn
+
+**Verze 1.1.2**
+- Modernizované hlavní menu
+- Rozšířené možnosti v historii (E+1, S+1, Trakt search)
+- Možnost označit/odznačit zhlédnuté na Trakt.tv
+- Optimalizace historie
+
+**Verze 1.1.1**
+- Oprava vyhledávání na Webshare
+- Podpora pro Trakt.tv watchlist
+- Základní historie hledání
