@@ -25,12 +25,13 @@ export default function SearchPage() {
   const handleSearch = async (e?: FormEvent, forcedQuery?: string) => {
     if (e) e.preventDefault();
     const searchQuery = forcedQuery || query;
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim()) return [];
 
     setLoading(true);
     const data = await traktService.search(searchQuery, type);
     setResults(data);
     setLoading(false);
+    return data;
   };
 
   const handleWebshareSearch = async (media: any, episode?: any) => {
@@ -38,11 +39,12 @@ export default function SearchPage() {
     
     if (episode) {
       searchQuery = `${media.title} S${episode.season.toString().padStart(2, '0')}E${episode.number.toString().padStart(2, '0')}`;
+    } else if (media.title && media.year) {
+      // If it's a movie/show object with title and year
+      searchQuery = `${media.title} ${media.year}`;
     } else if (media.title) {
       // If it's a raw title (e.g. from history auto-search)
       searchQuery = media.title;
-    } else {
-      searchQuery = `${media.title} ${media.year || ''}`;
     }
     
     // Apply separator if not space
@@ -77,11 +79,12 @@ export default function SearchPage() {
       setQuery(state.query);
       if (state.type) setType(state.type);
       if (state.autoSearch) {
-        handleSearch(undefined, state.query).then(() => {
-          if (state.webshare) {
-            // If it's a direct webshare search from history, we might not have the full media object yet
-            // But we can try to search Webshare with the query directly
-            handleWebshareSearch({ title: state.query, type: state.type || 'movie' });
+        handleSearch(undefined, state.query).then(async (data) => {
+          if (state.webshare && data && data.length > 0) {
+            const firstResult = data[0];
+            await handleMediaClick(firstResult);
+            // Use the original query from state for the webshare search
+            handleWebshareSearch({ title: state.query });
           }
         });
       }

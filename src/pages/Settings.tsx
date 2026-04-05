@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings as SettingsIcon, Key, Database, Globe, Shield, LogOut, Smartphone, Cloud, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Key, Database, Globe, Shield, LogOut, Smartphone, Cloud, Loader2, CheckCircle2, AlertCircle, ClipboardPaste } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { traktService, setTraktAuth } from '../lib/trakt';
 import { webshareService } from '../lib/webshare';
@@ -95,6 +95,16 @@ export default function SettingsPage() {
     toast.success('Webshare odhlášen');
   };
 
+  const handlePaste = async (setter: (val: string) => void) => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setter(text);
+      toast.success('Vloženo ze schránky');
+    } catch (err) {
+      toast.error('Nepodařilo se číst ze schránky. Ujistěte se, že máte povolen přístup.');
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -131,21 +141,39 @@ export default function SettingsPage() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-zinc-400">Client ID</label>
-                <input
-                  type="password"
-                  value={traktId}
-                  onChange={(e) => setTraktId(e.target.value)}
-                  className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all"
-                />
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={traktId}
+                    onChange={(e) => setTraktId(e.target.value)}
+                    className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all"
+                  />
+                  <button 
+                    onClick={() => handlePaste(setTraktId)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-white transition-colors"
+                    title="Vložit ze schránky"
+                  >
+                    <ClipboardPaste className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-zinc-400">Client Secret</label>
-                <input
-                  type="password"
-                  value={traktSecret}
-                  onChange={(e) => setTraktSecret(e.target.value)}
-                  className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all"
-                />
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={traktSecret}
+                    onChange={(e) => setTraktSecret(e.target.value)}
+                    className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all"
+                  />
+                  <button 
+                    onClick={() => handlePaste(setTraktSecret)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-white transition-colors"
+                    title="Vložit ze schránky"
+                  >
+                    <ClipboardPaste className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -222,21 +250,39 @@ export default function SettingsPage() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-400">Uživatelské jméno</label>
-                  <input
-                    type="text"
-                    value={wsUsername}
-                    onChange={(e) => setWsUsername(e.target.value)}
-                    className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={wsUsername}
+                      onChange={(e) => setWsUsername(e.target.value)}
+                      className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    />
+                    <button 
+                      onClick={() => handlePaste(setWsUsername)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-white transition-colors"
+                      title="Vložit ze schránky"
+                    >
+                      <ClipboardPaste className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-400">Heslo</label>
-                  <input
-                    type="password"
-                    value={wsPassword}
-                    onChange={(e) => setWsPassword(e.target.value)}
-                    className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  />
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={wsPassword}
+                      onChange={(e) => setWsPassword(e.target.value)}
+                      className="w-full bg-zinc-950 border border-white/10 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    />
+                    <button 
+                      onClick={() => handlePaste(setWsPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-white transition-colors"
+                      title="Vložit ze schránky"
+                    >
+                      <ClipboardPaste className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
               <button
