@@ -48,6 +48,11 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.1.5**
+- Kompletní lokalizace do angličtiny a češtiny
+- Přidána podpora pro tmavý režim na webu repozitáře
+- Oprava aktualizačního mechanismu doplňku
+
 **Verze 1.1.4**
 - Oprava vyhledávání z historie (automatické spuštění)
 - Synchronizace verze s repozitářem

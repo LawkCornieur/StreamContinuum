@@ -241,7 +241,12 @@ def trakt_search(query):
     xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.1.4[/B]\n"
+    changelog = "[B]Verze 1.1.5[/B]\n"
+    changelog += "- Kompletní lokalizace do angličtiny a češtiny\n"
+    changelog += "- Přidána podpora pro tmavý režim na webu repozitáře\n"
+    changelog += "- Oprava aktualizačního mechanismu doplňku\n\n"
+    
+    changelog += "[B]Verze 1.1.4[/B]\n"
     changelog += "- Oprava vyhledávání z historie (automatické spuštění)\n"
     changelog += "- Synchronizace verze s repozitářem\n\n"
     
