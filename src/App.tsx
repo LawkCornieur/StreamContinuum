@@ -1,7 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { LayoutDashboard, Search, History, Settings, Monitor } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
+import { setTraktAuth } from './lib/trakt';
 
 import Dashboard from './pages/Dashboard';
 import SearchPage from './pages/Search';
@@ -64,6 +66,14 @@ function Navigation() {
 }
 
 export default function App() {
+  useEffect(() => {
+    const traktId = localStorage.getItem('trakt_client_id');
+    const traktToken = localStorage.getItem('trakt_access_token');
+    if (traktId) {
+      setTraktAuth(traktId, traktToken || undefined);
+    }
+  }, []);
+
   return (
     <Router>
       <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">

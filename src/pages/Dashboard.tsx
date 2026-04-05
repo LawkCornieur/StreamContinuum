@@ -14,13 +14,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     const loadData = async () => {
-      const [localHistory, trendingMovies] = await Promise.all([
-        localDB.getHistory(),
-        traktService.getTrending('movies')
-      ]);
-      setHistory(localHistory.slice(0, 5));
-      setTrending(trendingMovies);
-      setLoading(false);
+      try {
+        const [localHistory, trendingMovies] = await Promise.all([
+          localDB.getHistory(),
+          traktService.getTrending('movies').catch(() => [])
+        ]);
+        setHistory(localHistory.slice(0, 5));
+        setTrending(trendingMovies);
+      } catch (err) {
+        console.error('Chyba při načítání dat dashboardu:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
   }, []);
@@ -35,7 +40,7 @@ export default function Dashboard() {
       {/* Hero Section / Banner */}
       <section className="relative h-[400px] rounded-3xl overflow-hidden group">
         <img
-          src="https://ais-dev-bf2mxtqt57uvd5noqh4wug-186940847534.asia-southeast1.run.app/banner.jpg" 
+          src="fanart.jpg" 
           alt="StreamContinuum Banner"
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           onError={(e) => {

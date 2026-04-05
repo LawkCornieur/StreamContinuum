@@ -4,10 +4,14 @@ import crypto from 'crypto';
 import AdmZip from 'adm-zip';
 
 const addonsDir = '.';
-const addonsXmlPath = 'addons.xml';
-const addonsXmlMd5Path = 'addons.xml.md5';
+const publicDir = 'public';
+const addonsXmlPath = path.join(publicDir, 'addons.xml');
+const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
 
 async function generateRepo() {
+    // Ensure public directory exists for Vite
+    if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir);
+
     let addonsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<addons>\n';
     
     // Extract changelog from addon.py
@@ -24,7 +28,10 @@ async function generateRepo() {
             for (const line of lines) {
                 if (line.includes('def show_changelog():')) inChangelog = true;
                 if (inChangelog && line.includes('changelog += "')) {
-                    changelog += line.match(/changelog \+= "([\s\S]*?)"/)[1].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
+                    const match = line.match(/changelog \+= "([\s\S]*?)"/);
+                    if (match) {
+                        changelog += match[1].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
+                    }
                 }
                 if (inChangelog && line.includes('xbmcgui.Dialog().textviewer')) break;
             }
@@ -33,48 +40,35 @@ async function generateRepo() {
 
     const dirs = fs.readdirSync(addonsDir).filter(f => {
         const fullPath = path.join(addonsDir, f);
-        return fs.statSync(fullPath).isDirectory() && !f.startsWith('.') && f !== 'node_modules' && f !== 'src' && f !== 'public';
+        return fs.statSync(fullPath).isDirectory() && !f.startsWith('.') && f !== 'node_modules' && f !== 'src' && f !== 'public' && f !== 'dist';
     });
     
-    // Ensure public directory exists for Vite
-    if (!fs.existsSync('public')) fs.mkdirSync('public');
-
     let latestPluginVersion = '1.0.0';
     let latestRepoVersion = '1.0.0';
 
     for (const addonId of dirs) {
-        const addonXmlPath = path.join(addonId, 'addon.xml');
-        if (fs.existsSync(addonXmlPath)) {
+        const addonXmlFile = path.join(addonId, 'addon.xml');
+        if (fs.existsSync(addonXmlFile)) {
             try {
                 console.log(`Processing ${addonId}...`);
                 
                 // Sync images from root to addon directory and public
                 if (fs.existsSync('icon.png')) {
                     fs.copyFileSync('icon.png', path.join(addonId, 'icon.png'));
-                    fs.copyFileSync('icon.png', 'public/icon.png');
+                    fs.copyFileSync('icon.png', path.join(publicDir, 'icon.png'));
                 }
                 if (fs.existsSync('fanart.jpg')) {
                     fs.copyFileSync('fanart.jpg', path.join(addonId, 'fanart.jpg'));
-                    fs.copyFileSync('fanart.jpg', 'public/fanart.jpg');
-                }
-
-                // Also ensure they are in root if we're processing the main plugin
-                if (addonId === 'plugin.video.streamcontinuum') {
-                    if (fs.existsSync(path.join(addonId, 'icon.png')) && !fs.existsSync('icon.png')) {
-                        fs.copyFileSync(path.join(addonId, 'icon.png'), 'icon.png');
-                    }
-                    if (fs.existsSync(path.join(addonId, 'fanart.jpg')) && !fs.existsSync('fanart.jpg')) {
-                        fs.copyFileSync(path.join(addonId, 'fanart.jpg'), 'fanart.jpg');
-                    }
+                    fs.copyFileSync('fanart.jpg', path.join(publicDir, 'fanart.jpg'));
                 }
 
                 // Read addon.xml
-                let content = fs.readFileSync(addonXmlPath, 'utf-8');
+                let content = fs.readFileSync(addonXmlFile, 'utf-8');
                 
                 // Extract version from <addon ... version="..."
                 const versionMatch = content.match(/<addon[^>]*version="([^"]+)"/);
                 if (!versionMatch) {
-                    console.error(`Could not find version in ${addonXmlPath}`);
+                    console.error(`Could not find version in ${addonXmlFile}`);
                     continue;
                 }
                 const version = versionMatch[1];
@@ -117,14 +111,23 @@ async function generateRepo() {
                 zip.writeZip(zipPath);
                 console.log(`Created ${zipPath}`);
                 
-                // Copy current version to root and clean up old root versions for this addon
-                const rootZipName = zipName;
-                const oldRootZips = fs.readdirSync('.').filter(f => f.startsWith(addonId) && f.endsWith('.zip') && f !== rootZipName);
+                // Copy current version to public and clean up old public versions for this addon
+                const publicZipPath = path.join(publicDir, zipName);
+                const oldPublicZips = fs.readdirSync(publicDir).filter(f => f.startsWith(addonId) && f.endsWith('.zip') && f !== zipName);
+                for (const oldPublicZip of oldPublicZips) {
+                    fs.unlinkSync(path.join(publicDir, oldPublicZip));
+                }
+                fs.copyFileSync(zipPath, publicZipPath);
+                
+                // Also copy to root for backward compatibility if needed, but public is primary
+                const rootZipPath = zipName;
+                const oldRootZips = fs.readdirSync('.').filter(f => f.startsWith(addonId) && f.endsWith('.zip') && f !== zipName);
                 for (const oldRootZip of oldRootZips) {
                     fs.unlinkSync(oldRootZip);
                 }
-                fs.copyFileSync(zipPath, rootZipName);
-                console.log(`Copied ${rootZipName} to root.`);
+                fs.copyFileSync(zipPath, rootZipPath);
+                
+                console.log(`Copied ${zipName} to public and root.`);
                 
             } catch (err) {
                 console.error(`Error processing ${addonId}:`, err);
@@ -134,14 +137,16 @@ async function generateRepo() {
     
     addonsXml += '</addons>\n';
     
-    // Write addons.xml
+    // Write addons.xml to root and public
+    fs.writeFileSync('addons.xml', addonsXml);
     fs.writeFileSync(addonsXmlPath, addonsXml);
     
-    // Generate MD5
+    // Generate MD5 for root and public
     const md5 = crypto.createHash('md5').update(addonsXml).digest('hex');
+    fs.writeFileSync('addons.xml.md5', md5);
     fs.writeFileSync(addonsXmlMd5Path, md5);
     
-    console.log('Generated addons.xml and addons.xml.md5 successfully.');
+    console.log('Generated addons.xml and addons.xml.md5 successfully in root and public.');
 
     // Update README.md
     const readmePath = 'README.md';
@@ -173,6 +178,27 @@ async function generateRepo() {
     };
     fs.writeFileSync(repoDataPath, JSON.stringify(repoData, null, 2));
     console.log('Updated src/repo_data.json');
+
+    // Copy dist content to root for GitHub Pages
+    const distPath = path.join(process.cwd(), 'dist');
+    if (fs.existsSync(distPath)) {
+        console.log('Copying dist content to root for GitHub Pages...');
+        const files = fs.readdirSync(distPath);
+        files.forEach(file => {
+            const src = path.join(distPath, file);
+            const dest = path.join(process.cwd(), file);
+            if (fs.statSync(src).isDirectory()) {
+                if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+                const subFiles = fs.readdirSync(src);
+                subFiles.forEach(subFile => {
+                    fs.copyFileSync(path.join(src, subFile), path.join(dest, subFile));
+                });
+            } else {
+                fs.copyFileSync(src, dest);
+            }
+        });
+        console.log('Website files copied to root.');
+    }
 
     // Update index.html kodi-listing section ONLY
     const indexPath = 'index.html';
