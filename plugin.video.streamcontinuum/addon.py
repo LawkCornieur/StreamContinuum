@@ -23,19 +23,19 @@ def list_categories():
 
     if trakt_token:
         items = [
-            ('Pokračovat ve sledování', 'trakt_playback', 'DefaultRecentlyAddedEpisodes.png'),
-            ('Seznam k zhlédnutí', 'trakt_watchlist', 'DefaultWatchlist.png'),
-            ('Hledat', 'search', 'DefaultAddonsSearch.png'),
-            ('Historie', 'history', 'DefaultHistory.png'),
-            ('Nastavení', 'settings', 'DefaultAddonSettings.png')
+            (ADDON.getLocalizedString(30050), 'trakt_playback', 'DefaultRecentlyAddedEpisodes.png'),
+            (ADDON.getLocalizedString(30051), 'trakt_watchlist', 'DefaultWatchlist.png'),
+            (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png'),
+            (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png'),
+            (ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png')
         ]
     else:
         items = [
-            ('Populární filmy', 'trending_movies', 'DefaultMovies.png'),
-            ('Populární seriály', 'trending_shows', 'DefaultTVShows.png'),
-            ('Hledat', 'search', 'DefaultAddonsSearch.png'),
-            ('Historie', 'history', 'DefaultHistory.png'),
-            ('Nastavení', 'settings', 'DefaultAddonSettings.png')
+            (ADDON.getLocalizedString(30055), 'trending_movies', 'DefaultMovies.png'),
+            (ADDON.getLocalizedString(30056), 'trending_shows', 'DefaultTVShows.png'),
+            (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png'),
+            (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png'),
+            (ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png')
         ]
     
     for label, action, icon in items:
@@ -49,7 +49,7 @@ def list_categories():
 
 def search(query=None):
     if not query:
-        keyboard = xbmc.Keyboard('', 'Hledat na Webshare')
+        keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30057))
         keyboard.doModal()
         if keyboard.isConfirmed():
             query = keyboard.getText()
@@ -58,10 +58,10 @@ def search(query=None):
             return
 
     if query:
-        xbmcplugin.setPluginCategory(HANDLE, f"Hledat: {query}")
+        xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30052)}: {query}")
         results = webshare.search(query)
         if not results:
-            xbmcgui.Dialog().notification("StreamContinuum", "Nebyly nalezeny žádné výsledky", xbmcgui.NOTIFICATION_INFO, 3000)
+            xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
             xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
             return
         
@@ -106,7 +106,7 @@ def search(query=None):
                 info['plot'] = f"[COLOR orange][{', '.join(audio_info)}][/COLOR] " + info['plot']
             
             # Add file info to plot
-            info['plot'] += f"\n\n[B]Velikost:[/B] {size_mb} MB\n[B]Kvalita:[/B] {res}p"
+            info['plot'] += f"\n\n[B]{ADDON.getLocalizedString(30059)}:[/B] {size_mb} MB\n[B]{ADDON.getLocalizedString(30060)}:[/B] {res}p"
             
             list_item.setInfo('video', info)
             
@@ -149,16 +149,16 @@ def play(ident, query=None, title=None):
             import history
             history.add_to_history(query, title)
     else:
-        xbmcgui.Dialog().notification("StreamContinuum", "Nepodařilo se získat odkaz k přehrání", xbmcgui.NOTIFICATION_ERROR, 3000)
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
 
 def show_history():
     import history
     items = history.get_history()
     
-    xbmcplugin.setPluginCategory(HANDLE, 'Historie')
+    xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
     
     if not items:
-        xbmcgui.Dialog().notification("StreamContinuum", "Historie je prázdná", xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
         
@@ -166,7 +166,7 @@ def show_history():
         query = item.get('query', '')
         title = item.get('title', '')
         
-        label = f"{title} [COLOR gray](Hledáno: {query})[/COLOR]"
+        label = f"{title} [COLOR gray]({ADDON.getLocalizedString(30063)}: {query})[/COLOR]"
         url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}&title={urllib.parse.quote(title)}"
         
         list_item = xbmcgui.ListItem(label=label)
@@ -176,13 +176,13 @@ def show_history():
     xbmcplugin.endOfDirectory(HANDLE)
 
 def history_menu(query, title):
-    xbmcplugin.setPluginCategory(HANDLE, f"Možnosti: {title}")
+    xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {title}")
     
     items = [
-        ('Hledat na Webshare', f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
-        ('Upravit', f'history_edit&title={urllib.parse.quote(title)}&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
-        ('Smazat', f'history_delete&title={urllib.parse.quote(title)}', 'DefaultDelete.png'),
-        ('Hledat na Trakt.tv', f'trakt_search&query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
+        (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
+        (ADDON.getLocalizedString(30065), f'history_edit&title={urllib.parse.quote(title)}&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
+        (ADDON.getLocalizedString(30066), f'history_delete&title={urllib.parse.quote(title)}', 'DefaultDelete.png'),
+        (ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
     ]
     
     # Add episode navigation if it looks like a series
@@ -194,10 +194,10 @@ def history_menu(query, title):
         episode = int(match.group(3))
         
         items.extend([
-            (f'Další díl (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'),
-            (f'Předchozí díl (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png') if episode > 1 else None,
-            (f'Další série (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{base_title} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'),
-            (f'Předchozí série (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{base_title} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png') if season > 1 else None,
+            (f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'),
+            (f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png') if episode > 1 else None,
+            (f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{base_title} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'),
+            (f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{base_title} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png') if season > 1 else None,
         ])
     
     for label, action_params, icon in [i for i in items if i]:
@@ -212,7 +212,7 @@ def trakt_search(query):
     xbmcplugin.setPluginCategory(HANDLE, f"Trakt.tv: {query}")
     results = trakt.search_trakt(query)
     if not results:
-        xbmcgui.Dialog().notification("Trakt.tv", "Nebyly nalezeny žádné výsledky", xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
         
@@ -232,8 +232,8 @@ def trakt_search(query):
         
         # Context menu for marking watched/unwatched
         cm = []
-        cm.append(('Označit jako zhlédnuté', f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
-        cm.append(('Označit jako nezhlédnuté', f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
+        cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
+        cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
         list_item.addContextMenuItems(cm)
         
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
@@ -262,15 +262,15 @@ def show_changelog():
     changelog += "- Podpora pro Trakt.tv watchlist\n"
     changelog += "- Základní historie hledání\n"
     
-    xbmcgui.Dialog().textviewer("StreamContinuum - Seznam změn", changelog)
+    xbmcgui.Dialog().textviewer(f"StreamContinuum - {ADDON.getLocalizedString(30042)}", changelog)
 
 import re
 
 def show_trakt_watchlist():
-    xbmcplugin.setPluginCategory(HANDLE, 'Seznam k zhlédnutí')
+    xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30051))
     items = trakt.get_watchlist()
     if not items:
-        xbmcgui.Dialog().notification("StreamContinuum", "Watchlist je prázdný", xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30074), xbmcgui.NOTIFICATION_INFO, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
         
@@ -308,7 +308,7 @@ def show_trakt_watchlist():
     xbmcplugin.endOfDirectory(HANDLE)
 
 def show_trakt_playback():
-    xbmcplugin.setPluginCategory(HANDLE, 'Pokračovat ve sledování')
+    xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30050))
     # Combine playback (paused) and progress (next episodes)
     playback_items = trakt.get_playback()
     progress_items = trakt.get_progress()
@@ -340,7 +340,7 @@ def show_trakt_playback():
             seen_ids.add(trakt_id)
 
     if not items:
-        xbmcgui.Dialog().notification("StreamContinuum", "Žádné rozehrané položky", xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30075), xbmcgui.NOTIFICATION_INFO, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
         
@@ -371,7 +371,7 @@ def show_trakt_playback():
     xbmcplugin.endOfDirectory(HANDLE)
 
 def search_prefill(query):
-    keyboard = xbmc.Keyboard(query, 'Hledat další díl')
+    keyboard = xbmc.Keyboard(query, ADDON.getLocalizedString(30076))
     keyboard.doModal()
     if keyboard.isConfirmed():
         new_query = keyboard.getText()
@@ -389,10 +389,10 @@ def run():
     # Update Trakt status if token exists but username is not set
     trakt_token = ADDON.getSetting('trakt_token')
     trakt_user = ADDON.getSetting('trakt_username')
-    if trakt_token and (not trakt_user or trakt_user == 'Nepřipojeno'):
+    if trakt_token and (not trakt_user or trakt_user == ADDON.getLocalizedString(30048)):
         user_info = trakt.get_user_info()
         if user_info:
-            ADDON.setSetting('trakt_username', user_info.get('username', 'Připojeno'))
+            ADDON.setSetting('trakt_username', user_info.get('username', ADDON.getLocalizedString(30077)))
 
     if not action:
         list_categories()
@@ -401,15 +401,15 @@ def run():
     elif action == 'trakt_refresh':
         user_info = trakt.get_user_info()
         if user_info:
-            username = user_info.get('username', 'Připojeno')
+            username = user_info.get('username', ADDON.getLocalizedString(30077))
             ADDON.setSetting('trakt_username', username)
-            xbmcgui.Dialog().notification("Trakt.tv", f"Stav obnoven: {username}", xbmcgui.NOTIFICATION_INFO)
+            xbmcgui.Dialog().notification("Trakt.tv", f"{ADDON.getLocalizedString(30078)}: {username}", xbmcgui.NOTIFICATION_INFO)
         else:
-            xbmcgui.Dialog().notification("Trakt.tv", "Nepodařilo se obnovit stav", xbmcgui.NOTIFICATION_ERROR)
+            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30079), xbmcgui.NOTIFICATION_ERROR)
     elif action == 'trakt_logout':
         ADDON.setSetting('trakt_token', '')
-        ADDON.setSetting('trakt_username', 'Nepřipojeno')
-        xbmcgui.Dialog().notification("Trakt.tv", "Odhlášeno", xbmcgui.NOTIFICATION_INFO)
+        ADDON.setSetting('trakt_username', ADDON.getLocalizedString(30048))
+        xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30080), xbmcgui.NOTIFICATION_INFO)
     elif action == 'paste_from_clipboard':
         target = params.get('target')
         try:
@@ -417,12 +417,12 @@ def run():
             clipboard = xbmc.getClipboard()
             if clipboard:
                 ADDON.setSetting(target, clipboard)
-                xbmcgui.Dialog().notification("StreamContinuum", f"Vloženo do {target}", xbmcgui.NOTIFICATION_INFO)
+                xbmcgui.Dialog().notification("StreamContinuum", f"{ADDON.getLocalizedString(30081)} {target}", xbmcgui.NOTIFICATION_INFO)
             else:
-                xbmcgui.Dialog().ok("Chyba", "Schránka je prázdná.")
+                xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30083))
         except AttributeError:
             # Fallback for older Kodi versions or platforms where getClipboard fails
-            xbmcgui.Dialog().ok("Chyba", "Vaše verze Kodi nepodporuje přímý přístup ke schránce. Použijte systémovou klávesnici.")
+            xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30084))
     elif action == 'settings':
         ADDON.openSettings()
     elif action == 'search':
@@ -432,10 +432,10 @@ def run():
     elif action == 'play':
         play(params.get('ident'), params.get('query'), params.get('title'))
     elif action == 'trending_movies':
-        xbmcgui.Dialog().ok("StreamContinuum", "Zde budou populární filmy (připravujeme)")
+        xbmcgui.Dialog().ok("StreamContinuum", f"{ADDON.getLocalizedString(30055)} (WIP)")
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
     elif action == 'trending_shows':
-        xbmcgui.Dialog().ok("StreamContinuum", "Zde budou populární seriály (připravujeme)")
+        xbmcgui.Dialog().ok("StreamContinuum", f"{ADDON.getLocalizedString(30056)} (WIP)")
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
     elif action == 'trakt_watchlist':
         show_trakt_watchlist()
@@ -452,9 +452,9 @@ def run():
         else:
             success = trakt.mark_unwatched(media_type, trakt_id)
         if success:
-            xbmcgui.Dialog().notification("Trakt.tv", "Úspěšně aktualizováno", xbmcgui.NOTIFICATION_INFO, 2000)
+            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
         else:
-            xbmcgui.Dialog().notification("Trakt.tv", "Chyba při aktualizaci", xbmcgui.NOTIFICATION_ERROR, 2000)
+            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30086), xbmcgui.NOTIFICATION_ERROR, 2000)
     elif action == 'history':
         show_history()
     elif action == 'history_menu':
@@ -466,7 +466,7 @@ def run():
     elif action == 'history_edit':
         old_title = params.get('title')
         old_query = params.get('query')
-        keyboard = xbmc.Keyboard(old_query, 'Upravit hledání')
+        keyboard = xbmc.Keyboard(old_query, ADDON.getLocalizedString(30087))
         keyboard.doModal()
         if keyboard.isConfirmed():
             new_query = keyboard.getText()

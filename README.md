@@ -17,7 +17,7 @@ Jednoduchý stream doplněk pro Kodi s integrací Trakt.tv a Webshare.cz.
 3. Vyberte **Instalovat ze souboru zip**.
 4. Pokud se zobrazí varování o neznámých zdrojích, povolte je v nastavení.
 5. Najděte přidaný zdroj `StreamContinuum Repo`.
-6. Vyberte soubor `repository.streamcontinuum-1.0.9.zip`.
+6. Vyberte soubor `repository.streamcontinuum-1.1.0.zip`.
 
 ### 3. Nainstalujte doplněk StreamContinuum
 1. Vyberte **Instalovat z repozitáře**.

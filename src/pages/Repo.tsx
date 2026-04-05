@@ -10,15 +10,15 @@ export default function RepoPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen bg-zinc-950 text-zinc-100"
+      className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-300"
     >
       {/* Hero Section */}
       <div className="relative overflow-hidden py-24 px-6">
         <div 
-          className="absolute inset-0 bg-cover bg-center opacity-20 grayscale"
+          className="absolute inset-0 bg-cover bg-center opacity-10 dark:opacity-20 grayscale"
           style={{ backgroundImage: "url('fanart.jpg')" }}
         ></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/50 via-zinc-950 to-zinc-950"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-white/50 via-white to-white dark:from-zinc-950/50 dark:via-zinc-950 dark:to-zinc-950"></div>
         
         <div className="relative max-w-5xl mx-auto text-center space-y-8">
           <motion.img 
@@ -33,7 +33,7 @@ export default function RepoPage() {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.1 }}
-              className="text-6xl font-bold tracking-tighter bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent"
+              className="text-6xl font-bold tracking-tighter bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent"
             >
               StreamContinuum
             </motion.h1>
@@ -41,7 +41,7 @@ export default function RepoPage() {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="text-xl text-zinc-400 max-w-2xl mx-auto"
+              className="text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto"
             >
               Moderní doplněk pro Kodi s integrací Trakt.tv a Webshare.cz. 
               Vše, co potřebujete pro dokonalý filmový zážitek.
@@ -58,7 +58,7 @@ export default function RepoPage() {
               <Download className="w-5 h-5 group-hover:bounce" />
               Stáhnout Repozitář (v{repoData.latestRepoVersion})
             </a>
-            <a href="#install" className="bg-zinc-900 hover:bg-zinc-800 text-white px-8 py-4 rounded-2xl font-bold transition-all border border-white/5 flex items-center gap-3">
+            <a href="#install" className="bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white px-8 py-4 rounded-2xl font-bold transition-all border border-black/5 dark:border-white/5 flex items-center gap-3">
               <BookOpen className="w-5 h-5" />
               Návod k instalaci
             </a>
@@ -69,12 +69,12 @@ export default function RepoPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="max-w-2xl mx-auto p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-4 text-left"
+            className="max-w-2xl mx-auto p-4 bg-amber-100 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-4 text-left"
           >
-            <AlertTriangle className="w-8 h-8 text-amber-500 flex-shrink-0" />
+            <AlertTriangle className="w-8 h-8 text-amber-600 dark:text-amber-500 flex-shrink-0" />
             <div>
-              <p className="text-amber-500 font-bold text-sm uppercase tracking-wider">Upozornění</p>
-              <p className="text-zinc-400 text-sm">Doplněk je v aktivním vývoji. Může obsahovat chyby nebo nedokončené funkce. Pravidelně aktualizujte repozitář pro nejnovější opravy.</p>
+              <p className="text-amber-700 dark:text-amber-500 font-bold text-sm uppercase tracking-wider">Upozornění</p>
+              <p className="text-amber-900/70 dark:text-zinc-400 text-sm">Doplněk je v aktivním vývoji. Může obsahovat chyby nebo nedokončené funkce. Pravidelně aktualizujte repozitář pro nejnovější opravy.</p>
             </div>
           </motion.div>
         </div>
@@ -82,13 +82,13 @@ export default function RepoPage() {
 
       {/* Kodi Style Info Section */}
       <section className="max-w-6xl mx-auto px-6 py-12">
-        <div className="bg-zinc-900/80 backdrop-blur-xl rounded-[2.5rem] border border-white/5 overflow-hidden shadow-2xl">
+        <div className="bg-zinc-50 dark:bg-zinc-900/80 backdrop-blur-xl rounded-[2.5rem] border border-black/5 dark:border-white/5 overflow-hidden shadow-2xl">
           {/* Header */}
           <div className="p-12 space-y-12">
             <div className="flex flex-col md:flex-row gap-12 items-start">
               {/* Logo & Basic Info */}
               <div className="w-full md:w-1/3 space-y-6">
-                <div className="aspect-square bg-zinc-950 rounded-[2rem] p-8 shadow-inner border border-white/5 relative group">
+                <div className="aspect-square bg-white dark:bg-zinc-950 rounded-[2rem] p-8 shadow-inner border border-black/5 dark:border-white/5 relative group">
                   <img src="icon.png" alt="Logo" className="w-full h-full object-contain" />
                   <div className="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2rem]"></div>
                 </div>
@@ -103,11 +103,11 @@ export default function RepoPage() {
                 {/* Screenshots Grid */}
                 <div className="grid grid-cols-3 gap-4">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="aspect-video bg-zinc-950 rounded-2xl border border-white/5 overflow-hidden relative group cursor-zoom-in">
+                    <div key={i} className="aspect-video bg-zinc-200 dark:bg-zinc-950 rounded-2xl border border-black/5 dark:border-white/5 overflow-hidden relative group cursor-zoom-in">
                       <img 
                         src={`https://picsum.photos/seed/streamcontinuum-${i}/800/450`} 
                         alt={`Screenshot ${i}`} 
-                        className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all group-hover:scale-105" 
+                        className="w-full h-full object-cover opacity-80 dark:opacity-60 group-hover:opacity-100 transition-all group-hover:scale-105" 
                       />
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
                         <Play className="w-8 h-8 text-white fill-white" />
@@ -118,13 +118,13 @@ export default function RepoPage() {
 
                 {/* Description Box */}
                 <div className="flex gap-8">
-                  <div className="flex-1 bg-zinc-950/50 p-8 rounded-3xl border border-white/5 space-y-4">
-                    <h3 className="text-xl font-bold text-blue-400">Jednoduchý stream doplněk s integrací Trakt.tv a Webshare.</h3>
-                    <p className="text-zinc-400 leading-relaxed">
+                  <div className="flex-1 bg-white dark:bg-zinc-950/50 p-8 rounded-3xl border border-black/5 dark:border-white/5 space-y-4">
+                    <h3 className="text-xl font-bold text-blue-600 dark:text-blue-400">Jednoduchý stream doplněk s integrací Trakt.tv a Webshare.</h3>
+                    <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
                       StreamContinuum umožňuje prohlížet a přehrávat obsah z Webshare.cz s plnou synchronizací Trakt.tv a lokální historií. 
                       Doplněk je navržen pro maximální rychlost a přehlednost v prostředí Kodi.
                     </p>
-                    <p className="text-zinc-600 text-xs italic">
+                    <p className="text-zinc-500 dark:text-zinc-600 text-xs italic">
                       This addon does not host any content. It is a tool to access third-party services.
                     </p>
                   </div>
@@ -132,18 +132,18 @@ export default function RepoPage() {
                   {/* Metadata */}
                   <div className="w-48 space-y-6 text-sm">
                     <div className="space-y-1">
-                      <p className="text-blue-400 font-medium">Kategorie:</p>
-                      <p className="text-zinc-300">Zdroje médií</p>
+                      <p className="text-blue-600 dark:text-blue-400 font-medium">Kategorie:</p>
+                      <p className="text-zinc-700 dark:text-zinc-300">Zdroje médií</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-blue-400 font-medium">Původ:</p>
-                      <p className="text-zinc-300">Repozitář</p>
+                      <p className="text-blue-600 dark:text-blue-400 font-medium">Původ:</p>
+                      <p className="text-zinc-700 dark:text-zinc-300">Repozitář</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-blue-400 font-medium">Stav:</p>
+                      <p className="text-blue-600 dark:text-blue-400 font-medium">Stav:</p>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                        <p className="text-zinc-300">Aktivní</p>
+                        <p className="text-zinc-700 dark:text-zinc-300">Aktivní</p>
                       </div>
                     </div>
                   </div>
@@ -152,18 +152,18 @@ export default function RepoPage() {
             </div>
 
             {/* Kodi Style Buttons */}
-            <div className="flex flex-wrap justify-center gap-4 pt-8 border-t border-white/5">
+            <div className="flex flex-wrap justify-center gap-4 pt-8 border-t border-black/5 dark:border-white/5">
               {[
                 { icon: Play, label: 'Otevřít' },
                 { icon: SettingsIcon, label: 'Konfigurovat' },
                 { icon: RefreshCw, label: 'Aktualizovat' },
                 { icon: Info, label: 'Závislosti' },
                 { icon: Package, label: 'Verze' },
-                { icon: Trash2, label: 'Odinstalovat', color: 'text-red-400' }
+                { icon: Trash2, label: 'Odinstalovat', color: 'text-red-500 dark:text-red-400' }
               ].map((btn, i) => (
-                <button key={i} className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-zinc-950 hover:bg-zinc-800 border border-white/5 transition-all min-w-[120px] group">
-                  <btn.icon className={`w-6 h-6 ${btn.color || 'text-zinc-400'} group-hover:scale-110 transition-transform`} />
-                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">{btn.label}</span>
+                <button key={i} className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-black/5 dark:border-white/5 transition-all min-w-[120px] group shadow-sm">
+                  <btn.icon className={`w-6 h-6 ${btn.color || 'text-zinc-500 dark:text-zinc-400'} group-hover:scale-110 transition-transform`} />
+                  <span className="text-xs font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-zinc-300">{btn.label}</span>
                 </button>
               ))}
             </div>
@@ -189,15 +189,15 @@ export default function RepoPage() {
                 { step: 2, title: 'Instalovat ze ZIP', desc: 'Jděte do Doplňky -> Instalovat ze souboru zip a vyberte přidaný zdroj.' },
                 { step: 3, title: 'Instalovat doplněk', desc: 'Jděte do Instalovat z repozitáře -> StreamContinuum Repo -> Doplňky videí -> StreamContinuum.' }
               ].map((item) => (
-                <div key={item.step} className="flex gap-6 p-6 bg-zinc-900/50 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all group">
+                <div key={item.step} className="flex gap-6 p-6 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 hover:border-blue-500/30 transition-all group shadow-sm">
                   <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl flex-shrink-0 shadow-lg shadow-blue-900/20 group-hover:scale-110 transition-transform">
                     {item.step}
                   </div>
                   <div className="space-y-2">
                     <h3 className="text-xl font-bold">{item.title}</h3>
-                    <p className="text-zinc-400 leading-relaxed">{item.desc}</p>
+                    <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">{item.desc}</p>
                     {item.code && (
-                      <code className="block bg-black/40 p-3 rounded-xl text-blue-300 text-sm font-mono break-all border border-white/5">
+                      <code className="block bg-zinc-200 dark:bg-black/40 p-3 rounded-xl text-blue-700 dark:text-blue-300 text-sm font-mono break-all border border-black/5 dark:border-white/5">
                         {item.code}
                       </code>
                     )}
@@ -211,15 +211,15 @@ export default function RepoPage() {
           <section className="space-y-8">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-indigo-500/10 rounded-2xl">
-                <History className="w-8 h-8 text-indigo-400" />
+                <History className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
               </div>
               <h2 className="text-3xl font-bold">Seznam změn</h2>
             </div>
             
-            <div className="bg-zinc-900/50 rounded-3xl border border-white/5 p-8 space-y-8 max-h-[600px] overflow-y-auto custom-scrollbar">
+            <div className="bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 p-8 space-y-8 max-h-[600px] overflow-y-auto custom-scrollbar shadow-sm">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-blue-400">Verze {repoData.latestPluginVersion}</h3>
+                  <h3 className="text-xl font-bold text-blue-600 dark:text-blue-400">Verze {repoData.latestPluginVersion}</h3>
                   <span className="text-sm text-zinc-500">{new Date(repoData.updatedAt).toLocaleDateString('cs-CZ')}</span>
                 </div>
                 <ul className="space-y-3">
@@ -227,7 +227,7 @@ export default function RepoPage() {
                     const cleanLine = line.replace(/^[-*•]\s*/, '').replace(/^\*\*(.*?)\*\*/, '$1').trim();
                     if (!cleanLine) return null;
                     return (
-                      <li key={i} className="flex gap-3 text-zinc-400">
+                      <li key={i} className="flex gap-3 text-zinc-700 dark:text-zinc-400">
                         <ChevronRight className="w-4 h-4 text-blue-500 flex-shrink-0 mt-1" />
                         <span>{cleanLine}</span>
                       </li>
@@ -243,10 +243,10 @@ export default function RepoPage() {
         <section className="space-y-12">
           <div className="text-center space-y-4">
             <div className="inline-flex p-3 bg-blue-500/10 rounded-2xl mb-4">
-              <Layers className="w-8 h-8 text-blue-400" />
+              <Layers className="w-8 h-8 text-blue-600 dark:text-blue-400" />
             </div>
             <h2 className="text-4xl font-bold">Klíčové vlastnosti</h2>
-            <p className="text-zinc-400 max-w-2xl mx-auto">Všechny funkce, které očekáváte od moderního doplňku.</p>
+            <p className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">Všechny funkce, které očekáváte od moderního doplňku.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -258,9 +258,9 @@ export default function RepoPage() {
               { title: 'Rychlé Hledání', desc: 'Pokročilé vyhledávání s podporou různých oddělovačů a formátů.' },
               { title: 'Automatické Aktualizace', desc: 'Repozitář se stará o to, abyste měli vždy nejnovější verzi.' }
             ].map((feature, i) => (
-              <div key={i} className="p-8 bg-zinc-900/50 rounded-3xl border border-white/5 hover:bg-zinc-900 transition-all">
+              <div key={i} className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all shadow-sm">
                 <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                <p className="text-zinc-400 text-sm leading-relaxed">{feature.desc}</p>
+                <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">{feature.desc}</p>
               </div>
             ))}
           </div>
@@ -270,10 +270,10 @@ export default function RepoPage() {
         <section className="space-y-12">
           <div className="text-center space-y-4">
             <div className="inline-flex p-3 bg-amber-500/10 rounded-2xl mb-4">
-              <Settings2 className="w-8 h-8 text-amber-400" />
+              <Settings2 className="w-8 h-8 text-amber-600 dark:text-amber-400" />
             </div>
             <h2 className="text-4xl font-bold">Konfigurace Trakt.tv</h2>
-            <p className="text-zinc-400 max-w-2xl mx-auto">Pro plnou funkčnost doplňku je nutné propojit váš Trakt.tv účet.</p>
+            <p className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">Pro plnou funkčnost doplňku je nutné propojit váš Trakt.tv účet.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -296,24 +296,24 @@ export default function RepoPage() {
                 desc: 'Zkopírujte údaje do nastavení doplňku a aktivujte zařízení.' 
               }
             ].map((item, i) => (
-              <div key={i} className="p-8 bg-zinc-900/50 rounded-3xl border border-white/5 space-y-4 hover:bg-zinc-900 transition-all">
-                <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center">
-                  <item.icon className="w-6 h-6 text-blue-400" />
+              <div key={i} className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 space-y-4 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                  <item.icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <h3 className="text-xl font-bold">{item.title}</h3>
-                <p className="text-zinc-400 text-sm leading-relaxed">{item.desc}</p>
+                <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">{item.desc}</p>
                 {item.link && (
                   <a 
                     href={item.link} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="inline-block text-blue-400 hover:text-blue-300 text-sm font-medium underline underline-offset-4"
+                    className="inline-block text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium underline underline-offset-4"
                   >
                     Otevřít Trakt API →
                   </a>
                 )}
                 {item.code && (
-                  <code className="block bg-black/40 p-2 rounded-lg text-blue-300 text-xs font-mono break-all border border-white/5">
+                  <code className="block bg-zinc-200 dark:bg-black/40 p-2 rounded-lg text-blue-700 dark:text-blue-300 text-xs font-mono break-all border border-black/5 dark:border-white/5">
                     {item.code}
                   </code>
                 )}
@@ -323,9 +323,9 @@ export default function RepoPage() {
         </section>
       </main>
 
-      <footer className="border-t border-white/5 py-16 text-center space-y-4">
+      <footer className="border-t border-black/5 dark:border-white/5 py-16 text-center space-y-4">
         <p className="text-zinc-500 text-sm">&copy; 2026 StreamContinuum Repository. Všechna práva vyhrazena.</p>
-        <p className="text-zinc-700 text-xs">Aktualizováno: {new Date(repoData.updatedAt).toLocaleDateString('cs-CZ')}</p>
+        <p className="text-zinc-400 dark:text-zinc-700 text-xs">Aktualizováno: {new Date(repoData.updatedAt).toLocaleDateString('cs-CZ')}</p>
       </footer>
     </motion.div>
   );

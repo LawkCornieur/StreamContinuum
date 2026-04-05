@@ -82,3 +82,179 @@ msgstr "Verze"
 msgctxt "#30042"
 msgid "Changelog"
 msgstr "Seznam změn"
+
+msgctxt "#30043"
+msgid "Refresh Trakt.tv status"
+msgstr "Obnovit stav Trakt.tv"
+
+msgctxt "#30044"
+msgid "Paste Client ID from clipboard"
+msgstr "Vložit Client ID ze schránky"
+
+msgctxt "#30045"
+msgid "Paste Client Secret from clipboard"
+msgstr "Vložit Client Secret ze schránky"
+
+msgctxt "#30046"
+msgid "Logout from Trakt.tv"
+msgstr "Odhlásit z Trakt.tv"
+
+msgctxt "#30047"
+msgid "Paste password from clipboard"
+msgstr "Vložit heslo ze schránky"
+
+msgctxt "#30048"
+msgid "Not connected"
+msgstr "Nepřipojeno"
+
+msgctxt "#30050"
+msgid "Continue watching"
+msgstr "Pokračovat ve sledování"
+
+msgctxt "#30051"
+msgid "Watchlist"
+msgstr "Seznam k zhlédnutí"
+
+msgctxt "#30052"
+msgid "Search"
+msgstr "Hledat"
+
+msgctxt "#30053"
+msgid "History"
+msgstr "Historie"
+
+msgctxt "#30054"
+msgid "Settings"
+msgstr "Nastavení"
+
+msgctxt "#30055"
+msgid "Trending Movies"
+msgstr "Populární filmy"
+
+msgctxt "#30056"
+msgid "Trending Shows"
+msgstr "Populární seriály"
+
+msgctxt "#30057"
+msgid "Search on Webshare"
+msgstr "Hledat na Webshare"
+
+msgctxt "#30058"
+msgid "No results found"
+msgstr "Nebyly nalezeny žádné výsledky"
+
+msgctxt "#30059"
+msgid "Size"
+msgstr "Velikost"
+
+msgctxt "#30060"
+msgid "Quality"
+msgstr "Kvalita"
+
+msgctxt "#30061"
+msgid "Failed to get playback link"
+msgstr "Nepodařilo se získat odkaz k přehrání"
+
+msgctxt "#30062"
+msgid "History is empty"
+msgstr "Historie je prázdná"
+
+msgctxt "#30063"
+msgid "Searched"
+msgstr "Hledáno"
+
+msgctxt "#30064"
+msgid "Options"
+msgstr "Možnosti"
+
+msgctxt "#30065"
+msgid "Edit"
+msgstr "Upravit"
+
+msgctxt "#30066"
+msgid "Delete"
+msgstr "Smazat"
+
+msgctxt "#30067"
+msgid "Search on Trakt.tv"
+msgstr "Hledat na Trakt.tv"
+
+msgctxt "#30068"
+msgid "Next episode"
+msgstr "Další díl"
+
+msgctxt "#30069"
+msgid "Previous episode"
+msgstr "Předchozí díl"
+
+msgctxt "#30070"
+msgid "Next season"
+msgstr "Další série"
+
+msgctxt "#30071"
+msgid "Previous season"
+msgstr "Předchozí série"
+
+msgctxt "#30072"
+msgid "Mark as watched"
+msgstr "Označit jako zhlédnuté"
+
+msgctxt "#30073"
+msgid "Mark as unwatched"
+msgstr "Označit jako nezhlédnuté"
+
+msgctxt "#30074"
+msgid "Watchlist is empty"
+msgstr "Watchlist je prázdný"
+
+msgctxt "#30075"
+msgid "No items in progress"
+msgstr "Žádné rozehrané položky"
+
+msgctxt "#30076"
+msgid "Search next episode"
+msgstr "Hledat další díl"
+
+msgctxt "#30077"
+msgid "Connected"
+msgstr "Připojeno"
+
+msgctxt "#30078"
+msgid "Status refreshed"
+msgstr "Stav obnoven"
+
+msgctxt "#30079"
+msgid "Failed to refresh status"
+msgstr "Nepodařilo se obnovit stav"
+
+msgctxt "#30080"
+msgid "Logged out"
+msgstr "Odhlášeno"
+
+msgctxt "#30081"
+msgid "Pasted to"
+msgstr "Vloženo do"
+
+msgctxt "#30082"
+msgid "Error"
+msgstr "Chyba"
+
+msgctxt "#30083"
+msgid "Clipboard is empty."
+msgstr "Schránka je prázdná."
+
+msgctxt "#30084"
+msgid "Your Kodi version does not support direct clipboard access. Use the system keyboard."
+msgstr "Vaše verze Kodi nepodporuje přímý přístup ke schránce. Použijte systémovou klávesnici."
+
+msgctxt "#30085"
+msgid "Successfully updated"
+msgstr "Úspěšně aktualizováno"
+
+msgctxt "#30086"
+msgid "Error updating"
+msgstr "Chyba při aktualizaci"
+
+msgctxt "#30087"
+msgid "Edit search"
+msgstr "Upravit hledání"

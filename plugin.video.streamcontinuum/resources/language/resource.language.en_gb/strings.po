@@ -70,3 +70,191 @@ msgstr "Client ID"
 msgctxt "#30032"
 msgid "Client Secret"
 msgstr "Client Secret"
+
+msgctxt "#30040"
+msgid "About"
+msgstr "About"
+
+msgctxt "#30041"
+msgid "Version"
+msgstr "Version"
+
+msgctxt "#30042"
+msgid "Changelog"
+msgstr "Changelog"
+
+msgctxt "#30043"
+msgid "Refresh Trakt.tv status"
+msgstr "Refresh Trakt.tv status"
+
+msgctxt "#30044"
+msgid "Paste Client ID from clipboard"
+msgstr "Paste Client ID from clipboard"
+
+msgctxt "#30045"
+msgid "Paste Client Secret from clipboard"
+msgstr "Paste Client Secret from clipboard"
+
+msgctxt "#30046"
+msgid "Logout from Trakt.tv"
+msgstr "Logout from Trakt.tv"
+
+msgctxt "#30047"
+msgid "Paste password from clipboard"
+msgstr "Paste password from clipboard"
+
+msgctxt "#30048"
+msgid "Not connected"
+msgstr "Not connected"
+
+msgctxt "#30050"
+msgid "Continue watching"
+msgstr "Continue watching"
+
+msgctxt "#30051"
+msgid "Watchlist"
+msgstr "Watchlist"
+
+msgctxt "#30052"
+msgid "Search"
+msgstr "Search"
+
+msgctxt "#30053"
+msgid "History"
+msgstr "History"
+
+msgctxt "#30054"
+msgid "Settings"
+msgstr "Settings"
+
+msgctxt "#30055"
+msgid "Trending Movies"
+msgstr "Trending Movies"
+
+msgctxt "#30056"
+msgid "Trending Shows"
+msgstr "Trending Shows"
+
+msgctxt "#30057"
+msgid "Search on Webshare"
+msgstr "Search on Webshare"
+
+msgctxt "#30058"
+msgid "No results found"
+msgstr "No results found"
+
+msgctxt "#30059"
+msgid "Size"
+msgstr "Size"
+
+msgctxt "#30060"
+msgid "Quality"
+msgstr "Quality"
+
+msgctxt "#30061"
+msgid "Failed to get playback link"
+msgstr "Failed to get playback link"
+
+msgctxt "#30062"
+msgid "History is empty"
+msgstr "History is empty"
+
+msgctxt "#30063"
+msgid "Searched"
+msgstr "Searched"
+
+msgctxt "#30064"
+msgid "Options"
+msgstr "Options"
+
+msgctxt "#30065"
+msgid "Edit"
+msgstr "Edit"
+
+msgctxt "#30066"
+msgid "Delete"
+msgstr "Delete"
+
+msgctxt "#30067"
+msgid "Search on Trakt.tv"
+msgstr "Search on Trakt.tv"
+
+msgctxt "#30068"
+msgid "Next episode"
+msgstr "Next episode"
+
+msgctxt "#30069"
+msgid "Previous episode"
+msgstr "Previous episode"
+
+msgctxt "#30070"
+msgid "Next season"
+msgstr "Next season"
+
+msgctxt "#30071"
+msgid "Previous season"
+msgstr "Previous season"
+
+msgctxt "#30072"
+msgid "Mark as watched"
+msgstr "Mark as watched"
+
+msgctxt "#30073"
+msgid "Mark as unwatched"
+msgstr "Mark as unwatched"
+
+msgctxt "#30074"
+msgid "Watchlist is empty"
+msgstr "Watchlist is empty"
+
+msgctxt "#30075"
+msgid "No items in progress"
+msgstr "No items in progress"
+
+msgctxt "#30076"
+msgid "Search next episode"
+msgstr "Search next episode"
+
+msgctxt "#30077"
+msgid "Connected"
+msgstr "Connected"
+
+msgctxt "#30078"
+msgid "Status refreshed"
+msgstr "Status refreshed"
+
+msgctxt "#30079"
+msgid "Failed to refresh status"
+msgstr "Failed to refresh status"
+
+msgctxt "#30080"
+msgid "Logged out"
+msgstr "Logged out"
+
+msgctxt "#30081"
+msgid "Pasted to"
+msgstr "Pasted to"
+
+msgctxt "#30082"
+msgid "Error"
+msgstr "Error"
+
+msgctxt "#30083"
+msgid "Clipboard is empty."
+msgstr "Clipboard is empty."
+
+msgctxt "#30084"
+msgid "Your Kodi version does not support direct clipboard access. Use the system keyboard."
+msgstr "Your Kodi version does not support direct clipboard access. Use the system keyboard."
+
+msgctxt "#30085"
+msgid "Successfully updated"
+msgstr "Successfully updated"
+
+msgctxt "#30086"
+msgid "Error updating"
+msgstr "Error updating"
+
+msgctxt "#30087"
+msgid "Edit search"
+msgstr "Edit search"
