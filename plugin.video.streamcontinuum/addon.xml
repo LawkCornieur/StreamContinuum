@@ -14,6 +14,7 @@
         <description lang="en_GB">StreamContinuum allows you to browse and play content from Webshare.cz with full Trakt.tv synchronization and local history.</description>
         <description lang="cs_CZ">StreamContinuum umožňuje prohlížet a přehrávat obsah z Webshare.cz s plnou synchronizací Trakt.tv a lokální historií.</description>
         <disclaimer lang="en_GB">This addon does not host any content. It is a tool to access third-party services.</disclaimer>
+        <disclaimer lang="cs_CZ">Tento doplněk nehostuje žádný obsah. Je to pouze nástroj pro přístup ke službám třetích stran.</disclaimer>
         <platform>all</platform>
         <assets>
             <icon>icon.png</icon>

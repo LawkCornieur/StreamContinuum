@@ -14,14 +14,14 @@ export default function RepoPage() {
     >
       {/* Hero Section */}
       <div className="relative overflow-hidden py-24 px-6">
-        <div className="absolute inset-0 bg-[url('fanart.jpg')] bg-cover bg-center opacity-20 grayscale"></div>
+        <div className="absolute inset-0 bg-[url('./fanart.jpg')] bg-cover bg-center opacity-20 grayscale"></div>
         <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/50 via-zinc-950 to-zinc-950"></div>
         
         <div className="relative max-w-5xl mx-auto text-center space-y-8">
           <motion.img 
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            src="icon.png" 
+            src="./icon.png" 
             alt="StreamContinuum Logo" 
             className="w-32 h-32 mx-auto rounded-3xl shadow-2xl border-4 border-blue-500/20"
           />
@@ -86,7 +86,7 @@ export default function RepoPage() {
               {/* Logo & Basic Info */}
               <div className="w-full md:w-1/3 space-y-6">
                 <div className="aspect-square bg-zinc-950 rounded-[2rem] p-8 shadow-inner border border-white/5 relative group">
-                  <img src="icon.png" alt="Logo" className="w-full h-full object-contain" />
+                  <img src="./icon.png" alt="Logo" className="w-full h-full object-contain" />
                   <div className="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2rem]"></div>
                 </div>
                 <div className="text-center md:text-left">

@@ -5,11 +5,15 @@
         <setting id="trakt_auth_btn" type="action" label="30004" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_auth)" />
         <setting id="trakt_token" type="text" label="" visible="false" default="" />
         <setting id="trakt_client_id" type="text" label="30031" default="" />
+        <setting id="trakt_id_paste" type="action" label="Vložit Client ID ze schránky" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=paste_from_clipboard&amp;target=trakt_client_id)" />
         <setting id="trakt_client_secret" type="text" label="30032" option="hidden" default="" />
+        <setting id="trakt_secret_paste" type="action" label="Vložit Client Secret ze schránky" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=paste_from_clipboard&amp;target=trakt_client_secret)" />
+        <setting id="trakt_logout" type="action" label="Odhlásit z Trakt.tv" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_logout)" />
     </category>
     <category label="30010">
         <setting id="ws_username" type="text" label="30012" default="" />
         <setting id="ws_password" type="text" label="30013" option="hidden" default="" />
+        <setting id="ws_pass_paste" type="action" label="Vložit heslo ze schránky" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=paste_from_clipboard&amp;target=ws_password)" />
         <setting id="ws_token" type="text" label="" visible="false" default="" />
     </category>
     <category label="30020">
@@ -17,7 +21,7 @@
         <setting id="max_resolution" type="enum" label="30023" lvalues="4K|1080p|720p|SD" default="1" />
     </category>
     <category label="30040">
-        <setting id="about_version" type="text" label="30041" default="1.1.2" enable="false" />
+        <setting id="about_version" type="text" label="30041" default="1.1.4" enable="false" />
         <setting id="about_changelog" type="action" label="30042" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=show_changelog)" />
     </category>
 </settings>

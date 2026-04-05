@@ -386,10 +386,35 @@ def run():
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:]))
     action = params.get('action')
 
+    # Update Trakt status if token exists but username is not set
+    trakt_token = ADDON.getSetting('trakt_token')
+    trakt_user = ADDON.getSetting('trakt_username')
+    if trakt_token and (not trakt_user or trakt_user == 'Nepřipojeno'):
+        user_info = trakt.get_user_info()
+        if user_info:
+            ADDON.setSetting('trakt_username', user_info.get('username', 'Připojeno'))
+
     if not action:
         list_categories()
     elif action == 'trakt_auth':
         trakt.authenticate()
+    elif action == 'trakt_logout':
+        ADDON.setSetting('trakt_token', '')
+        ADDON.setSetting('trakt_username', 'Nepřipojeno')
+        xbmcgui.Dialog().notification("Trakt.tv", "Odhlášeno", xbmcgui.NOTIFICATION_INFO)
+    elif action == 'paste_from_clipboard':
+        target = params.get('target')
+        try:
+            # Kodi 20+ has xbmc.getClipboard()
+            clipboard = xbmc.getClipboard()
+            if clipboard:
+                ADDON.setSetting(target, clipboard)
+                xbmcgui.Dialog().notification("StreamContinuum", f"Vloženo do {target}", xbmcgui.NOTIFICATION_INFO)
+            else:
+                xbmcgui.Dialog().ok("Chyba", "Schránka je prázdná.")
+        except AttributeError:
+            # Fallback for older Kodi versions or platforms where getClipboard fails
+            xbmcgui.Dialog().ok("Chyba", "Vaše verze Kodi nepodporuje přímý přístup ke schránce. Použijte systémovou klávesnici.")
     elif action == 'settings':
         ADDON.openSettings()
     elif action == 'search':

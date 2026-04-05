@@ -59,6 +59,12 @@ def authenticate():
         if token_res.status_code == 200:
             data = token_res.json()
             ADDON.setSetting('trakt_token', data['access_token'])
+            
+            # Fetch and save username
+            user_info = get_user_info()
+            if user_info:
+                ADDON.setSetting('trakt_username', user_info.get('username', 'Připojeno'))
+            
             xbmcgui.Dialog().notification("Trakt.tv", "Successfully connected!", xbmcgui.NOTIFICATION_INFO)
             break
         elif token_res.status_code == 400: # Pending
@@ -77,6 +83,16 @@ def get_headers():
         "trakt-api-key": client_id,
         "Authorization": f"Bearer {token}"
     }
+
+def get_user_info():
+    url = "https://api.trakt.tv/users/me"
+    try:
+        res = requests.get(url, headers=get_headers())
+        if res.status_code == 200:
+            return res.json()
+    except:
+        pass
+    return None
 
 def get_watchlist():
     url = "https://api.trakt.tv/sync/watchlist"
