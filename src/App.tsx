@@ -1,96 +1,98 @@
-import { motion } from 'motion/react';
-import { Download, Github, Terminal, Smartphone, Monitor, Info } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
+import { LayoutDashboard, Search, History, Settings, Monitor } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
+
+import Dashboard from './pages/Dashboard';
+import SearchPage from './pages/Search';
+import HistoryPage from './pages/History';
+import SettingsPage from './pages/Settings';
+import RepoPage from './pages/Repo';
+
+function Navigation() {
+  const location = useLocation();
+  
+  const links = [
+    { to: '/', icon: LayoutDashboard, label: 'Repozitář' },
+    { to: '/dashboard', icon: Monitor, label: 'Dashboard' },
+    { to: '/search', icon: Search, label: 'Hledat' },
+    { to: '/history', icon: History, label: 'Historie' },
+    { to: '/settings', icon: Settings, label: 'Nastavení' },
+  ];
+
+  return (
+    <nav className="fixed left-0 top-0 bottom-0 w-20 md:w-64 bg-zinc-950 border-r border-white/5 flex flex-col items-center md:items-stretch p-4 z-50">
+      <div className="flex items-center gap-3 px-2 mb-12">
+        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <Monitor className="w-6 h-6 text-white" />
+        </div>
+        <span className="hidden md:block font-bold text-xl tracking-tighter">
+          Stream<span className="text-blue-500">Continuum</span>
+        </span>
+      </div>
+
+      <div className="flex-grow space-y-2">
+        {links.map((link) => {
+          const Icon = link.icon;
+          const isActive = location.pathname === link.to;
+          return (
+            <Link
+              key={link.to}
+              to={link.to}
+              className={`flex items-center gap-4 p-4 rounded-2xl transition-all group ${
+                isActive 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
+                  : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300'
+              }`}
+            >
+              <Icon className={`w-6 h-6 ${isActive ? 'scale-110' : 'group-hover:scale-110'} transition-transform`} />
+              <span className="hidden md:block font-medium">{link.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="mt-auto p-4 bg-zinc-900/50 rounded-2xl border border-white/5 hidden md:block">
+        <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-1">Status</p>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+          <span className="text-sm font-semibold">Online</span>
+        </div>
+      </div>
+    </nav>
+  );
+}
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans p-8">
-      <div className="max-w-4xl mx-auto space-y-12">
-        {/* Header */}
-        <header className="text-center space-y-4">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-32 h-32 bg-blue-600 rounded-3xl mx-auto flex items-center justify-center shadow-2xl shadow-blue-500/20"
-          >
-            <Monitor className="w-16 h-16 text-white" />
-          </motion.div>
-          <h1 className="text-5xl font-bold tracking-tighter">
-            Stream<span className="text-blue-500">Continuum</span>
-          </h1>
-          <p className="text-zinc-400 text-xl">
-            Další generace Kodi doplňku pro Webshare a Trakt.tv
-          </p>
-        </header>
+    <Router>
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">
+        <Navigation />
+        
+        <main className="flex-grow ml-20 md:ml-64 min-h-screen relative">
+          <AnimatePresence mode="wait">
+            <Routes>
+              <Route path="/" element={<RepoPage />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </AnimatePresence>
+        </main>
 
-        {/* Main Info */}
-        <div className="grid md:grid-cols-2 gap-8">
-          <section className="bg-zinc-900/50 border border-white/5 p-8 rounded-3xl space-y-4">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Terminal className="w-6 h-6 text-blue-500" />
-              Stav projektu
-            </h2>
-            <p className="text-zinc-400 leading-relaxed">
-              Projekt je nyní připraven ve formátu **Kodi Addon (Python)**. 
-              Všechny soubory byly vygenerovány podle standardu Kodi 19/20 (Matrix/Nexus).
-            </p>
-            <ul className="space-y-2 text-sm text-zinc-300">
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                Plná integrace Trakt.tv Device Auth
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                Opravené přihlašování na Webshare (SHA1 hash)
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                Opravené nastavení a lokalizace do češtiny
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                Vizuální identita (ikona a fanart) integrována
-              </li>
-            </ul>
-          </section>
-
-          <section className="bg-zinc-900/50 border border-white/5 p-8 rounded-3xl space-y-6">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Download className="w-6 h-6 text-emerald-500" />
-              Instalace
-            </h2>
-            <div className="space-y-4">
-              <div className="bg-black/40 p-4 rounded-xl border border-white/5">
-                <p className="text-xs text-zinc-500 uppercase font-bold mb-2">GitHub Repozitář</p>
-                <a 
-                  href="https://github.com/LawkCornieur/StreamContinuum" 
-                  target="_blank"
-                  className="text-blue-400 hover:underline flex items-center gap-2"
-                >
-                  <Github className="w-4 h-4" />
-                  LawkCornieur/StreamContinuum
-                </a>
-              </div>
-              <p className="text-sm text-zinc-400">
-                Pro instalaci do Kodi stáhněte složku <code className="text-blue-400">plugin.video.streamcontinuum</code> jako ZIP a nainstalujte skrze menu doplňků.
-              </p>
-            </div>
-          </section>
-        </div>
-
-        {/* Remote Control Preview */}
-        <section className="bg-blue-600/10 border border-blue-500/20 p-8 rounded-3xl text-center space-y-4">
-          <Smartphone className="w-12 h-12 text-blue-500 mx-auto" />
-          <h3 className="text-2xl font-bold">Optimalizováno pro ovladače</h3>
-          <p className="text-zinc-400 max-w-2xl mx-auto">
-            Nastavení doplňku využívá nativní Kodi dialogy, které jsou plně ovladatelné dálkovým ovladačem. 
-            Trakt.tv aktivace probíhá skrze jednoduchý 8-místný kód bez nutnosti psát heslo na TV.
-          </p>
-        </section>
-
-        <footer className="text-center text-zinc-600 text-sm pt-8">
-          Vytvořeno pro komunitu Kodi & StreamContinuum
-        </footer>
+        <Toaster 
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: '#18181b',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.05)',
+              borderRadius: '1rem',
+            }
+          }}
+        />
       </div>
-    </div>
+    </Router>
   );
 }

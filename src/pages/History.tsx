@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { History as HistoryIcon, Trash2, Play, ExternalLink } from 'lucide-react';
+import { History as HistoryIcon, Trash2, Play, ExternalLink, ChevronRight, Search } from 'lucide-react';
 import { localDB } from '../lib/db';
+import { traktService } from '../lib/trakt';
 import { WatchedItem } from '../types';
 import { format } from 'date-fns';
 import { cs } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export default function HistoryPage() {
   const [history, setHistory] = useState<WatchedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const loadHistory = async () => {
     const data = await localDB.getHistory();
@@ -33,6 +36,28 @@ export default function HistoryPage() {
       toast.success('Historie vymazána');
       loadHistory();
     }
+  };
+
+  const handleNextEpisode = async (item: WatchedItem) => {
+    if (!item.season || !item.episode) return;
+    
+    setLoading(true);
+    const next = await traktService.getNextEpisode(item.id, item.season, item.episode);
+    setLoading(false);
+
+    if (next) {
+      const nextQuery = `${item.title} S${next.season}E${next.number}`;
+      navigate('/search', { state: { query: nextQuery, autoSearch: true } });
+    } else {
+      toast.error('Další díl nebyl nalezen');
+    }
+  };
+
+  const handleSearchWebshare = (item: WatchedItem) => {
+    const query = item.season 
+      ? `${item.title} S${item.season}E${item.episode}`
+      : item.title;
+    navigate('/search', { state: { query, autoSearch: true, webshare: true } });
   };
 
   return (
@@ -73,27 +98,42 @@ export default function HistoryPage() {
             <motion.div
               key={item.id}
               layout
-              className="flex items-center gap-6 p-4 bg-zinc-900/50 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all group"
+              className="flex flex-col md:flex-row md:items-center gap-6 p-4 bg-zinc-900/50 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all group"
             >
-              <div className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0">
-                <img src={item.poster} alt={item.title} className="w-full h-full object-cover" />
-              </div>
-              
-              <div className="flex-grow min-w-0">
-                <h3 className="font-bold text-lg truncate">{item.title}</h3>
-                <p className="text-zinc-500 text-sm">
-                  {item.season && `S${item.season}E${item.episode} • `}
-                  Sledováno {format(item.lastWatched, 'd. MMMM yyyy, HH:mm', { locale: cs })}
-                </p>
+              <div className="flex items-center gap-6 flex-grow">
+                <div className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0">
+                  <img src={item.poster} alt={item.title} className="w-full h-full object-cover" />
+                </div>
+                
+                <div className="flex-grow min-w-0">
+                  <h3 className="font-bold text-lg truncate">{item.title}</h3>
+                  <p className="text-zinc-500 text-sm">
+                    {item.season && `S${item.season}E${item.episode} • `}
+                    Sledováno {format(item.lastWatched, 'd. MMMM yyyy, HH:mm', { locale: cs })}
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button className="p-3 bg-blue-600 text-white rounded-xl hover:scale-110 transition-transform">
-                  <Play className="w-5 h-5 fill-current" />
+              <div className="flex items-center gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                {item.season && (
+                  <button
+                    onClick={() => handleNextEpisode(item)}
+                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm font-medium"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    Další díl
+                  </button>
+                )}
+                <button
+                  onClick={() => handleSearchWebshare(item)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 text-blue-400 rounded-xl hover:bg-blue-600/30 transition-all text-sm font-medium"
+                >
+                  <Search className="w-4 h-4" />
+                  Webshare
                 </button>
                 <button
                   onClick={() => removeItem(item.id)}
-                  className="p-3 bg-zinc-800 text-red-500 rounded-xl hover:bg-red-500/10 transition-all"
+                  className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
