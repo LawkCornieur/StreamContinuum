@@ -2,5 +2,5 @@
   "latestPluginVersion": "1.1.5",
   "latestRepoVersion": "1.1.0",
   "changelog": "**Verze 1.1.5**\n- Kompletní lokalizace do angličtiny a češtiny\n- Přidána podpora pro tmavý režim na webu repozitáře\n- Oprava aktualizačního mechanismu doplňku\n\n**Verze 1.1.4**\n- Oprava vyhledávání z historie (automatické spuštění)\n- Synchronizace verze s repozitářem\n\n**Verze 1.1.3**\n- Oprava hlavního menu (odstranění nefunkční hlavičky)\n- Přidány navigační drobky (nadpisy sekcí)\n- Vylepšení ikon v menu\n- Oprava zobrazení historie změn\n\n**Verze 1.1.2**\n- Modernizované hlavní menu\n- Rozšířené možnosti v historii (E+1, S+1, Trakt search)\n- Možnost označit/odznačit zhlédnuté na Trakt.tv\n- Optimalizace historie\n\n**Verze 1.1.1**\n- Oprava vyhledávání na Webshare\n- Podpora pro Trakt.tv watchlist\n- Základní historie hledání\n",
-  "updatedAt": "2026-04-05T22:35:52.858Z"
+  "updatedAt": "2026-04-05T22:44:55.637Z"
 }
