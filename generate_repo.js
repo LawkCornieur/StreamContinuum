@@ -81,6 +81,19 @@ async function generateRepo() {
                 content = content.replace(/<\?xml[^?]*\?>/g, '').trim();
                 addonsXml += content + '\n';
                 
+                // Sync version to settings.xml if it's the main plugin
+                if (addonId === 'plugin.video.streamcontinuum') {
+                    const settingsPath = path.join(addonId, 'resources', 'settings.xml');
+                    if (fs.existsSync(settingsPath)) {
+                        let settingsContent = fs.readFileSync(settingsPath, 'utf-8');
+                        const updatedSettings = settingsContent.replace(/(<setting id="about_version"[^>]*default=")[^"]+(")/, `$1${version}$2`);
+                        if (settingsContent !== updatedSettings) {
+                            fs.writeFileSync(settingsPath, updatedSettings);
+                            console.log(`Updated version to ${version} in settings.xml`);
+                        }
+                    }
+                }
+                
                 // Create ZIP file: addon_id/addon_id-version.zip
                 const zipName = `${addonId}-${version}.zip`;
                 const zipPath = path.join(addonId, zipName);
@@ -183,6 +196,12 @@ async function generateRepo() {
     const distPath = path.join(process.cwd(), 'dist');
     if (fs.existsSync(distPath)) {
         console.log('Copying dist content to root for GitHub Pages...');
+        
+        // Rename template.html to index.html in dist
+        if (fs.existsSync(path.join(distPath, 'template.html'))) {
+            fs.renameSync(path.join(distPath, 'template.html'), path.join(distPath, 'index.html'));
+        }
+
         const files = fs.readdirSync(distPath);
         files.forEach(file => {
             const src = path.join(distPath, file);
@@ -219,6 +238,28 @@ async function generateRepo() {
             indexContent = indexContent.replace(regex, newListing);
             fs.writeFileSync(indexPath, indexContent);
             console.log('Updated index.html kodi-listing section.');
+        }
+    }
+    
+    // Also update template.html so the source stays up to date
+    const templatePath = 'template.html';
+    if (fs.existsSync(templatePath)) {
+        let templateContent = fs.readFileSync(templatePath, 'utf-8');
+        
+        const listingStart = '<div id="kodi-listing" style="display:none">';
+        const listingEnd = '</div>';
+        const newListing = `${listingStart}
+      <a href="addons.xml">addons.xml</a>
+      <a href="addons.xml.md5">addons.xml.md5</a>
+      <a href="plugin.video.streamcontinuum-${latestPluginVersion}.zip">plugin.video.streamcontinuum-${latestPluginVersion}.zip</a>
+      <a href="repository.streamcontinuum-${latestRepoVersion}.zip">repository.streamcontinuum-${latestRepoVersion}.zip</a>
+    ${listingEnd}`;
+
+        const regex = new RegExp(`${listingStart}[\\s\\S]*?${listingEnd}`);
+        if (templateContent.match(regex)) {
+            templateContent = templateContent.replace(regex, newListing);
+            fs.writeFileSync(templatePath, templateContent);
+            console.log('Updated template.html kodi-listing section.');
         }
     }
 }
