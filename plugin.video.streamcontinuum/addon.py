@@ -18,10 +18,8 @@ HANDLE = int(sys.argv[1])
 def list_categories():
     trakt_token = ADDON.getSetting('trakt_token')
     
-    # Add a header item to show addon name
-    list_item = xbmcgui.ListItem(label='[B][COLOR orange]StreamContinuum[/COLOR][/B]')
-    list_item.setArt({'icon': 'DefaultAddonVideo.png', 'thumb': 'DefaultAddonVideo.png'})
-    xbmcplugin.addDirectoryItem(HANDLE, '', list_item, isFolder=False)
+    # Set plugin category for breadcrumbs
+    xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
 
     if trakt_token:
         items = [
@@ -46,7 +44,7 @@ def list_categories():
         list_item.setArt({'icon': icon, 'thumb': icon})
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
     
-    xbmcplugin.setContent(HANDLE, 'files')
+    xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
 def search(query=None):
@@ -60,6 +58,7 @@ def search(query=None):
             return
 
     if query:
+        xbmcplugin.setPluginCategory(HANDLE, f"Hledat: {query}")
         results = webshare.search(query)
         if not results:
             xbmcgui.Dialog().notification("StreamContinuum", "Nebyly nalezeny žádné výsledky", xbmcgui.NOTIFICATION_INFO, 3000)
@@ -156,6 +155,8 @@ def show_history():
     import history
     items = history.get_history()
     
+    xbmcplugin.setPluginCategory(HANDLE, 'Historie')
+    
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", "Historie je prázdná", xbmcgui.NOTIFICATION_INFO, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -175,6 +176,8 @@ def show_history():
     xbmcplugin.endOfDirectory(HANDLE)
 
 def history_menu(query, title):
+    xbmcplugin.setPluginCategory(HANDLE, f"Možnosti: {title}")
+    
     items = [
         ('Hledat na Webshare', f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
         ('Upravit', f'history_edit&title={urllib.parse.quote(title)}&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
@@ -206,6 +209,7 @@ def history_menu(query, title):
     xbmcplugin.endOfDirectory(HANDLE)
 
 def trakt_search(query):
+    xbmcplugin.setPluginCategory(HANDLE, f"Trakt.tv: {query}")
     results = trakt.search_trakt(query)
     if not results:
         xbmcgui.Dialog().notification("Trakt.tv", "Nebyly nalezeny žádné výsledky", xbmcgui.NOTIFICATION_INFO, 3000)
@@ -237,18 +241,29 @@ def trakt_search(query):
     xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.1.2[/B]\n"
-    changelog += "- Modernizované hlavní menu s názvem doplňku\n"
+    changelog = "[B]Verze 1.1.3[/B]\n"
+    changelog += "- Oprava hlavního menu (odstranění nefunkční hlavičky)\n"
+    changelog += "- Přidány navigační drobky (nadpisy sekcí)\n"
+    changelog += "- Vylepšení ikon v menu\n"
+    changelog += "- Oprava zobrazení historie změn\n\n"
+    
+    changelog += "[B]Verze 1.1.2[/B]\n"
+    changelog += "- Modernizované hlavní menu\n"
     changelog += "- Rozšířené možnosti v historii (E+1, S+1, Trakt search)\n"
     changelog += "- Možnost označit/odznačit zhlédnuté na Trakt.tv\n"
-    changelog += "- Oprava ikon a vylepšení vizuálu\n"
-    changelog += "- Optimalizace historie (odstranění duplicit seriálů)\n"
+    changelog += "- Optimalizace historie\n\n"
+    
+    changelog += "[B]Verze 1.1.1[/B]\n"
+    changelog += "- Oprava vyhledávání na Webshare\n"
+    changelog += "- Podpora pro Trakt.tv watchlist\n"
+    changelog += "- Základní historie hledání\n"
     
     xbmcgui.Dialog().textviewer("StreamContinuum - Seznam změn", changelog)
 
 import re
 
 def show_trakt_watchlist():
+    xbmcplugin.setPluginCategory(HANDLE, 'Seznam k zhlédnutí')
     items = trakt.get_watchlist()
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", "Watchlist je prázdný", xbmcgui.NOTIFICATION_INFO, 3000)
@@ -289,6 +304,7 @@ def show_trakt_watchlist():
     xbmcplugin.endOfDirectory(HANDLE)
 
 def show_trakt_playback():
+    xbmcplugin.setPluginCategory(HANDLE, 'Pokračovat ve sledování')
     # Combine playback (paused) and progress (next episodes)
     playback_items = trakt.get_playback()
     progress_items = trakt.get_progress()

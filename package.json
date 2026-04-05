@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
+    "generate": "node generate_repo.js",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
