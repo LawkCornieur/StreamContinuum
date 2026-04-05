@@ -48,6 +48,10 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.1.4**
+- Oprava vyhledávání z historie (automatické spuštění)
+- Synchronizace verze s repozitářem
+
 **Verze 1.1.3**
 - Oprava hlavního menu (odstranění nefunkční hlavičky)
 - Přidány navigační drobky (nadpisy sekcí)

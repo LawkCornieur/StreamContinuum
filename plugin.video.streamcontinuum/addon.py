@@ -241,7 +241,11 @@ def trakt_search(query):
     xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.1.3[/B]\n"
+    changelog = "[B]Verze 1.1.4[/B]\n"
+    changelog += "- Oprava vyhledávání z historie (automatické spuštění)\n"
+    changelog += "- Synchronizace verze s repozitářem\n\n"
+    
+    changelog += "[B]Verze 1.1.3[/B]\n"
     changelog += "- Oprava hlavního menu (odstranění nefunkční hlavičky)\n"
     changelog += "- Přidány navigační drobky (nadpisy sekcí)\n"
     changelog += "- Vylepšení ikon v menu\n"
@@ -389,7 +393,7 @@ def run():
     elif action == 'settings':
         ADDON.openSettings()
     elif action == 'search':
-        search()
+        search(params.get('query'))
     elif action == 'search_prefill':
         search_prefill(params.get('query', ''))
     elif action == 'play':
