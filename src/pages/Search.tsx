@@ -20,6 +20,7 @@ export default function SearchPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [webshareResults, setWebshareResults] = useState<any[]>([]);
   const [searchingWebshare, setSearchingWebshare] = useState(false);
+  const [separator, setSeparator] = useState(' ');
 
   const handleSearch = async (e?: FormEvent, forcedQuery?: string) => {
     if (e) e.preventDefault();
@@ -33,13 +34,25 @@ export default function SearchPage() {
   };
 
   const handleWebshareSearch = async (media: any, episode?: any) => {
-    const searchQuery = episode 
-      ? `${media.title} S${episode.season.toString().padStart(2, '0')}E${episode.number.toString().padStart(2, '0')}`
-      : `${media.title} ${media.year || ''}`;
+    let searchQuery = '';
+    
+    if (episode) {
+      searchQuery = `${media.title} S${episode.season.toString().padStart(2, '0')}E${episode.number.toString().padStart(2, '0')}`;
+    } else if (media.title) {
+      // If it's a raw title (e.g. from history auto-search)
+      searchQuery = media.title;
+    } else {
+      searchQuery = `${media.title} ${media.year || ''}`;
+    }
+    
+    // Apply separator if not space
+    if (separator !== ' ') {
+      searchQuery = searchQuery.replace(/\s+/g, separator);
+    }
     
     setSearchingWebshare(true);
     setWebshareResults([]);
-    toast.loading('Hledám na Webshare...', { id: 'webshare-search' });
+    toast.loading(`Hledám "${searchQuery}" na Webshare...`, { id: 'webshare-search' });
     
     try {
       // We'll use a mock or real search if token is available
@@ -59,12 +72,18 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
-    const state = location.state as { query?: string; autoSearch?: boolean; type?: 'movie' | 'show' };
+    const state = location.state as { query?: string; autoSearch?: boolean; type?: 'movie' | 'show'; webshare?: boolean };
     if (state?.query) {
       setQuery(state.query);
       if (state.type) setType(state.type);
       if (state.autoSearch) {
-        handleSearch(undefined, state.query);
+        handleSearch(undefined, state.query).then(() => {
+          if (state.webshare) {
+            // If it's a direct webshare search from history, we might not have the full media object yet
+            // But we can try to search Webshare with the query directly
+            handleWebshareSearch({ title: state.query, type: state.type || 'movie' });
+          }
+        });
       }
     }
   }, [location.state]);
@@ -231,10 +250,25 @@ export default function SearchPage() {
 
             {selectedMedia.type === 'show' && (
               <div className="space-y-4">
-                <h3 className="font-bold flex items-center gap-2">
-                  <List className="w-4 h-4 text-blue-500" />
-                  Série
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold flex items-center gap-2">
+                    <List className="w-4 h-4 text-blue-500" />
+                    Série
+                  </h3>
+                  <div className="flex gap-1 bg-black/20 p-1 rounded-lg">
+                    {[' ', '.', '_', '-'].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setSeparator(s)}
+                        className={`w-8 h-8 rounded flex items-center justify-center text-xs font-mono transition-all ${
+                          separator === s ? 'bg-blue-600 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        {s === ' ' ? '␣' : s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {seasons.map((s) => (
                     <button
@@ -289,13 +323,31 @@ export default function SearchPage() {
             )}
 
             {selectedMedia.type === 'movie' && (
-              <button 
-                onClick={() => handleWebshareSearch(selectedMedia.movie)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all"
-              >
-                <SearchIcon className="w-5 h-5" />
-                Hledat na Webshare
-              </button>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider">Oddělovač</span>
+                  <div className="flex gap-1 bg-black/20 p-1 rounded-lg">
+                    {[' ', '.', '_', '-'].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setSeparator(s)}
+                        className={`w-8 h-8 rounded flex items-center justify-center text-xs font-mono transition-all ${
+                          separator === s ? 'bg-blue-600 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        {s === ' ' ? '␣' : s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleWebshareSearch(selectedMedia.movie)}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all"
+                >
+                  <SearchIcon className="w-5 h-5" />
+                  Hledat na Webshare
+                </button>
+              </div>
             )}
 
             {/* Webshare Results */}
