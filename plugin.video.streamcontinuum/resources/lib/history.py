@@ -18,10 +18,22 @@ def get_history():
     except:
         return []
 
+import re
+
 def add_to_history(query, title):
     history = get_history()
-    # Remove existing entry with same query and title if exists
-    history = [item for item in history if not (item.get('query') == query and item.get('title') == title)]
+    
+    # Try to extract base title from series pattern (e.g., "Show Name S01E01")
+    series_pattern = re.compile(r'^(.*)\s+S\d{2}E\d{2}', re.IGNORECASE)
+    match = series_pattern.match(title)
+    base_title = match.group(1).strip() if match else title
+    
+    # Remove existing entry with same base title if it's a series, or same title if not
+    if match:
+        history = [item for item in history if not (series_pattern.match(item.get('title', '')) and series_pattern.match(item.get('title', '')).group(1).strip() == base_title)]
+    else:
+        history = [item for item in history if not (item.get('title') == title)]
+        
     # Add to top
     history.insert(0, {'query': query, 'title': title})
     # Keep only last 50

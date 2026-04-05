@@ -38,7 +38,7 @@ def list_categories():
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
         list_item = xbmcgui.ListItem(label=label)
-        list_item.setArt({'icon': icon})
+        list_item.setArt({'icon': icon, 'thumb': icon})
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
     
     xbmcplugin.endOfDirectory(HANDLE)
@@ -70,19 +70,23 @@ def search(query=None):
             info = {
                 'title': item['name'],
                 'plot': item['description'],
-                'size': item['size']
+                'size': item['size'],
+                'mediatype': 'video'
             }
             
             # Simple parsing of resolution and quality from name
             name_lower = item['name'].lower()
+            res = '480'
             if '2160p' in name_lower or '4k' in name_lower:
-                info['video_resolution'] = '2160'
+                res = '2160'
             elif '1080p' in name_lower:
-                info['video_resolution'] = '1080'
+                res = '1080'
             elif '720p' in name_lower:
-                info['video_resolution'] = '720'
+                res = '720'
             elif '480p' in name_lower:
-                info['video_resolution'] = '480'
+                res = '480'
+            
+            info['video_resolution'] = res
             
             # Parse audio tracks
             audio_info = []
@@ -96,7 +100,17 @@ def search(query=None):
             if audio_info:
                 info['plot'] = f"[COLOR orange][{', '.join(audio_info)}][/COLOR] " + info['plot']
             
+            # Add file info to plot
+            info['plot'] += f"\n\n[B]Velikost:[/B] {size_mb} MB\n[B]Kvalita:[/B] {res}p"
+            
             list_item.setInfo('video', info)
+            
+            # Set stream info for icons
+            list_item.addStreamInfo('video', {'width': int(res) * 16 // 9, 'height': int(res)})
+            if 'h265' in name_lower or 'hevc' in name_lower or 'x265' in name_lower:
+                list_item.addStreamInfo('video', {'codec': 'hevc'})
+            elif 'h264' in name_lower or 'x264' in name_lower:
+                list_item.addStreamInfo('video', {'codec': 'h264'})
             
             # Set art (thumbnail)
             if item.get('img'):
@@ -129,20 +143,6 @@ def play(ident, query=None, title=None):
         if query and title:
             import history
             history.add_to_history(query, title)
-            
-            monitor = PlayerMonitor()
-            # Wait for playback to start
-            for _ in range(20):
-                if monitor.isPlaying():
-                    break
-                xbmc.sleep(500)
-            
-            if monitor.isPlaying():
-                while monitor.isPlaying() and not monitor.ended:
-                    xbmc.sleep(1000)
-                
-                # Playback finished, move to history
-                xbmc.executebuiltin('Container.Update(plugin://plugin.video.streamcontinuum/?action=history)')
     else:
         xbmcgui.Dialog().notification("StreamContinuum", "Nepodařilo se získat odkaz k přehrání", xbmcgui.NOTIFICATION_ERROR, 3000)
 
@@ -209,7 +209,36 @@ def show_trakt_watchlist():
     xbmcplugin.endOfDirectory(HANDLE)
 
 def show_trakt_playback():
-    items = trakt.get_playback()
+    # Combine playback (paused) and progress (next episodes)
+    playback_items = trakt.get_playback()
+    progress_items = trakt.get_progress()
+    
+    # Use a set to avoid duplicates if something is in both
+    seen_ids = set()
+    items = []
+    
+    for item in playback_items:
+        media_type = item.get('type')
+        if media_type == 'movie':
+            movie = item.get('movie')
+            trakt_id = movie.get('ids', {}).get('trakt')
+            if trakt_id not in seen_ids:
+                items.append(item)
+                seen_ids.add(trakt_id)
+        elif media_type == 'episode':
+            episode = item.get('episode')
+            trakt_id = episode.get('ids', {}).get('trakt')
+            if trakt_id not in seen_ids:
+                items.append(item)
+                seen_ids.add(trakt_id)
+                
+    for item in progress_items:
+        episode = item.get('episode')
+        trakt_id = episode.get('ids', {}).get('trakt')
+        if trakt_id not in seen_ids:
+            items.append(item)
+            seen_ids.add(trakt_id)
+
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", "Žádné rozehrané položky", xbmcgui.NOTIFICATION_INFO, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -236,7 +265,7 @@ def show_trakt_playback():
             
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
         list_item = xbmcgui.ListItem(label=label)
-        list_item.setArt({'icon': icon})
+        list_item.setArt({'icon': icon, 'thumb': icon})
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
     xbmcplugin.endOfDirectory(HANDLE)

@@ -97,3 +97,37 @@ def get_playback():
     except:
         pass
     return []
+
+def get_progress():
+    # Get all watched shows
+    url = "https://api.trakt.tv/sync/watched/shows?extended=noseasons"
+    try:
+        res = requests.get(url, headers=get_headers())
+        if res.status_code != 200:
+            return []
+        watched_shows = res.json()
+        
+        progress_list = []
+        # For each show, get the next episode
+        # To avoid too many requests, we only take the top 15 recently watched
+        for item in watched_shows[:15]:
+            show = item.get('show')
+            show_id = show.get('ids', {}).get('trakt')
+            if not show_id:
+                continue
+                
+            prog_url = f"https://api.trakt.tv/shows/{show_id}/progress/watched"
+            prog_res = requests.get(prog_url, headers=get_headers())
+            if prog_res.status_code == 200:
+                prog_data = prog_res.json()
+                next_ep = prog_data.get('next_episode')
+                if next_ep:
+                    progress_list.append({
+                        'type': 'episode',
+                        'show': show,
+                        'episode': next_ep
+                    })
+        return progress_list
+    except:
+        pass
+    return []
