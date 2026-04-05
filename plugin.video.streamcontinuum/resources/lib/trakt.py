@@ -67,3 +67,33 @@ def authenticate():
             break
             
     progress.close()
+
+def get_headers():
+    client_id = ADDON.getSetting('trakt_client_id')
+    token = ADDON.getSetting('trakt_token')
+    return {
+        "Content-Type": "application/json",
+        "trakt-api-version": "2",
+        "trakt-api-key": client_id,
+        "Authorization": f"Bearer {token}"
+    }
+
+def get_watchlist():
+    url = "https://api.trakt.tv/sync/watchlist"
+    try:
+        res = requests.get(url, headers=get_headers())
+        if res.status_code == 200:
+            return res.json()
+    except:
+        pass
+    return []
+
+def get_playback():
+    url = "https://api.trakt.tv/sync/playback"
+    try:
+        res = requests.get(url, headers=get_headers())
+        if res.status_code == 200:
+            return res.json()
+    except:
+        pass
+    return []

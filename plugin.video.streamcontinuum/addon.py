@@ -16,13 +16,24 @@ ADDON = xbmcaddon.Addon()
 HANDLE = int(sys.argv[1])
 
 def list_categories():
-    items = [
-        ('Populární filmy', 'trending_movies', 'DefaultMovies.png'),
-        ('Populární seriály', 'trending_shows', 'DefaultTVShows.png'),
-        ('Hledat', 'search', 'DefaultAddonsSearch.png'),
-        ('Historie', 'history', 'DefaultHistory.png'),
-        ('Nastavení', 'settings', 'DefaultAddonSettings.png')
-    ]
+    trakt_token = ADDON.getSetting('trakt_token')
+    
+    if trakt_token:
+        items = [
+            ('Pokračovat ve sledování', 'trakt_playback', 'DefaultRecentlyAddedEpisodes.png'),
+            ('Seznam k zhlédnutí', 'trakt_watchlist', 'DefaultWatchlist.png'),
+            ('Hledat', 'search', 'DefaultAddonsSearch.png'),
+            ('Historie', 'history', 'DefaultHistory.png'),
+            ('Nastavení', 'settings', 'DefaultAddonSettings.png')
+        ]
+    else:
+        items = [
+            ('Populární filmy', 'trending_movies', 'DefaultMovies.png'),
+            ('Populární seriály', 'trending_shows', 'DefaultTVShows.png'),
+            ('Hledat', 'search', 'DefaultAddonsSearch.png'),
+            ('Historie', 'history', 'DefaultHistory.png'),
+            ('Nastavení', 'settings', 'DefaultAddonSettings.png')
+        ]
     
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
@@ -157,6 +168,79 @@ def show_history():
         
     xbmcplugin.endOfDirectory(HANDLE)
 
+def show_trakt_watchlist():
+    items = trakt.get_watchlist()
+    if not items:
+        xbmcgui.Dialog().notification("StreamContinuum", "Watchlist je prázdný", xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+        
+    for item in items:
+        media_type = item.get('type')
+        if media_type == 'movie':
+            movie = item.get('movie')
+            title = movie.get('title')
+            year = movie.get('year')
+            query = f"{title} {year}" if year else title
+            label = f"{title} ({year})" if year else title
+            icon = 'DefaultMovies.png'
+        elif media_type == 'show':
+            show = item.get('show')
+            title = show.get('title')
+            year = show.get('year')
+            query = title
+            label = f"{title} ({year})" if year else title
+            icon = 'DefaultTVShows.png'
+        elif media_type == 'episode':
+            show = item.get('show')
+            episode = item.get('episode')
+            title = f"{show.get('title')} S{episode.get('season'):02d}E{episode.get('number'):02d}"
+            query = title
+            label = title
+            icon = 'DefaultRecentlyAddedEpisodes.png'
+        else:
+            continue
+            
+        url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
+        list_item = xbmcgui.ListItem(label=label)
+        list_item.setArt({'icon': icon})
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+        
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def show_trakt_playback():
+    items = trakt.get_playback()
+    if not items:
+        xbmcgui.Dialog().notification("StreamContinuum", "Žádné rozehrané položky", xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+        
+    for item in items:
+        media_type = item.get('type')
+        if media_type == 'movie':
+            movie = item.get('movie')
+            title = movie.get('title')
+            year = movie.get('year')
+            query = f"{title} {year}" if year else title
+            label = f"{title} ({year})" if year else title
+            icon = 'DefaultMovies.png'
+        elif media_type == 'episode':
+            show = item.get('show')
+            episode = item.get('episode')
+            title = f"{show.get('title')} S{episode.get('season'):02d}E{episode.get('number'):02d}"
+            query = title
+            label = title
+            icon = 'DefaultRecentlyAddedEpisodes.png'
+        else:
+            continue
+            
+        url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
+        list_item = xbmcgui.ListItem(label=label)
+        list_item.setArt({'icon': icon})
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+        
+    xbmcplugin.endOfDirectory(HANDLE)
+
 def search_prefill(query):
     keyboard = xbmc.Keyboard(query, 'Hledat další díl')
     keyboard.doModal()
@@ -191,6 +275,10 @@ def run():
     elif action == 'trending_shows':
         xbmcgui.Dialog().ok("StreamContinuum", "Zde budou populární seriály (připravujeme)")
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+    elif action == 'trakt_watchlist':
+        show_trakt_watchlist()
+    elif action == 'trakt_playback':
+        show_trakt_playback()
     elif action == 'history':
         show_history()
     else:
