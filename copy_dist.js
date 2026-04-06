@@ -5,14 +5,10 @@ const distPath = path.join(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
     console.log('Copying dist content to root for GitHub Pages...');
     
-    // Rename template.html to index.html in dist
-    if (fs.existsSync(path.join(distPath, 'template.html'))) {
-        fs.renameSync(path.join(distPath, 'template.html'), path.join(distPath, 'index.html'));
-    }
-
+    // No need to rename template.html anymore
     const files = fs.readdirSync(distPath);
     files.forEach(file => {
-        if (file === 'icon-v0.0.1.png' || file === 'fanart-v0.0.1.jpg' || file.endsWith('.zip')) return; // Skip overwriting root images and zips
+        if (file === 'icon-v0.0.1.png' || file === 'fanart-v0.0.1.png' || file.endsWith('.zip')) return; // Skip overwriting root images and zips
         const src = path.join(distPath, file);
         const dest = path.join(process.cwd(), file);
         if (fs.statSync(src).isDirectory()) {

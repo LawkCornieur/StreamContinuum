@@ -57,9 +57,9 @@ async function generateRepo() {
                     fs.copyFileSync('icon-v0.0.1.png', path.join(addonId, 'icon-v0.0.1.png'));
                     fs.copyFileSync('icon-v0.0.1.png', path.join(publicDir, 'icon-v0.0.1.png'));
                 }
-                if (fs.existsSync('fanart-v0.0.1.jpg')) {
-                    fs.copyFileSync('fanart-v0.0.1.jpg', path.join(addonId, 'fanart-v0.0.1.jpg'));
-                    fs.copyFileSync('fanart-v0.0.1.jpg', path.join(publicDir, 'fanart-v0.0.1.jpg'));
+                if (fs.existsSync('fanart-v0.0.1.png')) {
+                    fs.copyFileSync('fanart-v0.0.1.png', path.join(addonId, 'fanart-v0.0.1.png'));
+                    fs.copyFileSync('fanart-v0.0.1.png', path.join(publicDir, 'fanart-v0.0.1.png'));
                 }
 
                 // Read addon.xml
@@ -227,28 +227,6 @@ async function generateRepo() {
             indexContent = indexContent.replace(regex, newListing);
             fs.writeFileSync(indexPath, indexContent);
             console.log('Updated index.html kodi-listing section.');
-        }
-    }
-    
-    // Also update template.html so the source stays up to date
-    const templatePath = 'template.html';
-    if (fs.existsSync(templatePath)) {
-        let templateContent = fs.readFileSync(templatePath, 'utf-8');
-        
-        const listingStart = '<div id="kodi-listing" style="display:none">';
-        const listingEnd = '</div>';
-        const newListing = `${listingStart}
-      <a href="addons.xml">addons.xml</a>
-      <a href="addons.xml.md5">addons.xml.md5</a>
-      <a href="plugin.video.streamcontinuum-${latestPluginVersion}.zip">plugin.video.streamcontinuum-${latestPluginVersion}.zip</a>
-      <a href="repository.streamcontinuum-${latestRepoVersion}.zip">repository.streamcontinuum-${latestRepoVersion}.zip</a>
-    ${listingEnd}`;
-
-        const regex = new RegExp(`${listingStart}[\\s\\S]*?${listingEnd}`);
-        if (templateContent.match(regex)) {
-            templateContent = templateContent.replace(regex, newListing);
-            fs.writeFileSync(templatePath, templateContent);
-            console.log('Updated template.html kodi-listing section.');
         }
     }
 }
