@@ -5,6 +5,7 @@
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests" version="2.25.1"/>
         <import addon="inputstream.adaptive" version="2.6.0"/>
+        <import addon="script.module.pycryptodome" version="3.4.3"/>
     </requires>
     <extension point="xbmc.python.pluginsource" library="addon.py">
         <provides>video</provides>
@@ -38,8 +39,8 @@
         <description lang="cs_CZ">Repozitář pro Kodi doplněk StreamContinuum. Poskytuje automatické aktualizace.</description>
         <platform>all</platform>
         <assets>
-            <icon>icon.png</icon>
-            <fanart>fanart.jpg</fanart>
+            <icon>icon-v0.0.1.png</icon>
+            <fanart>fanart-v0.0.1.jpg</fanart>
         </assets>
     </extension>
 </addon>

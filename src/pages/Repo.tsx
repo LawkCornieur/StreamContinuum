@@ -16,7 +16,7 @@ export default function RepoPage() {
       <div className="relative overflow-hidden py-24 px-6">
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-10 dark:opacity-20 grayscale"
-          style={{ backgroundImage: "url('./fanart.jpg')" }}
+          style={{ backgroundImage: "url('./fanart-v0.0.1.jpg')" }}
         ></div>
         <div className="absolute inset-0 bg-gradient-to-b from-white/50 via-white to-white dark:from-zinc-950/50 dark:via-zinc-950 dark:to-zinc-950"></div>
         
@@ -24,7 +24,7 @@ export default function RepoPage() {
           <motion.img 
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            src="./icon.png" 
+            src="./icon-v0.0.1.png" 
             alt="StreamContinuum Logo" 
             className="w-32 h-32 mx-auto rounded-3xl shadow-2xl border-4 border-blue-500/20"
           />

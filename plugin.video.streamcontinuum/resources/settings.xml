@@ -16,6 +16,9 @@
         <setting id="ws_password" type="text" label="30013" option="hidden" default="" />
         <setting id="ws_pass_paste" type="action" label="30047" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=paste_from_clipboard&amp;target=ws_password)" />
         <setting id="ws_token" type="text" label="" visible="false" default="" />
+        <setting id="ws_sync_history" type="action" label="Synchronizovat historii na Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=sync_history)" />
+        <setting id="ws_export_settings" type="action" label="Exportovat nastavení na Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=export_settings)" />
+        <setting id="ws_import_settings" type="action" label="Importovat nastavení z Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=import_settings)" />
     </category>
     <category label="30020">
         <setting id="autoplay_next" type="bool" label="30022" default="true" />

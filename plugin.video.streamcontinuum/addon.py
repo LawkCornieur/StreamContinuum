@@ -22,22 +22,15 @@ def list_categories():
     # Set plugin category for breadcrumbs
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
 
+    items = [
+        (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png'),
+        (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png')
+    ]
+
     if trakt_token:
-        items = [
-            (ADDON.getLocalizedString(30050), 'trakt_playback', 'DefaultRecentlyAddedEpisodes.png'),
-            (ADDON.getLocalizedString(30051), 'trakt_watchlist', 'DefaultWatchlist.png'),
-            (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png'),
-            (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png'),
-            (ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png')
-        ]
-    else:
-        items = [
-            (ADDON.getLocalizedString(30055), 'trending_movies', 'DefaultMovies.png'),
-            (ADDON.getLocalizedString(30056), 'trending_shows', 'DefaultTVShows.png'),
-            (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png'),
-            (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png'),
-            (ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png')
-        ]
+        items.append(('Trakt.tv', 'trakt_menu', 'DefaultAddonVideo.png'))
+        
+    items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png'))
     
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
@@ -46,6 +39,25 @@ def list_categories():
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
     
     xbmcplugin.setContent(HANDLE, 'addons')
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def trakt_menu():
+    xbmcplugin.setPluginCategory(HANDLE, 'Trakt.tv')
+    
+    items = [
+        (ADDON.getLocalizedString(30057), 'trakt_search_menu', 'DefaultAddonsSearch.png'),
+        (ADDON.getLocalizedString(30055), 'trending_movies', 'DefaultMovies.png'),
+        (ADDON.getLocalizedString(30056), 'trending_shows', 'DefaultTVShows.png'),
+        (ADDON.getLocalizedString(30050), 'trakt_playback', 'DefaultRecentlyAddedEpisodes.png'),
+        (ADDON.getLocalizedString(30051), 'trakt_watchlist', 'DefaultWatchlist.png')
+    ]
+    
+    for label, action, icon in items:
+        url = f"{sys.argv[0]}?action={action}"
+        list_item = xbmcgui.ListItem(label=label)
+        list_item.setArt({'icon': icon, 'thumb': icon})
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+        
     xbmcplugin.endOfDirectory(HANDLE)
 
 def search(query=None):
@@ -233,37 +245,47 @@ def history_menu(query, title):
         
     xbmcplugin.endOfDirectory(HANDLE)
 
-def trakt_search(query):
-    xbmcplugin.setPluginCategory(HANDLE, f"Trakt.tv: {query}")
-    results = trakt.search_trakt(query)
-    if not results:
-        xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-        return
-        
-    for item in results:
-        media_type = item.get('type')
-        data = item.get(media_type)
-        title = data.get('title')
-        year = data.get('year')
-        trakt_id = data.get('ids', {}).get('trakt')
-        
-        label = f"{title} ({year})" if year else title
-        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(title)}"
-        
-        list_item = xbmcgui.ListItem(label=label)
-        icon = 'DefaultMovies.png' if media_type == 'movie' else 'DefaultTVShows.png'
-        list_item.setArt({'icon': icon, 'thumb': icon})
-        
-        # Context menu for marking watched/unwatched
-        cm = []
-        cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
-        cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
-        list_item.addContextMenuItems(cm)
-        
-        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
-        
-    xbmcplugin.endOfDirectory(HANDLE)
+def trakt_search(query=None):
+    if not query:
+        keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30057))
+        keyboard.doModal()
+        if keyboard.isConfirmed():
+            query = keyboard.getText()
+        else:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            return
+
+    if query:
+        xbmcplugin.setPluginCategory(HANDLE, f"Trakt.tv: {query}")
+        results = trakt.search_trakt(query)
+        if not results:
+            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            return
+            
+        for item in results:
+            media_type = item.get('type')
+            data = item.get(media_type)
+            title = data.get('title')
+            year = data.get('year')
+            trakt_id = data.get('ids', {}).get('trakt')
+            
+            label = f"{title} ({year})" if year else title
+            url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(title)}"
+            
+            list_item = xbmcgui.ListItem(label=label)
+            icon = 'DefaultMovies.png' if media_type == 'movie' else 'DefaultTVShows.png'
+            list_item.setArt({'icon': icon, 'thumb': icon})
+            
+            # Context menu for marking watched/unwatched
+            cm = []
+            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
+            list_item.addContextMenuItems(cm)
+            
+            xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+            
+        xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
     changelog = "[B]Verze 1.1.6[/B]\n"
@@ -337,6 +359,15 @@ def show_trakt_watchlist():
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
         list_item = xbmcgui.ListItem(label=label)
         list_item.setArt({'icon': icon})
+        
+        cm = []
+        cm.append((ADDON.getLocalizedString(30052), f'RunPlugin({sys.argv[0]}?action=search&query={urllib.parse.quote(query)})'))
+        trakt_id = item.get(media_type, {}).get('ids', {}).get('trakt')
+        if trakt_id:
+            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
+        list_item.addContextMenuItems(cm)
+        
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
     xbmcplugin.endOfDirectory(HANDLE)
@@ -400,6 +431,15 @@ def show_trakt_playback():
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
         list_item = xbmcgui.ListItem(label=label)
         list_item.setArt({'icon': icon, 'thumb': icon})
+        
+        cm = []
+        cm.append((ADDON.getLocalizedString(30052), f'RunPlugin({sys.argv[0]}?action=search&query={urllib.parse.quote(query)})'))
+        trakt_id = item.get(media_type, {}).get('ids', {}).get('trakt')
+        if trakt_id:
+            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
+        list_item.addContextMenuItems(cm)
+        
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
     xbmcplugin.endOfDirectory(HANDLE)
@@ -430,8 +470,36 @@ def run():
 
     if not action:
         list_categories()
+    elif action == 'trakt_menu':
+        trakt_menu()
+    elif action == 'trakt_search_menu':
+        trakt_search()
     elif action == 'trakt_auth':
         trakt.authenticate()
+    elif action == 'sync_history':
+        import sync
+        if sync.sync_history():
+            xbmcgui.Dialog().notification("StreamContinuum", "Historie synchronizována", xbmcgui.NOTIFICATION_INFO)
+        else:
+            xbmcgui.Dialog().notification("StreamContinuum", "Chyba synchronizace", xbmcgui.NOTIFICATION_ERROR)
+    elif action == 'export_settings':
+        keyboard = xbmc.Keyboard('', 'Zadejte PIN pro šifrování')
+        keyboard.doModal()
+        if keyboard.isConfirmed() and keyboard.getText():
+            import sync
+            if sync.export_settings(keyboard.getText()):
+                xbmcgui.Dialog().notification("StreamContinuum", "Nastavení exportováno", xbmcgui.NOTIFICATION_INFO)
+            else:
+                xbmcgui.Dialog().notification("StreamContinuum", "Chyba exportu", xbmcgui.NOTIFICATION_ERROR)
+    elif action == 'import_settings':
+        keyboard = xbmc.Keyboard('', 'Zadejte PIN pro dešifrování')
+        keyboard.doModal()
+        if keyboard.isConfirmed() and keyboard.getText():
+            import sync
+            if sync.import_settings(keyboard.getText()):
+                xbmcgui.Dialog().notification("StreamContinuum", "Nastavení importováno", xbmcgui.NOTIFICATION_INFO)
+            else:
+                xbmcgui.Dialog().notification("StreamContinuum", "Chyba importu (špatný PIN?)", xbmcgui.NOTIFICATION_ERROR)
     elif action == 'trakt_refresh':
         user_info = trakt.get_user_info()
         if user_info:

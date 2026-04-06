@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "prebuild": "node -e \"const fs=require('fs'); if(!fs.existsSync('public')) fs.mkdirSync('public'); if(fs.existsSync('icon.png')) fs.copyFileSync('icon.png', 'public/icon.png'); if(fs.existsSync('fanart.jpg')) fs.copyFileSync('fanart.jpg', 'public/fanart.jpg');\"",
-    "build": "vite build && node generate_repo.js",
+    "prebuild": "node -e \"const fs=require('fs'); if(!fs.existsSync('public')) fs.mkdirSync('public'); if(fs.existsSync('icon-v0.0.1.png')) fs.copyFileSync('icon-v0.0.1.png', 'public/icon-v0.0.1.png'); if(fs.existsSync('fanart-v0.0.1.jpg')) fs.copyFileSync('fanart-v0.0.1.jpg', 'public/fanart-v0.0.1.jpg');\"",
+    "build": "node generate_repo.js && vite build && node copy_dist.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "generate": "node generate_repo.js",
@@ -17,6 +17,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "adm-zip": "^0.5.17",
+    "archiver": "^7.0.1",
     "axios": "^1.14.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

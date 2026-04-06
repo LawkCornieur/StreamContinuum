@@ -40,7 +40,7 @@ export default function Dashboard() {
       {/* Hero Section / Banner */}
       <section className="relative h-[400px] rounded-3xl overflow-hidden group">
         <img
-          src="fanart.jpg" 
+          src="fanart-v0.0.1.jpg" 
           alt="StreamContinuum Banner"
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           onError={(e) => {

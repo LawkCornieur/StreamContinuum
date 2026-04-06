@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import AdmZip from 'adm-zip';
+import archiver from 'archiver';
 
 const addonsDir = '.';
 const publicDir = 'public';
@@ -53,13 +53,13 @@ async function generateRepo() {
                 console.log(`Processing ${addonId}...`);
                 
                 // Sync images from root to addon directory and public
-                if (fs.existsSync('icon.png')) {
-                    fs.copyFileSync('icon.png', path.join(addonId, 'icon.png'));
-                    fs.copyFileSync('icon.png', path.join(publicDir, 'icon.png'));
+                if (fs.existsSync('icon-v0.0.1.png')) {
+                    fs.copyFileSync('icon-v0.0.1.png', path.join(addonId, 'icon-v0.0.1.png'));
+                    fs.copyFileSync('icon-v0.0.1.png', path.join(publicDir, 'icon-v0.0.1.png'));
                 }
-                if (fs.existsSync('fanart.jpg')) {
-                    fs.copyFileSync('fanart.jpg', path.join(addonId, 'fanart.jpg'));
-                    fs.copyFileSync('fanart.jpg', path.join(publicDir, 'fanart.jpg'));
+                if (fs.existsSync('fanart-v0.0.1.jpg')) {
+                    fs.copyFileSync('fanart-v0.0.1.jpg', path.join(addonId, 'fanart-v0.0.1.jpg'));
+                    fs.copyFileSync('fanart-v0.0.1.jpg', path.join(publicDir, 'fanart-v0.0.1.jpg'));
                 }
 
                 // Read addon.xml
@@ -104,25 +104,41 @@ async function generateRepo() {
                     fs.unlinkSync(path.join(addonId, oldZip));
                 }
                 
-                const zip = new AdmZip();
-                
-                // Add everything in the addon directory to the zip, but under a folder named addonId
-                const addonFiles = fs.readdirSync(addonId);
-                for (const file of addonFiles) {
-                    if (file.endsWith('.zip')) continue;
-                    
-                    const filePath = path.join(addonId, file);
-                    const stats = fs.statSync(filePath);
-                    
-                    if (stats.isDirectory()) {
-                        zip.addLocalFolder(filePath, path.join(addonId, file));
-                    } else {
-                        zip.addLocalFile(filePath, addonId);
+                // Use archiver
+                await new Promise((resolve, reject) => {
+                    const output = fs.createWriteStream(zipPath);
+                    const archive = archiver('zip', {
+                        zlib: { level: 9 } // Sets the compression level.
+                    });
+
+                    output.on('close', function() {
+                        console.log(`Created ${zipPath} (${archive.pointer()} total bytes)`);
+                        resolve();
+                    });
+
+                    archive.on('error', function(err) {
+                        reject(err);
+                    });
+
+                    archive.pipe(output);
+
+                    // Add everything in the addon directory to the zip, but under a folder named addonId
+                    const addonFiles = fs.readdirSync(addonId);
+                    for (const file of addonFiles) {
+                        if (file.endsWith('.zip')) continue;
+                        
+                        const filePath = path.join(addonId, file);
+                        const stats = fs.statSync(filePath);
+                        
+                        if (stats.isDirectory()) {
+                            archive.directory(filePath, path.join(addonId, file));
+                        } else {
+                            archive.file(filePath, { name: path.join(addonId, file) });
+                        }
                     }
-                }
-                
-                zip.writeZip(zipPath);
-                console.log(`Created ${zipPath}`);
+
+                    archive.finalize();
+                });
                 
                 // Copy current version to public and clean up old public versions for this addon
                 const publicZipPath = path.join(publicDir, zipName);
@@ -191,34 +207,6 @@ async function generateRepo() {
     };
     fs.writeFileSync(repoDataPath, JSON.stringify(repoData, null, 2));
     console.log('Updated src/repo_data.json');
-
-    // Copy dist content to root for GitHub Pages
-    const distPath = path.join(process.cwd(), 'dist');
-    if (fs.existsSync(distPath)) {
-        console.log('Copying dist content to root for GitHub Pages...');
-        
-        // Rename template.html to index.html in dist
-        if (fs.existsSync(path.join(distPath, 'template.html'))) {
-            fs.renameSync(path.join(distPath, 'template.html'), path.join(distPath, 'index.html'));
-        }
-
-        const files = fs.readdirSync(distPath);
-        files.forEach(file => {
-            if (file === 'icon.png' || file === 'fanart.jpg') return; // Skip overwriting root images
-            const src = path.join(distPath, file);
-            const dest = path.join(process.cwd(), file);
-            if (fs.statSync(src).isDirectory()) {
-                if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-                const subFiles = fs.readdirSync(src);
-                subFiles.forEach(subFile => {
-                    fs.copyFileSync(path.join(src, subFile), path.join(dest, subFile));
-                });
-            } else {
-                fs.copyFileSync(src, dest);
-            }
-        });
-        console.log('Website files copied to root.');
-    }
 
     // Update index.html kodi-listing section ONLY
     const indexPath = 'index.html';

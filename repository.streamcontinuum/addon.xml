@@ -14,8 +14,8 @@
         <description lang="cs_CZ">Repozitář pro Kodi doplněk StreamContinuum. Poskytuje automatické aktualizace.</description>
         <platform>all</platform>
         <assets>
-            <icon>icon.png</icon>
-            <fanart>fanart.jpg</fanart>
+            <icon>icon-v0.0.1.png</icon>
+            <fanart>fanart-v0.0.1.jpg</fanart>
         </assets>
     </extension>
 </addon>

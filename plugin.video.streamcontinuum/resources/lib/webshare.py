@@ -118,3 +118,68 @@ def get_link(ident):
         print(f"Webshare get_link error: {e}")
         
     return None
+
+def upload_file(filepath, filename):
+    token = get_token()
+    if not token:
+        return None
+        
+    url = BASE_URL + 'upload_link/'
+    data = {'wst': token}
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            root = ElementTree.fromstring(response.content)
+            link = root.find('link')
+            if link is not None and link.text:
+                upload_url = link.text
+                
+                with open(filepath, 'rb') as f:
+                    files = {'file': (filename, f)}
+                    upload_data = {'wst': token}
+                    up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=30)
+                    if up_resp.status_code == 200:
+                        return True
+    except Exception as e:
+        print(f"Webshare upload_file error: {e}")
+    return False
+
+def get_user_files():
+    token = get_token()
+    if not token:
+        return []
+        
+    url = BASE_URL + 'user_files/'
+    data = {'wst': token, 'limit': 100, 'offset': 0}
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            root = ElementTree.fromstring(response.content)
+            files = []
+            for file_elem in root.findall('.//file'):
+                ident = file_elem.find('ident')
+                name = file_elem.find('name')
+                if ident is not None and name is not None:
+                    files.append({
+                        'ident': ident.text,
+                        'name': name.text
+                    })
+            return files
+    except Exception as e:
+        print(f"Webshare get_user_files error: {e}")
+    return []
+
+def delete_file(ident):
+    token = get_token()
+    if not token:
+        return False
+        
+    url = BASE_URL + 'delete_file/'
+    data = {'wst': token, 'ident': ident}
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            return True
+    except Exception as e:
+        print(f"Webshare delete_file error: {e}")
+    return False
