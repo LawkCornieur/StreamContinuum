@@ -23,7 +23,7 @@ Grafická aktiva (ikony, fanarty) jsou spravována externě skrze Google Drive, 
 - **Mechanismus**: Doplněk při spuštění kontroluje přítomnost souborů v `resources/` a `resources/media/`. Pokud chybí, automaticky je stáhne pomocí skriptu `build_assets.py`.
 - **Struktura**:
   - `icon.png` -> `resources/icon.png`
-  - `fanart.jpg` -> `resources/fanart.jpg`
-  - `fanart_tra.jpg` -> `resources/media/fanart_tra.jpg`
-  - `fanart_ws.jpg` -> `resources/media/fanart_ws.jpg`
-  - `fanart_his.jpg` -> `resources/media/fanart_his.jpg`
+  - `fanart.png` -> `resources/fanart.png`
+  - `fanart_tra.png` -> `resources/media/fanart_tra.png`
+  - `fanart_ws.png` -> `resources/media/fanart_ws.png`
+  - `fanart_his.png` -> `resources/media/fanart_his.png`

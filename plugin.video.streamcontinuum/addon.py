@@ -7,12 +7,17 @@ import xbmcaddon
 import urllib.parse
 import re
 
-# Add resources/lib to sys.path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'resources', 'lib'))
+# Add addon root and resources/lib to sys.path
+ADDON_ROOT = os.path.dirname(__file__)
+sys.path.append(ADDON_ROOT)
+sys.path.append(os.path.join(ADDON_ROOT, 'resources', 'lib'))
 
 import trakt
 import webshare
-import build_assets
+try:
+    import build_assets
+except ImportError:
+    build_assets = None
 
 ADDON = xbmcaddon.Addon()
 HANDLE = int(sys.argv[1])
@@ -20,13 +25,16 @@ ADDON_PATH = ADDON.getAddonInfo('path')
 
 def get_asset(name):
     """Get path to asset, download if missing."""
-    if name in ['icon.png', 'fanart.jpg']:
+    if name in ['icon.png', 'fanart.png']:
         local_path = os.path.join(ADDON_PATH, 'resources', name)
     else:
         local_path = os.path.join(ADDON_PATH, 'resources', 'media', name)
     
-    if not os.path.exists(local_path):
-        build_assets.download_assets()
+    if not os.path.exists(local_path) and build_assets:
+        try:
+            build_assets.download_assets()
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Failed to download assets: {str(e)}", xbmc.LOGERROR)
     
     return local_path
 
@@ -37,16 +45,16 @@ def list_categories():
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
 
     # Main Fanart
-    main_fanart = get_asset('fanart.jpg')
+    main_fanart = get_asset('fanart.png')
 
     items = [
         # Label, Action, Icon, Fanart, Color
-        (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png', get_asset('fanart_ws.jpg'), '#012a39'),
-        (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fanart_his.jpg'), '#cc9900')
+        (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png', get_asset('fanart_ws.png'), '#012a39'),
+        (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fanart_his.png'), '#cc9900')
     ]
 
     if trakt_token:
-        items.append(('Trakt.tv', 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fanart_tra.jpg'), '#9f42c6'))
+        items.append(('Trakt.tv', 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fanart_tra.png'), '#9f42c6'))
         
     items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
     
@@ -66,7 +74,7 @@ def list_categories():
 
 def trakt_menu():
     xbmcplugin.setPluginCategory(HANDLE, 'Trakt.tv')
-    fanart = get_asset('fanart_tra.jpg')
+    fanart = get_asset('fanart_tra.png')
     
     items = [
         (ADDON.getLocalizedString(30057), 'trakt_search_menu', 'DefaultAddonsSearch.png'),
