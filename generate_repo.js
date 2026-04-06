@@ -204,6 +204,7 @@ async function generateRepo() {
 
         const files = fs.readdirSync(distPath);
         files.forEach(file => {
+            if (file === 'icon.png' || file === 'fanart.jpg') return; // Skip overwriting root images
             const src = path.join(distPath, file);
             const dest = path.join(process.cwd(), file);
             if (fs.statSync(src).isDirectory()) {

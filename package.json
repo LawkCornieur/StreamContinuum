@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "prebuild": "node -e \"const fs=require('fs'); if(!fs.existsSync('public')) fs.mkdirSync('public'); if(fs.existsSync('icon.png')) fs.copyFileSync('icon.png', 'public/icon.png'); if(fs.existsSync('fanart.jpg')) fs.copyFileSync('fanart.jpg', 'public/fanart.jpg');\"",
     "build": "vite build && node generate_repo.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
