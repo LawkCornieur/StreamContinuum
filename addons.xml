@@ -19,8 +19,8 @@
         <disclaimer lang="cs_CZ">Tento doplněk nehostuje žádný obsah. Je to pouze nástroj pro přístup ke službám třetích stran.</disclaimer>
         <platform>all</platform>
         <assets>
-            <icon>icon.png</icon>
-            <fanart>fanart.jpg</fanart>
+            <icon>resources/icon.png</icon>
+            <fanart>resources/fanart.jpg</fanart>
         </assets>
     </extension>
 </addon>
