@@ -5,6 +5,7 @@ import xbmcgui
 import xbmcplugin
 import xbmcaddon
 import urllib.parse
+import re
 
 # Add resources/lib to sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'resources', 'lib'))
@@ -65,15 +66,36 @@ def search(query=None):
             xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
             return
         
+        optimize_results = ADDON.getSetting('optimize_results') == 'true'
+        
         for item in results:
             url = f"{sys.argv[0]}?action=play&ident={item['ident']}&query={urllib.parse.quote(query)}&title={urllib.parse.quote(item['name'])}"
-            size_mb = round(item['size'] / (1024 * 1024), 2)
-            label = f"{item['name']} ({size_mb} MB)"
+            
+            size_mb = item['size'] / (1024 * 1024)
+            if size_mb > 1000:
+                size_str = f"{round(size_mb / 1024, 2)} GB"
+            else:
+                size_str = f"{round(size_mb, 2)} MB"
+            
+            name = item['name']
+            ext = ""
+            if optimize_results:
+                if '.' in name:
+                    parts = name.rsplit('.', 1)
+                    name = parts[0]
+                    ext = parts[1]
+                
+                # Replace dots, commas, underscores, hyphens with spaces
+                name = re.sub(r'[.,_\-]', ' ', name)
+                # Remove multiple spaces
+                name = re.sub(r'\s+', ' ', name).strip()
+            
+            label = name
             list_item = xbmcgui.ListItem(label=label)
             
             # Set video info
             info = {
-                'title': item['name'],
+                'title': name,
                 'plot': item['description'],
                 'size': item['size'],
                 'mediatype': 'video'
@@ -106,7 +128,10 @@ def search(query=None):
                 info['plot'] = f"[COLOR orange][{', '.join(audio_info)}][/COLOR] " + info['plot']
             
             # Add file info to plot
-            info['plot'] += f"\n\n[B]{ADDON.getLocalizedString(30059)}:[/B] {size_mb} MB\n[B]{ADDON.getLocalizedString(30060)}:[/B] {res}p"
+            info['plot'] += f"\n\n[B]{ADDON.getLocalizedString(30059)}:[/B] {size_str}"
+            if ext:
+                info['plot'] += f"\n[B]{ADDON.getLocalizedString(30089)}:[/B] {ext.upper()}"
+            info['plot'] += f"\n[B]{ADDON.getLocalizedString(30060)}:[/B] {res}p"
             
             list_item.setInfo('video', info)
             
@@ -241,7 +266,13 @@ def trakt_search(query):
     xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.1.5[/B]\n"
+    changelog = "[B]Verze 1.1.6[/B]\n"
+    changelog += "- Vylepšení zobrazení výsledků hledání z Webshare\n"
+    changelog += "- Přidána možnost optimalizace názvů souborů\n"
+    changelog += "- Přepočet velikosti nad 1000 MB na GB\n"
+    changelog += "- Oprava zobrazení obrázků v doplňku i na webu\n\n"
+    
+    changelog += "[B]Verze 1.1.5[/B]\n"
     changelog += "- Kompletní lokalizace do angličtiny a češtiny\n"
     changelog += "- Přidána podpora pro tmavý režim na webu repozitáře\n"
     changelog += "- Oprava aktualizačního mechanismu doplňku\n\n"
@@ -268,8 +299,6 @@ def show_changelog():
     changelog += "- Základní historie hledání\n"
     
     xbmcgui.Dialog().textviewer(f"StreamContinuum - {ADDON.getLocalizedString(30042)}", changelog)
-
-import re
 
 def show_trakt_watchlist():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30051))

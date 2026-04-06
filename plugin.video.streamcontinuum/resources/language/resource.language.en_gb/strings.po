@@ -258,3 +258,11 @@ msgstr "Error updating"
 msgctxt "#30087"
 msgid "Edit search"
 msgstr "Edit search"
+
+msgctxt "#30088"
+msgid "Optimize search results"
+msgstr "Optimize search results"
+
+msgctxt "#30089"
+msgid "Extension"
+msgstr "Extension"

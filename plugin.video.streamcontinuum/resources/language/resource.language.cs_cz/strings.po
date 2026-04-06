@@ -258,3 +258,11 @@ msgstr "Chyba při aktualizaci"
 msgctxt "#30087"
 msgid "Edit search"
 msgstr "Upravit hledání"
+
+msgctxt "#30088"
+msgid "Optimize search results"
+msgstr "Optimalizovat výsledky hledání"
+
+msgctxt "#30089"
+msgid "Extension"
+msgstr "Přípona"

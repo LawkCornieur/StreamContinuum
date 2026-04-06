@@ -48,6 +48,12 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.1.6**
+- Vylepšení zobrazení výsledků hledání z Webshare
+- Přidána možnost optimalizace názvů souborů
+- Přepočet velikosti nad 1000 MB na GB
+- Oprava zobrazení obrázků v doplňku i na webu
+
 **Verze 1.1.5**
 - Kompletní lokalizace do angličtiny a češtiny
 - Přidána podpora pro tmavý režim na webu repozitáře
