@@ -54,12 +54,16 @@ async function generateRepo() {
                 
                 // Sync images from root to addon directory and public
                 if (fs.existsSync('icon-v0.0.1.png')) {
-                    fs.copyFileSync('icon-v0.0.1.png', path.join(addonId, 'icon-v0.0.1.png'));
+                    const iconDest = path.join(addonId, 'resources', 'icon.png');
+                    if (!fs.existsSync(path.dirname(iconDest))) fs.mkdirSync(path.dirname(iconDest), { recursive: true });
+                    fs.copyFileSync('icon-v0.0.1.png', iconDest);
                     fs.copyFileSync('icon-v0.0.1.png', path.join(publicDir, 'icon-v0.0.1.png'));
                 }
-                if (fs.existsSync('fanart-v0.0.1.png')) {
-                    fs.copyFileSync('fanart-v0.0.1.png', path.join(addonId, 'fanart-v0.0.1.png'));
-                    fs.copyFileSync('fanart-v0.0.1.png', path.join(publicDir, 'fanart-v0.0.1.png'));
+                if (fs.existsSync('fa-v0.0.1.png')) {
+                    const fanartDest = path.join(addonId, 'resources', 'fanart.png');
+                    if (!fs.existsSync(path.dirname(fanartDest))) fs.mkdirSync(path.dirname(fanartDest), { recursive: true });
+                    fs.copyFileSync('fa-v0.0.1.png', fanartDest);
+                    fs.copyFileSync('fa-v0.0.1.png', path.join(publicDir, 'fa-v0.0.1.png'));
                 }
 
                 // Read addon.xml

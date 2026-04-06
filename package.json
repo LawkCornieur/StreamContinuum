@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "prebuild": "node -e \"const fs=require('fs'); if(!fs.existsSync('public')) fs.mkdirSync('public'); if(fs.existsSync('icon-v0.0.1.png')) fs.copyFileSync('icon-v0.0.1.png', 'public/icon-v0.0.1.png'); if(fs.existsSync('fanart-v0.0.1.jpg')) fs.copyFileSync('fanart-v0.0.1.jpg', 'public/fanart-v0.0.1.jpg');\"",
+    "prebuild": "node -e \"const fs=require('fs'); if(!fs.existsSync('public')) fs.mkdirSync('public'); if(fs.existsSync('icon-v0.0.1.png')) fs.copyFileSync('icon-v0.0.1.png', 'public/icon-v0.0.1.png'); if(fs.existsSync('fa-v0.0.1.png')) fs.copyFileSync('fa-v0.0.1.png', 'public/fa-v0.0.1.png');\"",
     "build": "node generate_repo.js && vite build && node copy_dist.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
