@@ -12,9 +12,23 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'resources', 'lib'))
 
 import trakt
 import webshare
+import build_assets
 
 ADDON = xbmcaddon.Addon()
 HANDLE = int(sys.argv[1])
+ADDON_PATH = ADDON.getAddonInfo('path')
+
+def get_asset(name):
+    """Get path to asset, download if missing."""
+    if name in ['icon.png', 'fanart.jpg']:
+        local_path = os.path.join(ADDON_PATH, 'resources', name)
+    else:
+        local_path = os.path.join(ADDON_PATH, 'resources', 'media', name)
+    
+    if not os.path.exists(local_path):
+        build_assets.download_assets()
+    
+    return local_path
 
 def list_categories():
     trakt_token = ADDON.getSetting('trakt_token')
@@ -22,20 +36,29 @@ def list_categories():
     # Set plugin category for breadcrumbs
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
 
+    # Main Fanart
+    main_fanart = get_asset('fanart.jpg')
+
     items = [
-        (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png'),
-        (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png')
+        # Label, Action, Icon, Fanart, Color
+        (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png', get_asset('fanart_ws.jpg'), '#012a39'),
+        (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fanart_his.jpg'), '#cc9900')
     ]
 
     if trakt_token:
-        items.append(('Trakt.tv', 'trakt_menu', 'DefaultAddonVideo.png'))
+        items.append(('Trakt.tv', 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fanart_tra.jpg'), '#9f42c6'))
         
-    items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png'))
+    items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
     
-    for label, action, icon in items:
+    for label, action, icon, fanart, color in items:
         url = f"{sys.argv[0]}?action={action}"
-        list_item = xbmcgui.ListItem(label=label)
-        list_item.setArt({'icon': icon, 'thumb': icon})
+        display_label = f"[COLOR {color}]{label}[/COLOR]" if color else label
+        list_item = xbmcgui.ListItem(label=display_label)
+        list_item.setArt({
+            'icon': icon, 
+            'thumb': icon,
+            'fanart': fanart
+        })
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
     
     xbmcplugin.setContent(HANDLE, 'addons')
@@ -43,6 +66,7 @@ def list_categories():
 
 def trakt_menu():
     xbmcplugin.setPluginCategory(HANDLE, 'Trakt.tv')
+    fanart = get_asset('fanart_tra.jpg')
     
     items = [
         (ADDON.getLocalizedString(30057), 'trakt_search_menu', 'DefaultAddonsSearch.png'),
@@ -54,8 +78,12 @@ def trakt_menu():
     
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
-        list_item = xbmcgui.ListItem(label=label)
-        list_item.setArt({'icon': icon, 'thumb': icon})
+        list_item = xbmcgui.ListItem(label=f"[COLOR #9f42c6]{label}[/COLOR]")
+        list_item.setArt({
+            'icon': icon, 
+            'thumb': icon,
+            'fanart': fanart
+        })
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
     xbmcplugin.endOfDirectory(HANDLE)

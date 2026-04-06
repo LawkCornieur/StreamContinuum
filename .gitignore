@@ -6,3 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Kodi assets (downloaded from GDrive)
+plugin.video.streamcontinuum/resources/icon.png
+plugin.video.streamcontinuum/resources/fanart.jpg
+plugin.video.streamcontinuum/resources/media/fanart_tra.jpg
+plugin.video.streamcontinuum/resources/media/fanart_ws.jpg
+plugin.video.streamcontinuum/resources/media/fanart_his.jpg
