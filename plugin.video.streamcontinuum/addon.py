@@ -211,10 +211,10 @@ def play(ident, query=None, title=None):
             
         # Monitor playback
         monitor = PlayerMonitor()
-        while not monitor.ended:
+        # Wait a bit for the player to initialize
+        xbmc.sleep(2000)
+        while xbmc.getCondVisibility('Player.HasMedia') or xbmc.Player().isPlaying():
             xbmc.sleep(1000)
-            if not xbmc.getCondVisibility('Player.HasMedia'):
-                monitor.ended = True
                 
         # After playback logic
         after = ADDON.getSetting('after_playback')
@@ -328,7 +328,12 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.1.7[/B]\n"
+    changelog = "[B]Verze 1.1.8[/B]\n"
+    changelog += "- Oprava automatického návratu po přehrání\n"
+    changelog += "- Oprava poškození obrázků při nahrávání na GitHub\n"
+    changelog += "- Výchozí akce po přehrání nastavena na původní hledání\n\n"
+    
+    changelog += "[B]Verze 1.1.7[/B]\n"
     changelog += "- Přidána možnost volby akce po skončení přehrávání\n"
     changelog += "- Přidána funkce zálohování a obnovy nastavení na Webshare\n"
     changelog += "- Odstraněno nefunkční tlačítko návodu na webu\n"

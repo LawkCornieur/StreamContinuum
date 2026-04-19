@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addons>
-<addon id="plugin.video.streamcontinuum" name="StreamContinuum" version="1.1.7" provider-name="LawkCornieur">
+<addon id="plugin.video.streamcontinuum" name="StreamContinuum" version="1.1.6" provider-name="LawkCornieur">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests" version="2.25.1"/>
@@ -19,8 +19,8 @@
         <disclaimer lang="cs_CZ">Tento doplněk nehostuje žádný obsah. Je to pouze nástroj pro přístup ke službám třetích stran.</disclaimer>
         <platform>all</platform>
         <assets>
-            <icon>resources/icon.png</icon>
-            <fanart>resources/fanart.png</fanart>
+            <icon>icon.png</icon>
+            <fanart>fanart.jpg</fanart>
         </assets>
     </extension>
 </addon>
@@ -39,8 +39,8 @@
         <description lang="cs_CZ">Repozitář pro Kodi doplněk StreamContinuum. Poskytuje automatické aktualizace.</description>
         <platform>all</platform>
         <assets>
-            <icon>icon.png</icon>
-            <fanart>fanart.png</fanart>
+            <icon>icon-v0.0.1.png</icon>
+            <fanart>fanart-v0.0.1.jpg</fanart>
         </assets>
     </extension>
 </addon>
