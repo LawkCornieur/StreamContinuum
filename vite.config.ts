@@ -13,7 +13,7 @@ export default defineConfig(({mode}) => {
     base: './',
     build: {
       rollupOptions: {
-        input: 'index.html'
+        input: 'template.html'
       }
     },
     define: {

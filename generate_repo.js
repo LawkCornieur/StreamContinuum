@@ -45,7 +45,7 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     const addonPyPath = path.join('plugin.video.streamcontinuum', 'addon.py');
     if (fs.existsSync(addonPyPath)) {
         const addonPy = fs.readFileSync(addonPyPath, 'utf-8');
-        const changelogMatch = addonPy.match(/def show_changelog\(\):[\s\S]*?changelog = "([\s\S]*?)"/);
+        const changelogMatch = addonPy.match(/def show_changelog\(\):[\s\S]*?changelog\s*=\s*["']([\s\S]*?)["']/);
         if (changelogMatch) {
             changelog = changelogMatch[1].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
             // Extract the rest of the changelog lines
@@ -54,7 +54,7 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
             for (const line of lines) {
                 if (line.includes('def show_changelog():')) inChangelog = true;
                 if (inChangelog && line.includes('changelog += "')) {
-                    const match = line.match(/changelog \+= "([\s\S]*?)"/);
+                    const match = line.match(/changelog\s*\+=\s*["']([\s\S]*?)["']/);
                     if (match) {
                         changelog += match[1].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
                     }
@@ -284,10 +284,10 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     fs.writeFileSync(repoDataPath, JSON.stringify(repoData, null, 2));
     console.log('Updated src/repo_data.json');
 
-    // Update index.html kodi-listing section ONLY
-    const indexPath = 'index.html';
-    if (fs.existsSync(indexPath)) {
-        let indexContent = fs.readFileSync(indexPath, 'utf-8');
+    // Update template.html kodi-listing section ONLY
+    const templatePath = 'template.html';
+    if (fs.existsSync(templatePath)) {
+        let templateContent = fs.readFileSync(templatePath, 'utf-8');
         
         const listingStart = '<div id="kodi-listing" style="display:none">';
         const listingEnd = '</div>';
@@ -299,10 +299,10 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     ${listingEnd}`;
 
         const regex = new RegExp(`${listingStart}[\\s\\S]*?${listingEnd}`);
-        if (indexContent.match(regex)) {
-            indexContent = indexContent.replace(regex, newListing);
-            fs.writeFileSync(indexPath, indexContent);
-            console.log('Updated index.html kodi-listing section.');
+        if (templateContent.match(regex)) {
+            templateContent = templateContent.replace(regex, newListing);
+            fs.writeFileSync(templatePath, templateContent);
+            console.log('Updated template.html kodi-listing section.');
         }
     }
 }
