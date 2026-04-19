@@ -8,7 +8,7 @@ if (fs.existsSync(distPath)) {
     // No need to rename template.html anymore
     const files = fs.readdirSync(distPath);
     files.forEach(file => {
-        if (file === 'icon-v0.0.1.png' || file === 'fa-v0.0.1.png' || file.endsWith('.zip')) return; // Skip overwriting root images and zips
+        if (file === 'icon.png' || file === 'fa.png' || file.endsWith('.zip')) return; // Skip overwriting root images and zips
         const src = path.join(distPath, file);
         const dest = path.join(process.cwd(), file);
         if (fs.statSync(src).isDirectory()) {

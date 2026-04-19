@@ -52,18 +52,61 @@ async function generateRepo() {
             try {
                 console.log(`Processing ${addonId}...`);
                 
-                // Sync images from root to addon directory and public
-                if (fs.existsSync('icon-v0.0.1.png')) {
-                    const iconDest = path.join(addonId, 'resources', 'icon.png');
-                    if (!fs.existsSync(path.dirname(iconDest))) fs.mkdirSync(path.dirname(iconDest), { recursive: true });
-                    fs.copyFileSync('icon-v0.0.1.png', iconDest);
-                    fs.copyFileSync('icon-v0.0.1.png', path.join(publicDir, 'icon-v0.0.1.png'));
+                // Sync images from media-src to addon directory and public
+                const mediaSrc = 'media-src';
+                
+                // Main Icon
+                if (fs.existsSync(path.join(mediaSrc, 'icon.png'))) {
+                    // Copy to resources for plugin
+                    const iconResources = path.join(addonId, 'resources', 'icon.png');
+                    if (!fs.existsSync(path.dirname(iconResources))) fs.mkdirSync(path.dirname(iconResources), { recursive: true });
+                    fs.copyFileSync(path.join(mediaSrc, 'icon.png'), iconResources);
+                    // Copy to root for repository
+                    fs.copyFileSync(path.join(mediaSrc, 'icon.png'), path.join(addonId, 'icon.png'));
+                    // Copy to public for web
+                    fs.copyFileSync(path.join(mediaSrc, 'icon.png'), path.join(publicDir, 'icon.png'));
                 }
-                if (fs.existsSync('fa-v0.0.1.png')) {
-                    const fanartDest = path.join(addonId, 'resources', 'fanart.png');
-                    if (!fs.existsSync(path.dirname(fanartDest))) fs.mkdirSync(path.dirname(fanartDest), { recursive: true });
-                    fs.copyFileSync('fa-v0.0.1.png', fanartDest);
-                    fs.copyFileSync('fa-v0.0.1.png', path.join(publicDir, 'fa-v0.0.1.png'));
+                
+                // Main Fanart
+                if (fs.existsSync(path.join(mediaSrc, 'fa.png'))) {
+                    // Copy to resources for plugin
+                    const fanartResources = path.join(addonId, 'resources', 'fanart.png');
+                    if (!fs.existsSync(path.dirname(fanartResources))) fs.mkdirSync(path.dirname(fanartResources), { recursive: true });
+                    fs.copyFileSync(path.join(mediaSrc, 'fa.png'), fanartResources);
+                    // Copy to root for repository
+                    fs.copyFileSync(path.join(mediaSrc, 'fa.png'), path.join(addonId, 'fanart.png'));
+                    // Copy to public for web
+                    fs.copyFileSync(path.join(mediaSrc, 'fa.png'), path.join(publicDir, 'fa.png'));
+                }
+
+                // Section Fanarts (media folder)
+                const sectionMedia = {
+                    'fa-ws.png': 'fa-ws.png',
+                    'fa-trakt.png': 'fa-trakt.png',
+                    'fa-history.png': 'fa-history.png'
+                };
+
+                for (const [src, dest] of Object.entries(sectionMedia)) {
+                    if (fs.existsSync(path.join(mediaSrc, src))) {
+                        const destPath = path.join(addonId, 'resources', 'media', dest);
+                        if (!fs.existsSync(path.dirname(destPath))) fs.mkdirSync(path.dirname(destPath), { recursive: true });
+                        fs.copyFileSync(path.join(mediaSrc, src), destPath);
+                        fs.copyFileSync(path.join(mediaSrc, src), path.join(publicDir, src));
+                    }
+                }
+
+                // Sync Favicons
+                const faviconSrc = path.join(mediaSrc, 'favicon');
+                if (fs.existsSync(faviconSrc)) {
+                    const favicons = fs.readdirSync(faviconSrc);
+                    for (const fav of favicons) {
+                        fs.copyFileSync(path.join(faviconSrc, fav), path.join(publicDir, fav));
+                    }
+                }
+
+                // Sync Webmanifest
+                if (fs.existsSync('site.webmanifest')) {
+                    fs.copyFileSync('site.webmanifest', path.join(publicDir, 'site.webmanifest'));
                 }
 
                 // Read addon.xml

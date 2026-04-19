@@ -14,29 +14,16 @@ sys.path.append(os.path.join(ADDON_ROOT, 'resources', 'lib'))
 
 import trakt
 import webshare
-try:
-    import build_assets
-except ImportError:
-    build_assets = None
 
 ADDON = xbmcaddon.Addon()
 HANDLE = int(sys.argv[1])
 ADDON_PATH = ADDON.getAddonInfo('path')
 
 def get_asset(name):
-    """Get path to asset, download if missing."""
+    """Get path to asset."""
     if name in ['icon.png', 'fanart.png']:
-        local_path = os.path.join(ADDON_PATH, 'resources', name)
-    else:
-        local_path = os.path.join(ADDON_PATH, 'resources', 'media', name)
-    
-    if not os.path.exists(local_path) and build_assets:
-        try:
-            build_assets.download_assets()
-        except Exception as e:
-            xbmc.log(f"StreamContinuum: Failed to download assets: {str(e)}", xbmc.LOGERROR)
-    
-    return local_path
+        return os.path.join(ADDON_PATH, 'resources', name)
+    return os.path.join(ADDON_PATH, 'resources', 'media', name)
 
 def list_categories():
     trakt_token = ADDON.getSetting('trakt_token')
@@ -49,12 +36,12 @@ def list_categories():
 
     items = [
         # Label, Action, Icon, Fanart, Color
-        (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png', get_asset('fanart_ws.png'), '#012a39'),
-        (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fanart_his.png'), '#cc9900')
+        (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png', get_asset('fa-ws.png'), '#012a39'),
+        (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fa-history.png'), '#cc9900')
     ]
 
     if trakt_token:
-        items.append(('Trakt.tv', 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fanart_tra.png'), '#9f42c6'))
+        items.append(('Trakt.tv', 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fa-trakt.png'), '#9f42c6'))
         
     items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
     
@@ -74,7 +61,7 @@ def list_categories():
 
 def trakt_menu():
     xbmcplugin.setPluginCategory(HANDLE, 'Trakt.tv')
-    fanart = get_asset('fanart_tra.png')
+    fanart = get_asset('fa-trakt.png')
     
     items = [
         (ADDON.getLocalizedString(30057), 'trakt_search_menu', 'DefaultAddonsSearch.png'),
@@ -221,6 +208,23 @@ def play(ident, query=None, title=None):
         if query and title:
             import history
             history.add_to_history(query, title)
+            
+        # Monitor playback
+        monitor = PlayerMonitor()
+        while not monitor.ended:
+            xbmc.sleep(1000)
+            if not xbmc.getCondVisibility('Player.HasMedia'):
+                monitor.ended = True
+                
+        # After playback logic
+        after = ADDON.getSetting('after_playback')
+        if after == '0': # Původní hledání
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(query)})')
+        elif after == '1': # Prázdné hledání
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search)')
+        elif after == '3': # Historie
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history)')
+        # case 2 is "Last results", which is default behavior in Kodi
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
 
@@ -324,7 +328,14 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.1.6[/B]\n"
+    changelog = "[B]Verze 1.1.7[/B]\n"
+    changelog += "- Přidána možnost volby akce po skončení přehrávání\n"
+    changelog += "- Přidána funkce zálohování a obnovy nastavení na Webshare\n"
+    changelog += "- Odstraněno nefunkční tlačítko návodu na webu\n"
+    changelog += "- Přechod na jednotný zdroj obrázků z media-src\n"
+    changelog += "- Odstraněny staré skripty pro stahování z Google Drive\n\n"
+    
+    changelog += "[B]Verze 1.1.6[/B]\n"
     changelog += "- Vylepšení zobrazení výsledků hledání z Webshare\n"
     changelog += "- Přidána možnost optimalizace názvů souborů\n"
     changelog += "- Přepočet velikosti nad 1000 MB na GB\n"

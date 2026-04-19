@@ -16,7 +16,7 @@ export default function RepoPage() {
       <div className="relative overflow-hidden py-24 px-6">
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-10 dark:opacity-20 grayscale"
-          style={{ backgroundImage: "url('fa-v0.0.1.png')" }}
+          style={{ backgroundImage: "url('fa.png')" }}
         ></div>
         <div className="absolute inset-0 bg-gradient-to-b from-white/50 via-white to-white dark:from-zinc-950/50 dark:via-zinc-950 dark:to-zinc-950"></div>
         
@@ -24,7 +24,7 @@ export default function RepoPage() {
           <motion.img 
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            src="icon-v0.0.1.png" 
+            src="icon.png" 
             alt="StreamContinuum Logo" 
             className="w-32 h-32 mx-auto rounded-3xl shadow-2xl border-4 border-blue-500/20"
           />
@@ -56,10 +56,6 @@ export default function RepoPage() {
             <a href={`repository.streamcontinuum-${repoData.latestRepoVersion}.zip`} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-xl shadow-blue-900/20 flex items-center gap-3 group">
               <Download className="w-5 h-5 group-hover:bounce" />
               Stáhnout Repozitář (v{repoData.latestRepoVersion})
-            </a>
-            <a href="#install" className="bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white px-8 py-4 rounded-2xl font-bold transition-all border border-black/5 dark:border-white/5 flex items-center gap-3">
-              <BookOpen className="w-5 h-5" />
-              Návod k instalaci
             </a>
           </motion.div>
 
