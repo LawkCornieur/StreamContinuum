@@ -8,9 +8,35 @@ const publicDir = 'public';
 const addonsXmlPath = path.join(publicDir, 'addons.xml');
 const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
 
-async function generateRepo() {
+    async function generateRepo() {
     // Ensure public directory exists for Vite
     if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir);
+
+    const mediaSrc = 'media-src';
+    if (!fs.existsSync(mediaSrc)) fs.mkdirSync(mediaSrc);
+
+    // Helper to find asset with fallbacks
+    const findAsset = (name) => {
+        const primary = path.join(mediaSrc, name);
+        if (fs.existsSync(primary)) return primary;
+        
+        const fallbacks = [
+            path.join('.', name),
+            path.join(mediaSrc, name.replace('.png', '.jpg')),
+            path.join('.', name.replace('.png', '.jpg')),
+        ];
+        
+        if (name === 'fa.png') {
+            fallbacks.push(path.join('.', 'fanart.jpg'));
+            fallbacks.push(path.join(mediaSrc, 'fanart.jpg'));
+            fallbacks.push(path.join(mediaSrc, 'fa.jpg'));
+        }
+        
+        for (const f of fallbacks) {
+            if (fs.existsSync(f)) return f;
+        }
+        return null;
+    };
 
     let addonsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<addons>\n';
     
@@ -56,27 +82,29 @@ async function generateRepo() {
                 const mediaSrc = 'media-src';
                 
                 // Main Icon
-                if (fs.existsSync(path.join(mediaSrc, 'icon.png'))) {
+                const iconPath = findAsset('icon.png');
+                if (iconPath) {
                     // Copy to resources for plugin
                     const iconResources = path.join(addonId, 'resources', 'icon.png');
                     if (!fs.existsSync(path.dirname(iconResources))) fs.mkdirSync(path.dirname(iconResources), { recursive: true });
-                    fs.copyFileSync(path.join(mediaSrc, 'icon.png'), iconResources);
+                    fs.copyFileSync(iconPath, iconResources);
                     // Copy to root for repository
-                    fs.copyFileSync(path.join(mediaSrc, 'icon.png'), path.join(addonId, 'icon.png'));
+                    fs.copyFileSync(iconPath, path.join(addonId, 'icon.png'));
                     // Copy to public for web
-                    fs.copyFileSync(path.join(mediaSrc, 'icon.png'), path.join(publicDir, 'icon.png'));
+                    fs.copyFileSync(iconPath, path.join(publicDir, 'icon.png'));
                 }
                 
                 // Main Fanart
-                if (fs.existsSync(path.join(mediaSrc, 'fa.png'))) {
+                const fanartPath = findAsset('fa.png');
+                if (fanartPath) {
                     // Copy to resources for plugin
                     const fanartResources = path.join(addonId, 'resources', 'fanart.png');
                     if (!fs.existsSync(path.dirname(fanartResources))) fs.mkdirSync(path.dirname(fanartResources), { recursive: true });
-                    fs.copyFileSync(path.join(mediaSrc, 'fa.png'), fanartResources);
+                    fs.copyFileSync(fanartPath, fanartResources);
                     // Copy to root for repository
-                    fs.copyFileSync(path.join(mediaSrc, 'fa.png'), path.join(addonId, 'fanart.png'));
+                    fs.copyFileSync(fanartPath, path.join(addonId, 'fanart.png'));
                     // Copy to public for web
-                    fs.copyFileSync(path.join(mediaSrc, 'fa.png'), path.join(publicDir, 'fa.png'));
+                    fs.copyFileSync(fanartPath, path.join(publicDir, 'fa.png'));
                 }
 
                 // Section Fanarts (media folder)
@@ -87,11 +115,12 @@ async function generateRepo() {
                 };
 
                 for (const [src, dest] of Object.entries(sectionMedia)) {
-                    if (fs.existsSync(path.join(mediaSrc, src))) {
+                    const sectionPath = findAsset(src);
+                    if (sectionPath) {
                         const destPath = path.join(addonId, 'resources', 'media', dest);
                         if (!fs.existsSync(path.dirname(destPath))) fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                        fs.copyFileSync(path.join(mediaSrc, src), destPath);
-                        fs.copyFileSync(path.join(mediaSrc, src), path.join(publicDir, src));
+                        fs.copyFileSync(sectionPath, destPath);
+                        fs.copyFileSync(sectionPath, path.join(publicDir, src));
                     }
                 }
 

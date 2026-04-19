@@ -218,12 +218,16 @@ def play(ident, query=None, title=None):
                 
         # After playback logic
         after = ADDON.getSetting('after_playback')
-        if after == '0': # Původní hledání
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(query)})')
-        elif after == '1': # Prázdné hledání
+        safe_query = urllib.parse.quote(query) if query else ""
+        
+        if after == '0' and query: # Původní hledání (automaticky)
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query})')
+        elif after == '1': # Prázdné hledání (dialog)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search)')
         elif after == '3': # Historie
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history)')
+        elif after == '4' and query: # Předvyplněné hledání (dialog s textem)
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query})')
         # case 2 is "Last results", which is default behavior in Kodi
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
@@ -328,7 +332,13 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.1.8[/B]\n"
+    changelog = "[B]Verze 1.1.9[/B]\n"
+    changelog += "- Oprava cesty ke grafickým souborům\n"
+    changelog += "- Odstraněna nefunkční volba maximálního rozlišení\n"
+    changelog += "- Oprava a rozšíření voleb po skončení přehrávání\n"
+    changelog += "- Přidána volba předvyplněného hledání po přehrání\n\n"
+    
+    changelog += "[B]Verze 1.1.8[/B]\n"
     changelog += "- Oprava automatického návratu po přehrání\n"
     changelog += "- Oprava poškození obrázků při nahrávání na GitHub\n"
     changelog += "- Výchozí akce po přehrání nastavena na původní hledání\n\n"

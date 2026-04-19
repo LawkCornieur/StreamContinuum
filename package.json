@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "prebuild": "node -e \"const fs=require('fs'); if(!fs.existsSync('public')) fs.mkdirSync('public'); const mediaSrc='media-src'; if(fs.existsSync(mediaSrc+'/icon.png')) fs.copyFileSync(mediaSrc+'/icon.png', 'public/icon.png'); if(fs.existsSync(mediaSrc+'/fa.png')) fs.copyFileSync(mediaSrc+'/fa.png', 'public/fa.png');\"",
+    "prebuild": "node -e \"const fs=require('fs'); if(!fs.existsSync('public')) fs.mkdirSync('public'); const find=(n)=>{if(fs.existsSync('media-src/'+n)) return 'media-src/'+n; if(fs.existsSync(n)) return n; if(fs.existsSync('fanart.jpg') && n=='fa.png') return 'fanart.jpg'; return null;}; const i=find('icon.png'); if(i) fs.copyFileSync(i, 'public/icon.png'); const f=find('fa.png'); if(f) fs.copyFileSync(f, 'public/fa.png');\"",
     "build": "node generate_repo.js && vite build && node copy_dist.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",

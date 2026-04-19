@@ -266,3 +266,27 @@ msgstr "Optimalizovat výsledky hledání"
 msgctxt "#30089"
 msgid "Extension"
 msgstr "Přípona"
+
+msgctxt "#30090"
+msgid "After playback"
+msgstr "Po skončení přehrávání"
+
+msgctxt "#30091"
+msgid "Original search"
+msgstr "Původní hledání (automaticky)"
+
+msgctxt "#30092"
+msgid "Empty search"
+msgstr "Prázdné hledání (dialog)"
+
+msgctxt "#30093"
+msgid "Last results"
+msgstr "Poslední výsledky (zůstat v seznamu)"
+
+msgctxt "#30094"
+msgid "History"
+msgstr "Historie hledání"
+
+msgctxt "#30095"
+msgid "Prefilled search"
+msgstr "Předvyplněné hledání (dialog s textem)"
