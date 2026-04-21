@@ -7,6 +7,7 @@ try:
 except ImportError:
     from Cryptodome.Cipher import AES
     from Cryptodome.Util.Padding import pad, unpad
+import xbmc
 import xbmcaddon
 import xbmcvfs
 import webshare
