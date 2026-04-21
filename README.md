@@ -17,7 +17,7 @@ Jednoduchý stream doplněk pro Kodi s integrací Trakt.tv a Webshare.cz.
 3. Vyberte **Instalovat ze souboru zip**.
 4. Pokud se zobrazí varování o neznámých zdrojích, povolte je v nastavení.
 5. Najděte přidaný zdroj `StreamContinuum Repo`.
-6. Vyberte soubor `repository.streamcontinuum-1.1.0.zip`.
+6. Vyberte soubor `repository.streamcontinuum-1.1.1.zip`.
 
 ### 3. Nainstalujte doplněk StreamContinuum
 1. Vyberte **Instalovat z repozitáře**.
@@ -47,6 +47,38 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 
 ## Seznam změn
+
+**Verze 1.2.2**
+- Oprava automatického sestavení na GitHub Actions (vyřešen konflikt s 'unstaged changes')
+- Sjednocení procesu nahrávání vygenerovaných souborů do repozitáře
+
+**Verze 1.2.1**
+- Oprava poškození grafických souborů při nahrávání z AI Studia (vypnuto LFS)
+- Oprava konfliktů při automatickém sestavení repozitáře na GitHubu
+
+**Verze 1.2.0**
+- Oprava exportu nastavení (kompatibilita s novějšími verzemi šifrovací knihovny)
+- Zvýšení spolehlivosti předvyplněného hledání po přehrání
+- Oprava synchronizace verze a seznamu změn v repozitáři
+
+**Verze 1.1.9**
+- Oprava cesty ke grafickým souborům
+- Odstraněna nefunkční volba maximálního rozlišení
+- Oprava a rozšíření voleb po skončení přehrávání
+- Přidána volba předvyplněného hledání po přehrání
+- Přidána uvítací melodie při startu Kodi (lze vypnout v nastavení)
+
+**Verze 1.1.8**
+- Oprava automatického návratu po přehrání
+- Oprava poškození obrázků při nahrávání na GitHub
+- Výchozí akce po přehrání nastavena na původní hledání
+
+**Verze 1.1.7**
+- Přidána možnost volby akce po skončení přehrávání
+- Přidána funkce zálohování a obnovy nastavení na Webshare
+- Odstraněno nefunkční tlačítko návodu na webu
+- Přechod na jednotný zdroj obrázků z media-src
+- Odstraněny staré skripty pro stahování z Google Drive
 
 **Verze 1.1.6**
 - Vylepšení zobrazení výsledků hledání z Webshare
