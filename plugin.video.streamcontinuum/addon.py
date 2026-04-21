@@ -336,7 +336,11 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.2.0[/B]\n"
+    changelog = "[B]Verze 1.2.1[/B]\n"
+    changelog += "- Oprava poškození grafických souborů při nahrávání z AI Studia (vypnuto LFS)\n"
+    changelog += "- Oprava konfliktů při automatickém sestavení repozitáře na GitHubu\n\n"
+
+    changelog += "[B]Verze 1.2.0[/B]\n"
     changelog += "- Oprava exportu nastavení (kompatibilita s novějšími verzemi šifrovací knihovny)\n"
     changelog += "- Zvýšení spolehlivosti předvyplněného hledání po přehrání\n"
     changelog += "- Oprava synchronizace verze a seznamu změn v repozitáři\n\n"
