@@ -15,6 +15,9 @@ if (fs.existsSync(distPath)) {
     const files = fs.readdirSync(distPath);
     files.forEach(file => {
         // Protected files that should never be overwritten by web build
+        if (file === 'template.html' || file === 'index.html') {
+            return;
+        }
         if (file === 'icon.png' || file === 'fa.png' || file.endsWith('.zip') || file.endsWith('.png')) {
              if (fs.existsSync(path.join(process.cwd(), file))) {
                  console.log(`Skipping protected file ${file}`);
