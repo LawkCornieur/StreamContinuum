@@ -7,6 +7,7 @@ try:
 except ImportError:
     from Cryptodome.Cipher import AES
     from Cryptodome.Util.Padding import pad, unpad
+# This is a virtual module provided by Kodi, it must be imported for the addon to function.
 import xbmc
 import xbmcaddon
 import xbmcvfs

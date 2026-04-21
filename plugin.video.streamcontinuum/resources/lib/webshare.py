@@ -1,4 +1,5 @@
 import requests
+# This is a virtual module provided by Kodi, it must be imported for the addon to function.
 import xbmc
 import xbmcaddon
 import xbmcgui
