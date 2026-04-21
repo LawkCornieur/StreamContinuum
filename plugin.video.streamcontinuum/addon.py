@@ -336,7 +336,11 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.2.1[/B]\n"
+    changelog = "[B]Verze 1.2.2[/B]\n"
+    changelog += "- Oprava automatického sestavení na GitHub Actions (vyřešen konflikt s 'unstaged changes')\n"
+    changelog += "- Sjednocení procesu nahrávání vygenerovaných souborů do repozitáře\n\n"
+
+    changelog += "[B]Verze 1.2.1[/B]\n"
     changelog += "- Oprava poškození grafických souborů při nahrávání z AI Studia (vypnuto LFS)\n"
     changelog += "- Oprava konfliktů při automatickém sestavení repozitáře na GitHubu\n\n"
 

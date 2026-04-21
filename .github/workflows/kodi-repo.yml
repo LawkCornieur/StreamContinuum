@@ -38,7 +38,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add addons.xml addons.xml.md5 *.zip plugin.video.streamcontinuum/*.zip repository.streamcontinuum/*.zip index.html template.html src/repo_data.json assets/ media-src/ *.png *.ico *.webmanifest README.md
+          git add .
           git commit -m "Automated Kodi repo and web update [skip ci]" || echo "No changes to commit"
-          git pull --rebase origin main
+          git pull --rebase --autostash origin main
           git push

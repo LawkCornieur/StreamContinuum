@@ -46,18 +46,22 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     if (fs.existsSync(addonPyPath)) {
         const addonPy = fs.readFileSync(addonPyPath, 'utf-8');
         // Match both single and double quotes, and handle potential whitespace
-        const changelogMatch = addonPy.match(/def show_changelog\(\):[\s\S]*?changelog\s*=\s*["']([\s\S]*?)["']/);
+        const changelogMatch = addonPy.match(/def show_changelog\(\):[\s\S]*?changelog\s*=\s*(["'])([\s\S]*?)\1/);
         if (changelogMatch) {
-            changelog = changelogMatch[1].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
+            changelog = changelogMatch[2].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
             // Extract the rest of the changelog lines
             const lines = addonPy.split('\n');
             let inChangelog = false;
             for (const line of lines) {
                 if (line.includes('def show_changelog():')) inChangelog = true;
                 if (inChangelog && (line.includes('changelog += "') || line.includes("changelog += '"))) {
-                    const match = line.match(/changelog\s*\+=\s*["']([\s\S]*?)["']/);
-                    if (match) {
-                        changelog += match[1].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
+                    // Match the outer quotes by checking which one is used first
+                    const quote = line.includes('changelog += "') ? '"' : "'";
+                    const startIdx = line.indexOf(quote);
+                    const endIdx = line.lastIndexOf(quote);
+                    if (startIdx !== -1 && endIdx !== -1 && startIdx !== endIdx) {
+                        const content = line.substring(startIdx + 1, endIdx);
+                        changelog += content.replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
                     }
                 }
                 if (inChangelog && line.includes('xbmcgui.Dialog().textviewer')) break;
