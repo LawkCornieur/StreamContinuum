@@ -221,12 +221,16 @@ def play(ident, query=None, title=None):
         safe_query = urllib.parse.quote(query) if query else ""
         
         if after == '0' and query: # Původní hledání (automaticky)
+            xbmc.sleep(500)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query})')
         elif after == '1': # Prázdné hledání (dialog)
+            xbmc.sleep(500)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search)')
         elif after == '3': # Historie
+            xbmc.sleep(500)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history)')
         elif after == '4' and query: # Předvyplněné hledání (dialog s textem)
+            xbmc.sleep(500)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query})')
         # case 2 is "Last results", which is default behavior in Kodi
     else:
@@ -332,7 +336,12 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.1.9[/B]\n"
+    changelog = "[B]Verze 1.2.0[/B]\n"
+    changelog += "- Oprava exportu nastavení (kompatibilita s novějšími verzemi šifrovací knihovny)\n"
+    changelog += "- Zvýšení spolehlivosti předvyplněného hledání po přehrání\n"
+    changelog += "- Oprava synchronizace verze a seznamu změn v repozitáři\n\n"
+
+    changelog += "[B]Verze 1.1.9[/B]\n"
     changelog += "- Oprava cesty ke grafickým souborům\n"
     changelog += "- Odstraněna nefunkční volba maximálního rozlišení\n"
     changelog += "- Oprava a rozšíření voleb po skončení přehrávání\n"

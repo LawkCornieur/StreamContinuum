@@ -45,6 +45,7 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     const addonPyPath = path.join('plugin.video.streamcontinuum', 'addon.py');
     if (fs.existsSync(addonPyPath)) {
         const addonPy = fs.readFileSync(addonPyPath, 'utf-8');
+        // Match both single and double quotes, and handle potential whitespace
         const changelogMatch = addonPy.match(/def show_changelog\(\):[\s\S]*?changelog\s*=\s*["']([\s\S]*?)["']/);
         if (changelogMatch) {
             changelog = changelogMatch[1].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
@@ -53,7 +54,7 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
             let inChangelog = false;
             for (const line of lines) {
                 if (line.includes('def show_changelog():')) inChangelog = true;
-                if (inChangelog && line.includes('changelog += "')) {
+                if (inChangelog && (line.includes('changelog += "') || line.includes("changelog += '"))) {
                     const match = line.match(/changelog\s*\+=\s*["']([\s\S]*?)["']/);
                     if (match) {
                         changelog += match[1].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');

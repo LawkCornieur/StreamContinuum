@@ -1,8 +1,12 @@
 import os
 import json
 import hashlib
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
+try:
+    from Crypto.Cipher import AES
+    from Crypto.Util.Padding import pad, unpad
+except ImportError:
+    from Cryptodome.Cipher import AES
+    from Cryptodome.Util.Padding import pad, unpad
 import xbmcaddon
 import xbmcvfs
 import webshare
