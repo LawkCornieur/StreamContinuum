@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addons>
-<addon id="plugin.video.streamcontinuum" name="StreamContinuum" version="1.2.2" provider-name="LawkCornieur">
+<addon id="plugin.video.streamcontinuum" name="StreamContinuum" version="1.1.6" provider-name="LawkCornieur">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests" version="2.25.1"/>
@@ -10,7 +10,6 @@
     <extension point="xbmc.python.pluginsource" library="addon.py">
         <provides>video</provides>
     </extension>
-    <extension point="xbmc.service" library="service.py" />
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">Simple stream addon with Trakt.tv and Webshare integration.</summary>
         <summary lang="cs_CZ">Jednoduchý stream doplněk s integrací Trakt.tv a Webshare.</summary>
@@ -20,12 +19,12 @@
         <disclaimer lang="cs_CZ">Tento doplněk nehostuje žádný obsah. Je to pouze nástroj pro přístup ke službám třetích stran.</disclaimer>
         <platform>all</platform>
         <assets>
-            <icon>resources/icon.png</icon>
-            <fanart>resources/fa.png</fanart>
+            <icon>icon.png</icon>
+            <fanart>fa.png</fanart>
         </assets>
     </extension>
 </addon>
-<addon id="repository.streamcontinuum" name="StreamContinuum Repository" version="1.1.1" provider-name="LawkCornieur">
+<addon id="repository.streamcontinuum" name="StreamContinuum Repository" version="1.1.0" provider-name="LawkCornieur">
     <extension point="xbmc.addon.repository" name="StreamContinuum Repository">
         <dir>
             <info compressed="false">https://lawkcornieur.github.io/StreamContinuum/addons.xml</info>
