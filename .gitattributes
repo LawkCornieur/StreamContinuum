@@ -1,7 +1,6 @@
 * text=auto eol=lf
-
 # Force binary files to be treated as such
-*.png binary
+*.png filter=lfs diff=lfs merge=lfs -text
 *.jpg binary
 *.jpeg binary
 *.gif binary
@@ -12,3 +11,4 @@
 *.woff2 binary
 *.ttf binary
 *.eot binary
+*.mp3 filter=lfs diff=lfs merge=lfs -text
