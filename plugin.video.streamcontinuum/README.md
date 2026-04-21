@@ -17,9 +17,8 @@ StreamContinuum je moderní Kodi doplněk pro Webshare.cz s integrací Trakt.tv.
 Tento projekt je vyvíjen s pomocí Google AI Studio.
 
 ## Správa obrázků (Asset Management)
-Grafická aktiva (ikony, fanarty) jsou spravována externě skrze Google Drive, který slouží jako "single source of truth". 
+Grafická aktiva (ikony, fanarty) jsou spravována ze složky media-src, který slouží jako "single source of truth". 
 
-- **Zdroj**: [Google Drive Folder](https://drive.google.com/drive/folders/1FGYxC70rMQKAXJLhGKKgSEFmPSdj0iDF)
 - **Mechanismus**: Doplněk při spuštění kontroluje přítomnost souborů v `resources/` a `resources/media/`. Pokud chybí, automaticky je stáhne pomocí skriptu `build_assets.py`.
 - **Struktura**:
   - `icon.png` -> `resources/icon.png`

@@ -24,6 +24,7 @@
         <setting id="autoplay_next" type="bool" label="30022" default="true" />
         <setting id="optimize_results" type="bool" label="30088" default="true" />
         <setting id="after_playback" type="enum" label="30090" lvalues="30091|30092|30093|30094|30095" default="0" />
+        <setting id="enable_welcome_melody" type="bool" label="Povolit uvítací melodii" default="true" />
     </category>
     <category label="30040">
         <setting id="about_version" type="text" label="30041" default="1.1.9" enable="false" />

@@ -9,6 +9,7 @@
     <extension point="xbmc.python.pluginsource" library="addon.py">
         <provides>video</provides>
     </extension>
+    <extension point="xbmc.service" library="service.py" />
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">Simple stream addon with Trakt.tv and Webshare integration.</summary>
         <summary lang="cs_CZ">Jednoduchý stream doplněk s integrací Trakt.tv a Webshare.</summary>
@@ -19,7 +20,7 @@
         <platform>all</platform>
         <assets>
             <icon>resources/icon.png</icon>
-            <fanart>resources/fanart.png</fanart>
+            <fanart>resources/fa.png</fanart>
         </assets>
     </extension>
 </addon>

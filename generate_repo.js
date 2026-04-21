@@ -98,13 +98,24 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 const fanartPath = findAsset('fa.png');
                 if (fanartPath) {
                     // Copy to resources for plugin
-                    const fanartResources = path.join(addonId, 'resources', 'fanart.png');
+                    const fanartResources = path.join(addonId, 'resources', 'fa.png');
                     if (!fs.existsSync(path.dirname(fanartResources))) fs.mkdirSync(path.dirname(fanartResources), { recursive: true });
                     fs.copyFileSync(fanartPath, fanartResources);
                     // Copy to root for repository
-                    fs.copyFileSync(fanartPath, path.join(addonId, 'fanart.png'));
+                    fs.copyFileSync(fanartPath, path.join(addonId, 'fa.png'));
                     // Copy to public for web
                     fs.copyFileSync(fanartPath, path.join(publicDir, 'fa.png'));
+                }
+
+                // Welcome Melody
+                if (addonId === 'plugin.video.streamcontinuum') {
+                    const welcomeSrc = path.join(mediaSrc, 'StreamContinuum.mp3');
+                    if (fs.existsSync(welcomeSrc)) {
+                        const welcomeDest = path.join(addonId, 'resources', 'media', 'welcome.mp3');
+                        if (!fs.existsSync(path.dirname(welcomeDest))) fs.mkdirSync(path.dirname(welcomeDest), { recursive: true });
+                        fs.copyFileSync(welcomeSrc, welcomeDest);
+                        console.log('Synced welcome melody to resources/media/welcome.mp3');
+                    }
                 }
 
                 // Section Fanarts (media folder)

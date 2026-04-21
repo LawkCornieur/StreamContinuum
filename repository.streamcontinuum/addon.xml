@@ -15,7 +15,7 @@
         <platform>all</platform>
         <assets>
             <icon>icon.png</icon>
-            <fanart>fanart.png</fanart>
+            <fanart>fa.png</fanart>
         </assets>
     </extension>
 </addon>

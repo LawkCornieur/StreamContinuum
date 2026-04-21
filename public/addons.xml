@@ -20,7 +20,7 @@
         <platform>all</platform>
         <assets>
             <icon>icon.png</icon>
-            <fanart>fanart.jpg</fanart>
+            <fanart>fa.png</fanart>
         </assets>
     </extension>
 </addon>
@@ -39,8 +39,8 @@
         <description lang="cs_CZ">Repozitář pro Kodi doplněk StreamContinuum. Poskytuje automatické aktualizace.</description>
         <platform>all</platform>
         <assets>
-            <icon>icon-v0.0.1.png</icon>
-            <fanart>fanart-v0.0.1.jpg</fanart>
+            <icon>icon.png</icon>
+            <fanart>fa.png</fanart>
         </assets>
     </extension>
 </addon>

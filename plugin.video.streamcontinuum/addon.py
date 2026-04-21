@@ -21,7 +21,7 @@ ADDON_PATH = ADDON.getAddonInfo('path')
 
 def get_asset(name):
     """Get path to asset."""
-    if name in ['icon.png', 'fanart.png']:
+    if name in ['icon.png', 'fa.png']:
         return os.path.join(ADDON_PATH, 'resources', name)
     return os.path.join(ADDON_PATH, 'resources', 'media', name)
 
@@ -32,7 +32,7 @@ def list_categories():
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
 
     # Main Fanart
-    main_fanart = get_asset('fanart.png')
+    main_fanart = get_asset('fa.png')
 
     items = [
         # Label, Action, Icon, Fanart, Color
@@ -336,7 +336,8 @@ def show_changelog():
     changelog += "- Oprava cesty ke grafickým souborům\n"
     changelog += "- Odstraněna nefunkční volba maximálního rozlišení\n"
     changelog += "- Oprava a rozšíření voleb po skončení přehrávání\n"
-    changelog += "- Přidána volba předvyplněného hledání po přehrání\n\n"
+    changelog += "- Přidána volba předvyplněného hledání po přehrání\n"
+    changelog += "- Přidána uvítací melodie při startu Kodi (lze vypnout v nastavení)\n\n"
     
     changelog += "[B]Verze 1.1.8[/B]\n"
     changelog += "- Oprava automatického návratu po přehrání\n"
