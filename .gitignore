@@ -7,9 +7,9 @@ coverage/
 .env*
 !.env.example
 
-# Kodi assets (downloaded from GDrive)
-plugin.video.streamcontinuum/resources/icon.png
-plugin.video.streamcontinuum/resources/fanart.png
-plugin.video.streamcontinuum/resources/media/fanart_tra.png
-plugin.video.streamcontinuum/resources/media/fanart_ws.png
-plugin.video.streamcontinuum/resources/media/fanart_his.png
+# Kodi assets (tracked in repository)
+# plugin.video.streamcontinuum/resources/icon.png
+# plugin.video.streamcontinuum/resources/fanart.png
+# plugin.video.streamcontinuum/resources/media/fanart_tra.png
+# plugin.video.streamcontinuum/resources/media/fanart_ws.png
+# plugin.video.streamcontinuum/resources/media/fanart_his.png

@@ -14,7 +14,13 @@ if (fs.existsSync(distPath)) {
     
     const files = fs.readdirSync(distPath);
     files.forEach(file => {
-        if (file === 'icon.png' || file === 'fa.png' || file.endsWith('.zip')) return; // Skip overwriting root images and zips
+        // Protected files that should never be overwritten by web build
+        if (file === 'icon.png' || file === 'fa.png' || file.endsWith('.zip') || file.endsWith('.png')) {
+             if (fs.existsSync(path.join(process.cwd(), file))) {
+                 console.log(`Skipping protected file ${file}`);
+                 return;
+             }
+        }
         const src = path.join(distPath, file);
         const dest = path.join(process.cwd(), file);
         if (fs.statSync(src).isDirectory()) {

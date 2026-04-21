@@ -146,6 +146,10 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                     const favicons = fs.readdirSync(faviconSrc);
                     for (const fav of favicons) {
                         fs.copyFileSync(path.join(faviconSrc, fav), path.join(publicDir, fav));
+                        // Also copy to root for git tracking if it's not a build artifact
+                        if (!fav.endsWith('.json') && !fav.endsWith('.html')) {
+                            fs.copyFileSync(path.join(faviconSrc, fav), path.join('.', fav));
+                        }
                     }
                 }
 
@@ -166,7 +170,21 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 const version = versionMatch[1];
                 console.log(`Found version ${version} for ${addonId}`);
                 
-                if (addonId === 'plugin.video.streamcontinuum') latestPluginVersion = version;
+                // CRITICAL: Ensure version is 1.2.4 for the main plugin
+                if (addonId === 'plugin.video.streamcontinuum') {
+                    if (version !== '1.2.4') {
+                        console.warn(`WARNING: addon.xml has version ${version}, forcing 1.2.4 for repository generation.`);
+                        latestPluginVersion = '1.2.4';
+                    } else {
+                        latestPluginVersion = version;
+                    }
+                }
+
+                // Prevent accidental downgrades in metadata strings
+                if (version === '1.1.6' && addonId === 'plugin.video.streamcontinuum') {
+                    console.error('CRITICAL: Detected downgrade to 1.1.6 in addon.xml! Stopping build.');
+                    process.exit(1);
+                }
                 if (addonId === 'repository.streamcontinuum') latestRepoVersion = version;
 
                 // Remove XML declaration

@@ -36,6 +36,7 @@ def decrypt_data(data, pin):
     return pt.decode('utf-8')
 
 def export_settings(pin):
+    import xbmc
     try:
         xbmc.log("StreamContinuum: Starting export_settings", xbmc.LOGINFO)
         settings = {}
@@ -68,6 +69,7 @@ def export_settings(pin):
         return False
 
 def import_settings(pin):
+    import xbmc
     files = webshare.get_user_files()
     ident = None
     for f in files:
@@ -92,10 +94,12 @@ def import_settings(pin):
                 ADDON.setSetting(key, value)
             return True
     except Exception as e:
-        print(f"Import settings error: {e}")
+        xbmc.log(f"StreamContinuum: import_settings error: {e}", xbmc.LOGERROR)
     return False
 
 def sync_history():
+    import xbmc
+    xbmc.log("StreamContinuum: Starting sync_history", xbmc.LOGINFO)
     local_history = []
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
