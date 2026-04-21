@@ -336,7 +336,12 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.2.3[/B]\n"
+    changelog = "[B]Verze 1.2.4[/B]\n"
+    changelog += "- Oprava exportu nastavení na Webshare (přidáno logování a stabilizace)\n"
+    changelog += "- Přidána možnost automatického spuštění doplňku po startu Kodi\n"
+    changelog += "- Oprava poškození binárních souborů na GitHubu (úprava .gitattributes)\n\n"
+
+    changelog += "[B]Verze 1.2.3[/B]\n"
     changelog += "- Aktualizace grafických aktiv a audio souborů z media-src\n"
     changelog += "- Stabilizace procesu synchronizace s GitHubem\n"
     changelog += "- Pročištění starých verzí archivů\n\n"

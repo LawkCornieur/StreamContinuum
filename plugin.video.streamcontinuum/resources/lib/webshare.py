@@ -19,7 +19,7 @@ def get_salt(username):
             if root.find('status') is not None and root.find('status').text == 'OK':
                 return root.find('salt').text
     except Exception as e:
-        print(f"Webshare get_salt error: {e}")
+        xbmc.log(f"Webshare get_salt error: {e}", xbmc.LOGERROR)
     return None
 
 def login():
@@ -52,7 +52,7 @@ def login():
                     ADDON.setSetting('ws_token', token)
                     return token
     except Exception as e:
-        print(f"Webshare login error: {e}")
+        xbmc.log(f"Webshare login error: {e}", xbmc.LOGERROR)
         
     return None
 
@@ -141,7 +141,7 @@ def upload_file(filepath, filename):
                     if up_resp.status_code == 200:
                         return True
     except Exception as e:
-        print(f"Webshare upload_file error: {e}")
+        xbmc.log(f"Webshare upload_file error: {e}", xbmc.LOGERROR)
     return False
 
 def get_user_files():

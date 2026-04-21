@@ -1,14 +1,14 @@
 * text=auto eol=lf
-# Force binary files to be treated as such
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.zip binary
-*.pyc binary
-*.woff binary
-*.woff2 binary
-*.ttf binary
-*.eot binary
-*.mp3 binary
+# Force binary files to be treated as such and disable text conversions
+*.png binary -text -diff
+*.jpg binary -text -diff
+*.jpeg binary -text -diff
+*.gif binary -text -diff
+*.ico binary -text -diff
+*.zip binary -text -diff
+*.pyc binary -text -diff
+*.woff binary -text -diff
+*.woff2 binary -text -diff
+*.ttf binary -text -diff
+*.eot binary -text -diff
+*.mp3 binary -text -diff

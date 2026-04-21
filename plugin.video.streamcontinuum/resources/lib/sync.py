@@ -34,27 +34,36 @@ def decrypt_data(data, pin):
     return pt.decode('utf-8')
 
 def export_settings(pin):
-    settings = {}
-    for key in ['ws_username', 'ws_password', 'trakt_token', 'trakt_username']:
-        settings[key] = ADDON.getSetting(key)
-    
-    data = json.dumps(settings)
-    encrypted = encrypt_data(data, pin)
-    
-    if not os.path.exists(PROFILE_DIR):
-        os.makedirs(PROFILE_DIR)
+    try:
+        xbmc.log("StreamContinuum: Starting export_settings", xbmc.LOGINFO)
+        settings = {}
+        for key in ['ws_username', 'ws_password', 'trakt_token', 'trakt_username']:
+            settings[key] = ADDON.getSetting(key)
         
-    filepath = os.path.join(PROFILE_DIR, 'streamcontinuum_settings.enc')
-    with open(filepath, 'wb') as f:
-        f.write(encrypted)
+        data = json.dumps(settings)
+        encrypted = encrypt_data(data, pin)
         
-    files = webshare.get_user_files()
-    for f in files:
-        if f['name'] == 'streamcontinuum_settings.enc':
-            webshare.delete_file(f['ident'])
+        if not os.path.exists(PROFILE_DIR):
+            os.makedirs(PROFILE_DIR)
             
-    success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
-    return success
+        filepath = os.path.join(PROFILE_DIR, 'streamcontinuum_settings.enc')
+        with open(filepath, 'wb') as f:
+            f.write(encrypted)
+            
+        xbmc.log(f"StreamContinuum: Settings encrypted and saved to {filepath}", xbmc.LOGINFO)
+            
+        files = webshare.get_user_files()
+        for f in files:
+            if f['name'] == 'streamcontinuum_settings.enc':
+                xbmc.log(f"StreamContinuum: Found old settings file {f['ident']}, deleting...", xbmc.LOGINFO)
+                webshare.delete_file(f['ident'])
+                
+        success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
+        xbmc.log(f"StreamContinuum: Upload success={success}", xbmc.LOGINFO)
+        return success
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: export_settings error: {e}", xbmc.LOGERROR)
+        return False
 
 def import_settings(pin):
     files = webshare.get_user_files()
