@@ -9,7 +9,7 @@ msgstr "Trakt.tv"
 
 msgctxt "#30001"
 msgid "Account"
-msgstr "Account"
+msgstr "Konto"
 
 msgctxt "#30002"
 msgid "Token"
@@ -17,11 +17,11 @@ msgstr "Token"
 
 msgctxt "#30003"
 msgid "User"
-msgstr "User"
+msgstr "Benutzer"
 
 msgctxt "#30004"
 msgid "Activate Device"
-msgstr "Activate Device"
+msgstr "Gerät aktivieren"
 
 msgctxt "#30010"
 msgid "Webshare"
@@ -29,15 +29,15 @@ msgstr "Webshare"
 
 msgctxt "#30011"
 msgid "Credentials"
-msgstr "Credentials"
+msgstr "Anmeldeinformationen"
 
 msgctxt "#30012"
 msgid "Username"
-msgstr "Username"
+msgstr "Benutzername"
 
 msgctxt "#30013"
 msgid "Password"
-msgstr "Password"
+msgstr "Passwort"
 
 msgctxt "#30014"
 msgid "Token"
@@ -45,23 +45,23 @@ msgstr "Token"
 
 msgctxt "#30020"
 msgid "General"
-msgstr "General"
+msgstr "Allgemein"
 
 msgctxt "#30021"
 msgid "Playback"
-msgstr "Playback"
+msgstr "Wiedergabe"
 
 msgctxt "#30022"
 msgid "Autoplay next"
-msgstr "Autoplay next"
+msgstr "Nächstes automatisch abspielen"
 
 msgctxt "#30023"
 msgid "Max resolution"
-msgstr "Max resolution"
+msgstr "Maximale Auflösung"
 
 msgctxt "#30030"
 msgid "API Settings"
-msgstr "API Settings"
+msgstr "API-Einstellungen"
 
 msgctxt "#30031"
 msgid "Client ID"
@@ -73,7 +73,7 @@ msgstr "Client Secret"
 
 msgctxt "#30040"
 msgid "About"
-msgstr "About"
+msgstr "Über"
 
 msgctxt "#30041"
 msgid "Version"
@@ -81,212 +81,212 @@ msgstr "Version"
 
 msgctxt "#30042"
 msgid "Changelog"
-msgstr "Changelog"
+msgstr "Änderungsprotokoll"
 
 msgctxt "#30043"
 msgid "Refresh Trakt.tv status"
-msgstr "Refresh Trakt.tv status"
+msgstr "Trakt.tv Status aktualisieren"
 
 msgctxt "#30044"
 msgid "Paste Client ID from clipboard"
-msgstr "Paste Client ID from clipboard"
+msgstr "Client ID aus der Zwischenablage einfügen"
 
 msgctxt "#30045"
 msgid "Paste Client Secret from clipboard"
-msgstr "Paste Client Secret from clipboard"
+msgstr "Client Secret aus der Zwischenablage einfügen"
 
 msgctxt "#30046"
 msgid "Logout from Trakt.tv"
-msgstr "Logout from Trakt.tv"
+msgstr "Von Trakt.tv abmelden"
 
 msgctxt "#30047"
 msgid "Paste password from clipboard"
-msgstr "Paste password from clipboard"
+msgstr "Passwort aus der Zwischenablage einfügen"
 
 msgctxt "#30048"
 msgid "Not connected"
-msgstr "Not connected"
+msgstr "Nicht verbunden"
 
 msgctxt "#30050"
 msgid "Continue watching"
-msgstr "Continue watching"
+msgstr "Weiterschauen"
 
 msgctxt "#30051"
 msgid "Watchlist"
-msgstr "Watchlist"
+msgstr "Merkliste"
 
 msgctxt "#30052"
 msgid "Search"
-msgstr "Search"
+msgstr "Suchen"
 
 msgctxt "#30053"
 msgid "History"
-msgstr "History"
+msgstr "Verlauf"
 
 msgctxt "#30054"
 msgid "Settings"
-msgstr "Settings"
+msgstr "Einstellungen"
 
 msgctxt "#30055"
 msgid "Trending Movies"
-msgstr "Trending Movies"
+msgstr "Trendfilme"
 
 msgctxt "#30056"
 msgid "Trending Shows"
-msgstr "Trending Shows"
+msgstr "Trendserien"
 
 msgctxt "#30057"
 msgid "Search on Webshare"
-msgstr "Search on Webshare"
+msgstr "Auf Webshare suchen"
 
 msgctxt "#30058"
 msgid "No results found"
-msgstr "No results found"
+msgstr "Keine Ergebnisse gefunden"
 
 msgctxt "#30059"
 msgid "Size"
-msgstr "Size"
+msgstr "Größe"
 
 msgctxt "#30060"
 msgid "Quality"
-msgstr "Quality"
+msgstr "Qualität"
 
 msgctxt "#30061"
 msgid "Failed to get playback link"
-msgstr "Failed to get playback link"
+msgstr "Wiedergabelink konnte nicht abgerufen werden"
 
 msgctxt "#30062"
 msgid "History is empty"
-msgstr "History is empty"
+msgstr "Verlauf ist leer"
 
 msgctxt "#30063"
 msgid "Searched"
-msgstr "Searched"
+msgstr "Gesucht"
 
 msgctxt "#30064"
 msgid "Options"
-msgstr "Options"
+msgstr "Optionen"
 
 msgctxt "#30065"
 msgid "Edit"
-msgstr "Edit"
+msgstr "Bearbeiten"
 
 msgctxt "#30066"
 msgid "Delete"
-msgstr "Delete"
+msgstr "Löschen"
 
 msgctxt "#30067"
 msgid "Search on Trakt.tv"
-msgstr "Search on Trakt.tv"
+msgstr "Auf Trakt.tv suchen"
 
 msgctxt "#30068"
 msgid "Next episode"
-msgstr "Next episode"
+msgstr "Nächste Episode"
 
 msgctxt "#30069"
 msgid "Previous episode"
-msgstr "Previous episode"
+msgstr "Vorherige Episode"
 
 msgctxt "#30070"
 msgid "Next season"
-msgstr "Next season"
+msgstr "Nächste Staffel"
 
 msgctxt "#30071"
 msgid "Previous season"
-msgstr "Previous season"
+msgstr "Vorherige Staffel"
 
 msgctxt "#30072"
 msgid "Mark as watched"
-msgstr "Mark as watched"
+msgstr "Als gesehen markieren"
 
 msgctxt "#30073"
 msgid "Mark as unwatched"
-msgstr "Mark as unwatched"
+msgstr "Als ungesehen markieren"
 
 msgctxt "#30074"
 msgid "Watchlist is empty"
-msgstr "Watchlist is empty"
+msgstr "Merkliste ist leer"
 
 msgctxt "#30075"
 msgid "No items in progress"
-msgstr "No items in progress"
+msgstr "Keine laufenden Elemente"
 
 msgctxt "#30076"
 msgid "Search next episode"
-msgstr "Search next episode"
+msgstr "Nächste Episode suchen"
 
 msgctxt "#30077"
 msgid "Connected"
-msgstr "Connected"
+msgstr "Verbunden"
 
 msgctxt "#30078"
 msgid "Status refreshed"
-msgstr "Status refreshed"
+msgstr "Status aktualisiert"
 
 msgctxt "#30079"
 msgid "Failed to refresh status"
-msgstr "Failed to refresh status"
+msgstr "Status konnte nicht aktualisiert werden"
 
 msgctxt "#30080"
 msgid "Logged out"
-msgstr "Logged out"
+msgstr "Abgemeldet"
 
 msgctxt "#30081"
 msgid "Pasted to"
-msgstr "Pasted to"
+msgstr "Eingefügt in"
 
 msgctxt "#30082"
 msgid "Error"
-msgstr "Error"
+msgstr "Fehler"
 
 msgctxt "#30083"
 msgid "Clipboard is empty."
-msgstr "Clipboard is empty."
+msgstr "Zwischenablage ist leer."
 
 msgctxt "#30084"
 msgid "Your Kodi version does not support direct clipboard access. Use the system keyboard."
-msgstr "Your Kodi version does not support direct clipboard access. Use the system keyboard."
+msgstr "Ihre Kodi-Version unterstützt keinen direkten Zugriff auf die Zwischenablage. Verwenden Sie die Systemtastatur."
 
 msgctxt "#30085"
 msgid "Successfully updated"
-msgstr "Successfully updated"
+msgstr "Erfolgreich aktualisiert"
 
 msgctxt "#30086"
 msgid "Error updating"
-msgstr "Error updating"
+msgstr "Fehler beim Aktualisieren"
 
 msgctxt "#30087"
 msgid "Edit search"
-msgstr "Edit search"
+msgstr "Suche bearbeiten"
 
 msgctxt "#30088"
 msgid "Optimize search results"
-msgstr "Optimize search results"
+msgstr "Suchergebnisse optimieren"
 
 msgctxt "#30089"
 msgid "Extension"
-msgstr "Extension"
+msgstr "Erweiterung"
 
 msgctxt "#30090"
 msgid "After playback"
-msgstr "After playback"
+msgstr "Nach der Wiedergabe"
 
 msgctxt "#30091"
 msgid "Original search"
-msgstr "Original search (automatic)"
+msgstr "Originalsuche (automatisch)"
 
 msgctxt "#30092"
 msgid "Empty search"
-msgstr "Empty search (dialog)"
+msgstr "Leere Suche (Dialog)"
 
 msgctxt "#30093"
 msgid "Last results"
-msgstr "Last results (stay in list)"
+msgstr "Letzte Ergebnisse (in Liste bleiben)"
 
 msgctxt "#30094"
 msgid "History"
-msgstr "History of searched"
+msgstr "Suchverlauf"
 
 msgctxt "#30095"
 msgid "Prefilled search"
-msgstr "Prefilled search (dialog witch text)"
+msgstr "Vorausgefüllte Suche (Dialog mit Text)"

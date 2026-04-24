@@ -336,6 +336,10 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
+    changelog = "[B]Verze 1.2.5[/B]\n"
+    changelog += "- Oprava a doplnění anglického překladu\n"
+    changelog += "- Přidán něměcký překlad\n"
+    
     changelog = "[B]Verze 1.2.4[/B]\n"
     changelog += "- Oprava exportu nastavení na Webshare (přidáno logování a stabilizace)\n"
     changelog += "- Přidána možnost automatického spuštění doplňku po startu Kodi\n"

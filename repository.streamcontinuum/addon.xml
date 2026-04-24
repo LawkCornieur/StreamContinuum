@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="repository.streamcontinuum" name="StreamContinuum Repository" version="1.1.1" provider-name="LawkCornieur">
+<addon id="repository.streamcontinuum" name="StreamContinuum Repository" version="1.1.2" provider-name="LawkCornieur">
     <extension point="xbmc.addon.repository" name="StreamContinuum Repository">
         <dir>
             <info compressed="false">https://lawkcornieur.github.io/StreamContinuum/addons.xml</info>
@@ -10,8 +10,10 @@
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">StreamContinuum Repository</summary>
         <summary lang="cs_CZ">Repozitář StreamContinuum</summary>
+        <summary lang="de_DE">StreamContinuum Repository</summary>
         <description lang="en_GB">Repository for StreamContinuum Kodi Addon. Provides automatic updates.</description>
         <description lang="cs_CZ">Repozitář pro Kodi doplněk StreamContinuum. Poskytuje automatické aktualizace.</description>
+        <description lang="de_DE">Repository für das StreamContinuum Kodi Addon. Ermöglicht automatische Updates.</description>
         <platform>all</platform>
         <assets>
             <icon>icon.png</icon>
