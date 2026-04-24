@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addons>
-<addon id="plugin.video.streamcontinuum" name="StreamContinuum" version="1.2.4" provider-name="LawkCornieur">
+<addon id="plugin.video.streamcontinuum" name="StreamContinuum" version="1.2.5" provider-name="LawkCornieur">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.requests" version="2.25.1"/>
@@ -14,10 +14,13 @@
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">Simple stream addon with Trakt.tv and Webshare integration.</summary>
         <summary lang="cs_CZ">Jednoduchý stream doplněk s integrací Trakt.tv a Webshare.</summary>
+        <summary lang="de_DE">Einfaches Stream-Addon mit Trakt.tv- und Webshare-Integration.</summary>
         <description lang="en_GB">StreamContinuum allows you to browse and play content from Webshare.cz with full Trakt.tv synchronization and local history.</description>
         <description lang="cs_CZ">StreamContinuum umožňuje prohlížet a přehrávat obsah z Webshare.cz s plnou synchronizací Trakt.tv a lokální historií.</description>
+        <description lang="de_DE">StreamContinuum ermöglicht das Durchsuchen und Abspielen von Inhalten von Webshare.cz mit vollständiger Trakt.tv-Synchronisierung und lokalem Verlauf.</description>
         <disclaimer lang="en_GB">This addon does not host any content. It is a tool to access third-party services.</disclaimer>
         <disclaimer lang="cs_CZ">Tento doplněk nehostuje žádný obsah. Je to pouze nástroj pro přístup ke službám třetích stran.</disclaimer>
+        <disclaimer lang="de_DE">Dieses Addon hostet keine Inhalte. Es ist ein Werkzeug für den Zugriff auf Dienste von Drittanbietern.</disclaimer>
         <platform>all</platform>
         <assets>
             <icon>resources/icon.png</icon>
@@ -25,7 +28,7 @@
         </assets>
     </extension>
 </addon>
-<addon id="repository.streamcontinuum" name="StreamContinuum Repository" version="1.1.1" provider-name="LawkCornieur">
+<addon id="repository.streamcontinuum" name="StreamContinuum Repository" version="1.1.2" provider-name="LawkCornieur">
     <extension point="xbmc.addon.repository" name="StreamContinuum Repository">
         <dir>
             <info compressed="false">https://lawkcornieur.github.io/StreamContinuum/addons.xml</info>
@@ -36,8 +39,10 @@
     <extension point="xbmc.addon.metadata">
         <summary lang="en_GB">StreamContinuum Repository</summary>
         <summary lang="cs_CZ">Repozitář StreamContinuum</summary>
+        <summary lang="de_DE">StreamContinuum Repository</summary>
         <description lang="en_GB">Repository for StreamContinuum Kodi Addon. Provides automatic updates.</description>
         <description lang="cs_CZ">Repozitář pro Kodi doplněk StreamContinuum. Poskytuje automatické aktualizace.</description>
+        <description lang="de_DE">Repository für das StreamContinuum Kodi Addon. Ermöglicht automatische Updates.</description>
         <platform>all</platform>
         <assets>
             <icon>icon.png</icon>
