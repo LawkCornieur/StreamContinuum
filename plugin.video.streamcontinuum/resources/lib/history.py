@@ -20,40 +20,31 @@ def get_history():
 
 import re
 
-def add_to_history(query, title):
+def add_to_history(query, title=None):
     history = get_history()
     
-    # Try to extract base title from series pattern (e.g., "Show Name S01E01")
-    series_pattern = re.compile(r'^(.*)\s+S\d{2}E\d{2}', re.IGNORECASE)
-    match = series_pattern.match(title)
-    base_title = match.group(1).strip() if match else title
-    
-    # Remove existing entry with same base title if it's a series, or same title if not
-    if match:
-        history = [item for item in history if not (series_pattern.match(item.get('title', '')) and series_pattern.match(item.get('title', '')).group(1).strip() == base_title)]
-    else:
-        history = [item for item in history if not (item.get('title') == title)]
+    # Remove existing entry with same query
+    history = [item for item in history if item.get('query') != query]
         
     # Add to top
-    history.insert(0, {'query': query, 'title': title})
+    history.insert(0, {'query': query})
     # Keep only last 50
     history = history[:50]
     
     with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=4)
 
-def delete_from_history(title):
+def delete_from_history(query):
     history = get_history()
-    history = [item for item in history if item.get('title') != title]
+    history = [item for item in history if item.get('query') != query]
     with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=4)
 
-def update_history_item(old_title, new_query, new_title):
+def update_history_item(old_query, new_query, new_title=None):
     history = get_history()
     for item in history:
-        if item.get('title') == old_title:
+        if item.get('query') == old_query:
             item['query'] = new_query
-            item['title'] = new_title
             break
     with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=4)

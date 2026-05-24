@@ -40,7 +40,7 @@ def export_settings(pin):
     try:
         xbmc.log("StreamContinuum: Starting export_settings", xbmc.LOGINFO)
         settings = {}
-        for key in ['ws_username', 'ws_password', 'trakt_token', 'trakt_username']:
+        for key in ['ws_username', 'ws_password', 'trakt_token', 'trakt_username', 'trakt_client_id', 'trakt_client_secret']:
             settings[key] = ADDON.getSetting(key)
         
         data = json.dumps(settings)
@@ -55,13 +55,22 @@ def export_settings(pin):
             
         xbmc.log(f"StreamContinuum: Settings encrypted and saved to {filepath}", xbmc.LOGINFO)
             
-        files = webshare.get_user_files()
+        files = webshare.get_sync_files()
         for f in files:
             if f['name'] == 'streamcontinuum_settings.enc':
                 xbmc.log(f"StreamContinuum: Found old settings file {f['ident']}, deleting...", xbmc.LOGINFO)
                 webshare.delete_file(f['ident'])
                 
+        # Also clean up public root just in case
+        public_files = webshare.get_user_files()
+        for f in public_files:
+            if f['name'] == 'streamcontinuum_settings.enc':
+                webshare.delete_file(f['ident'])
+                
         success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
+        if success:
+            webshare.move_to_sync('streamcontinuum_settings.enc')
+            
         xbmc.log(f"StreamContinuum: Upload success={success}", xbmc.LOGINFO)
         return success
     except Exception as e:
@@ -70,7 +79,7 @@ def export_settings(pin):
 
 def import_settings(pin):
     import xbmc
-    files = webshare.get_user_files()
+    files = webshare.get_sync_files()
     ident = None
     for f in files:
         if f['name'] == 'streamcontinuum_settings.enc':
@@ -108,7 +117,7 @@ def sync_history():
             except:
                 pass
                 
-    files = webshare.get_user_files()
+    files = webshare.get_sync_files()
     ident = None
     for f in files:
         if f['name'] == 'streamcontinuum_history.json':
@@ -143,5 +152,15 @@ def sync_history():
         
     if ident:
         webshare.delete_file(ident)
-    webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
+    
+    # Try deleting from public root as well just in case
+    public_files = webshare.get_user_files()
+    for f in public_files:
+        if f['name'] == 'streamcontinuum_history.json':
+            webshare.delete_file(f['ident'])
+            
+    success = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
+    if success:
+        webshare.move_to_sync('streamcontinuum_history.json')
+        
     return True

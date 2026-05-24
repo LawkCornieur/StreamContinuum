@@ -199,15 +199,15 @@ class PlayerMonitor(xbmc.Player):
     def onPlayBackStopped(self):
         self.ended = True
 
-def play(ident, query=None, title=None):
+def play(ident, query=None):
     link = webshare.get_link(ident)
     if link:
         list_item = xbmcgui.ListItem(path=link)
         xbmcplugin.setResolvedUrl(HANDLE, True, list_item)
         
-        if query and title:
+        if query:
             import history
-            history.add_to_history(query, title)
+            history.add_to_history(query)
             
         # Monitor playback
         monitor = PlayerMonitor()
@@ -222,16 +222,16 @@ def play(ident, query=None, title=None):
         
         if after == '0' and query: # Původní hledání (automaticky)
             xbmc.sleep(500)
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query})')
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
         elif after == '1': # Prázdné hledání (dialog)
             xbmc.sleep(500)
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search)')
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search,replace)')
         elif after == '3': # Historie
             xbmc.sleep(500)
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history)')
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
         elif after == '4' and query: # Předvyplněné hledání (dialog s textem)
             xbmc.sleep(500)
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query})')
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query},replace)')
         # case 2 is "Last results", which is default behavior in Kodi
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
@@ -251,8 +251,8 @@ def show_history():
         query = item.get('query', '')
         title = item.get('title', '')
         
-        label = f"{title} [COLOR gray]({ADDON.getLocalizedString(30063)}: {query})[/COLOR]"
-        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}&title={urllib.parse.quote(title)}"
+        label = query or title
+        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query or title)}"
         
         list_item = xbmcgui.ListItem(label=label)
         list_item.setArt({'icon': 'DefaultHistory.png', 'thumb': 'DefaultHistory.png'})
@@ -260,19 +260,19 @@ def show_history():
         
     xbmcplugin.endOfDirectory(HANDLE)
 
-def history_menu(query, title):
-    xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {title}")
+def history_menu(query, title=None):
+    xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {query}")
     
     items = [
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
-        (ADDON.getLocalizedString(30065), f'history_edit&title={urllib.parse.quote(title)}&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
-        (ADDON.getLocalizedString(30066), f'history_delete&title={urllib.parse.quote(title)}', 'DefaultDelete.png'),
+        (ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
+        (ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'),
         (ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
     ]
     
     # Add episode navigation if it looks like a series
     series_pattern = re.compile(r'^(.*)\s+S(\d{2})E(\d{2})', re.IGNORECASE)
-    match = series_pattern.match(title)
+    match = series_pattern.match(query)
     if match:
         base_title = match.group(1).strip()
         season = int(match.group(2))
@@ -626,7 +626,7 @@ def run():
     elif action == 'search_prefill':
         search_prefill(params.get('query', ''))
     elif action == 'play':
-        play(params.get('ident'), params.get('query'), params.get('title'))
+        play(params.get('ident'), params.get('query'))
     elif action == 'trending_movies':
         xbmcgui.Dialog().ok("StreamContinuum", f"{ADDON.getLocalizedString(30055)} (WIP)")
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -654,13 +654,12 @@ def run():
     elif action == 'history':
         show_history()
     elif action == 'history_menu':
-        history_menu(params.get('query'), params.get('title'))
+        history_menu(params.get('query'))
     elif action == 'history_delete':
         import history
-        history.delete_from_history(params.get('title'))
+        history.delete_from_history(params.get('query'))
         xbmc.executebuiltin('Container.Refresh')
     elif action == 'history_edit':
-        old_title = params.get('title')
         old_query = params.get('query')
         keyboard = xbmc.Keyboard(old_query, ADDON.getLocalizedString(30087))
         keyboard.doModal()
@@ -668,7 +667,7 @@ def run():
             new_query = keyboard.getText()
             if new_query:
                 import history
-                history.update_history_item(old_title, new_query, new_query) # Simple update
+                history.update_history_item(old_query, new_query) # Simple update
                 xbmc.executebuiltin('Container.Refresh')
     elif action == 'show_changelog':
         show_changelog()

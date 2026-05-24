@@ -77,12 +77,14 @@ def authenticate():
 def get_headers():
     client_id = ADDON.getSetting('trakt_client_id')
     token = ADDON.getSetting('trakt_token')
-    return {
+    headers = {
         "Content-Type": "application/json",
         "trakt-api-version": "2",
-        "trakt-api-key": client_id,
-        "Authorization": f"Bearer {token}"
+        "trakt-api-key": client_id
     }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
 
 def get_user_info():
     url = "https://api.trakt.tv/users/me"

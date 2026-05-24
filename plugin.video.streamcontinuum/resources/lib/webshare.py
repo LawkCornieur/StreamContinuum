@@ -185,3 +185,48 @@ def delete_file(ident):
     except Exception as e:
         print(f"Webshare delete_file error: {e}")
     return False
+
+def get_sync_files():
+    token = get_token()
+    if not token:
+        return []
+        
+    url = BASE_URL + 'files/'
+    data = {'wst': token, 'path': '/StreamContinuum_Sync/', 'private': 1}
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        if response.status_code == 200:
+            root = ElementTree.fromstring(response.content)
+            files = []
+            for file_elem in root.findall('.//file'):
+                ident = file_elem.find('ident')
+                name = file_elem.find('name')
+                if ident is not None and name is not None:
+                    files.append({
+                        'ident': ident.text,
+                        'name': name.text
+                    })
+            return files
+    except Exception as e:
+        print(f"Webshare get_sync_files error: {e}")
+    return []
+
+def move_to_sync(filename):
+    token = get_token()
+    if not token:
+        return False
+        
+    url = BASE_URL + 'move_file/'
+    data = {
+        'wst': token,
+        'src': f'/{filename}',
+        'dest': '/StreamContinuum_Sync/',
+        'src_private': 0,
+        'dest_private': 1
+    }
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        return response.status_code == 200
+    except Exception as e:
+        print(f"Webshare move_to_sync error: {e}")
+    return False
