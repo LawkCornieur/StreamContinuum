@@ -170,14 +170,9 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 const version = versionMatch[1];
                 console.log(`Found version ${version} for ${addonId}`);
                 
-                // CRITICAL: Ensure version is 1.2.4 for the main plugin
+                // Remove hardcoded version forcing config to allow dynamic reading
                 if (addonId === 'plugin.video.streamcontinuum') {
-                    if (version !== '1.2.4') {
-                        console.warn(`WARNING: addon.xml has version ${version}, forcing 1.2.4 for repository generation.`);
-                        latestPluginVersion = '1.2.4';
-                    } else {
-                        latestPluginVersion = version;
-                    }
+                    latestPluginVersion = version;
                 }
 
                 // Prevent accidental downgrades in metadata strings
