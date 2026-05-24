@@ -64,9 +64,6 @@ def trakt_menu():
     fanart = get_asset('fa-trakt.png')
     
     items = [
-        (ADDON.getLocalizedString(30057), 'trakt_search_menu', 'DefaultAddonsSearch.png'),
-        (ADDON.getLocalizedString(30055), 'trending_movies', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30056), 'trending_shows', 'DefaultTVShows.png'),
         (ADDON.getLocalizedString(30050), 'trakt_playback', 'DefaultRecentlyAddedEpisodes.png'),
         (ADDON.getLocalizedString(30051), 'trakt_watchlist', 'DefaultWatchlist.png')
     ]
@@ -336,7 +333,11 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.2.7[/B]\n"
+    changelog = "[B]Verze 1.2.8[/B]\n"
+    changelog += "- Oprava filtrování epizod stejného seriálu v historii vyhledávání.\n"
+    changelog += "- Úprava Trakt.tv menu a oprava řazení seriálů (nově se zobrazují skutečně nejnovější sledované jako první).\n\n"
+
+    changelog += "[B]Verze 1.2.7[/B]\n"
     changelog += "- Oprava exportu nastavení a záloha Trakt.tv credentials (upload_url) na Webshare \n"
     changelog += "- Oprava pádu kvůli zamknutému souboru při aktualizaci doplňku pod Windows.\n\n"
     

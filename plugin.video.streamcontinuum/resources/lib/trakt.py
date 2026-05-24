@@ -125,6 +125,9 @@ def get_progress():
             return []
         watched_shows = res.json()
         
+        # Sort by recently watched first
+        watched_shows.sort(key=lambda x: str(x.get('last_watched_at') or ''), reverse=True)
+        
         progress_list = []
         # For each show, get the next episode
         # To avoid too many requests, we only take the top 15 recently watched

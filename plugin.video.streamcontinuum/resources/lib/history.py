@@ -2,6 +2,7 @@ import os
 import json
 import xbmcaddon
 import xbmcvfs
+import re
 
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
@@ -18,13 +19,31 @@ def get_history():
     except:
         return []
 
-import re
+def get_base_name(query):
+    if not query:
+        return ""
+    # Matches patterns like S01E01, s1e1, 1x01 and everything after it
+    pattern = r'(?i)\s*(s\d+\s*e\d+|\d+x\d+).*$'
+    base = re.sub(pattern, '', query).strip()
+    return base if base else query
 
 def add_to_history(query, title=None):
     history = get_history()
     
-    # Remove existing entry with same query
-    history = [item for item in history if item.get('query') != query]
+    base_name = get_base_name(query).lower()
+    
+    new_history = []
+    for item in history:
+        item_q = item.get('query', '')
+        # Remove exact match
+        if item_q == query:
+            continue
+        # Remove previous episodes of the same show, if base name matches
+        if get_base_name(item_q).lower() == base_name and base_name != item_q.lower() and base_name != "":
+            continue
+        new_history.append(item)
+    
+    history = new_history
         
     # Add to top
     history.insert(0, {'query': query})
