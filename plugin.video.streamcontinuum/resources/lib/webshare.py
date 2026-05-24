@@ -126,15 +126,15 @@ def upload_file(filepath, filename):
     if not token:
         return None
         
-    url = BASE_URL + 'upload_link/'
+    url = BASE_URL + 'upload_url/'
     data = {'wst': token}
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10)
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
-            link = root.find('link')
-            if link is not None and link.text:
-                upload_url = link.text
+            url_node = root.find('url')
+            if url_node is not None and url_node.text:
+                upload_url = url_node.text
                 
                 with open(filepath, 'rb') as f:
                     files = {'file': (filename, f)}

@@ -336,11 +336,19 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.2.5[/B]\n"
-    changelog += "- Oprava a doplnění anglického překladu\n"
-    changelog += "- Přidán něměcký překlad\n"
+    changelog = "[B]Verze 1.2.7[/B]\n"
+    changelog += "- Oprava exportu nastavení a záloha Trakt.tv credentials (upload_url) na Webshare \n"
+    changelog += "- Oprava pádu kvůli zamknutému souboru při aktualizaci doplňku pod Windows.\n\n"
     
-    changelog = "[B]Verze 1.2.4[/B]\n"
+    changelog += "[B]Verze 1.2.6[/B]\n"
+    changelog += "- Přepracování historie vyhledávání, možnost úpravy položky.\n"
+    changelog += "- Úprava přesměrování po přehrání položky do historie ihned.\n\n"
+
+    changelog += "[B]Verze 1.2.5[/B]\n"
+    changelog += "- Oprava a doplnění anglického překladu\n"
+    changelog += "- Přidán něměcký překlad\n\n"
+    
+    changelog += "[B]Verze 1.2.4[/B]\n"
     changelog += "- Oprava exportu nastavení na Webshare (přidáno logování a stabilizace)\n"
     changelog += "- Přidána možnost automatického spuštění doplňku po startu Kodi\n"
     changelog += "- Oprava poškození binárních souborů na GitHubu (úprava .gitattributes)\n\n"
