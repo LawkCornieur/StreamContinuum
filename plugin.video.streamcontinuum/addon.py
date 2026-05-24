@@ -145,7 +145,7 @@ def search(query=None):
             elif '480p' in name_lower:
                 res = '480'
             
-            info['video_resolution'] = res
+            # info['video_resolution'] = res
             
             # Parse audio tracks
             audio_info = []
@@ -333,7 +333,12 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.2.8[/B]\n"
+    changelog = "[B]Verze 1.2.9[/B]\n"
+    changelog += "- Dynamická aktualizace zobrazení verze v nastavení doplňku.\n"
+    changelog += "- Oprava pádu doplňku při synchronizaci historie (KeyError: 'title').\n"
+    changelog += "- Opraveny chybové hlášky ohledně zastaralých metod při spouštění přehrávání.\n\n"
+
+    changelog += "[B]Verze 1.2.8[/B]\n"
     changelog += "- Oprava filtrování epizod stejného seriálu v historii vyhledávání.\n"
     changelog += "- Úprava Trakt.tv menu a oprava řazení seriálů (nově se zobrazují skutečně nejnovější sledované jako první).\n\n"
 
@@ -560,6 +565,9 @@ def search_prefill(query):
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
 def run():
+    # Force updating the visible version setting since Kodi caches the default from first install
+    ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
+    
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:]))
     action = params.get('action')
 

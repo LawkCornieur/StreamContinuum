@@ -138,9 +138,10 @@ def sync_history():
     final_history = []
     seen = set()
     for item in local_history + remote_history:
-        if item['title'] not in seen:
+        title = item.get('title') or item.get('query')
+        if title and title not in seen:
             final_history.append(item)
-            seen.add(item['title'])
+            seen.add(title)
             
     final_history = final_history[:50]
     
