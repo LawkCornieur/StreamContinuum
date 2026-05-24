@@ -48,6 +48,11 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.2.9**
+- Dynamická aktualizace zobrazení verze v nastavení doplňku.
+- Oprava pádu doplňku při synchronizaci historie (KeyError: 'title').
+- Opraveny chybové hlášky ohledně zastaralých metod při spouštění přehrávání.
+
 **Verze 1.2.8**
 - Oprava filtrování epizod stejného seriálu v historii vyhledávání.
 - Úprava Trakt.tv menu a oprava řazení seriálů (nově se zobrazují skutečně nejnovější sledované jako první).
