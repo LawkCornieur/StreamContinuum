@@ -598,19 +598,21 @@ def run():
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
             import sync
-            if sync.export_settings(keyboard.getText()):
+            success, msg = sync.export_settings(keyboard.getText())
+            if success:
                 xbmcgui.Dialog().notification("StreamContinuum", "Nastavení exportováno", xbmcgui.NOTIFICATION_INFO)
             else:
-                xbmcgui.Dialog().notification("StreamContinuum", "Chyba exportu", xbmcgui.NOTIFICATION_ERROR)
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba exportu", xbmcgui.NOTIFICATION_ERROR)
     elif action == 'import_settings':
         keyboard = xbmc.Keyboard('', 'Zadejte PIN pro dešifrování')
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
             import sync
-            if sync.import_settings(keyboard.getText()):
+            success, msg = sync.import_settings(keyboard.getText())
+            if success:
                 xbmcgui.Dialog().notification("StreamContinuum", "Nastavení importováno", xbmcgui.NOTIFICATION_INFO)
             else:
-                xbmcgui.Dialog().notification("StreamContinuum", "Chyba importu (špatný PIN?)", xbmcgui.NOTIFICATION_ERROR)
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba importu", xbmcgui.NOTIFICATION_ERROR)
     elif action == 'trakt_refresh':
         user_info = trakt.get_user_info()
         if user_info:
