@@ -165,14 +165,23 @@ def search(query=None):
                 info['plot'] += f"\n[B]{ADDON.getLocalizedString(30089)}:[/B] {ext.upper()}"
             info['plot'] += f"\n[B]{ADDON.getLocalizedString(30060)}:[/B] {res}p"
             
-            list_item.setInfo('video', info)
+            # Set video info using modern InfoTagVideo API (Kodi 20+)
+            info_tag = list_item.getVideoInfoTag()
+            info_tag.setTitle(name)
+            info_tag.setPlot(info['plot'])
+            info_tag.setMediaType('video')
             
-            # Set stream info for icons
-            list_item.addStreamInfo('video', {'width': int(res) * 16 // 9, 'height': int(res)})
+            # Set stream info using modern VideoStreamDetail API (Kodi 20+)
+            video_stream = xbmc.VideoStreamDetail()
+            video_stream.setWidth(int(res) * 16 // 9)
+            video_stream.setHeight(int(res))
+            
             if 'h265' in name_lower or 'hevc' in name_lower or 'x265' in name_lower:
-                list_item.addStreamInfo('video', {'codec': 'hevc'})
+                video_stream.setCodec('hevc')
             elif 'h264' in name_lower or 'x264' in name_lower:
-                list_item.addStreamInfo('video', {'codec': 'h264'})
+                video_stream.setCodec('h264')
+                
+            info_tag.addVideoStream(video_stream)
             
             # Set art (thumbnail)
             if item.get('img'):
@@ -342,7 +351,11 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.3.0[/B]\n"
+    changelog = "[B]Verze 1.3.1[/B]\n"
+    changelog += "- Odstraněna varování (deprecated warnings) v Kodi logu pomocí přechodu na nové InfoTagVideo API.\n"
+    changelog += "- Oprava mazání souborů na Webshare (změna API endpointu na správný remove_file).\n\n"
+
+    changelog += "[B]Verze 1.3.0[/B]\n"
     changelog += "- Stabilizace otevírání oken a přidání spolehlivých časových limitů pro zavření přehrávače.\n"
     changelog += "- Oprava a stabilizace mazání souborů na Webshare (přidána 2s pauza a validace XML odpovědí).\n\n"
 
