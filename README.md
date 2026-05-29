@@ -48,6 +48,10 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.3.1**
+- Odstraněna varování (deprecated warnings) v Kodi logu pomocí přechodu na nové InfoTagVideo API.
+- Oprava mazání souborů na Webshare (změna API endpointu na správný remove_file).
+
 **Verze 1.3.0**
 - Stabilizace otevírání oken a přidání spolehlivých časových limitů pro zavření přehrávače.
 - Oprava a stabilizace mazání souborů na Webshare (přidána 2s pauza a validace XML odpovědí).
