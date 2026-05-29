@@ -68,6 +68,7 @@ def export_settings(pin):
             if name.startswith('streamcontinuum_settings') and name.endswith('.enc'):
                 xbmc.log(f"StreamContinuum: Found old settings file {name} ({f['ident']}), deleting...", xbmc.LOGINFO)
                 webshare.delete_file(f['ident'])
+                time.sleep(0.5)
                 
         # Clean up public root
         public_files = webshare.get_user_files()
@@ -76,9 +77,10 @@ def export_settings(pin):
             if name.startswith('streamcontinuum_settings') and name.endswith('.enc'):
                 xbmc.log(f"StreamContinuum: Found old settings in root {name} ({f['ident']}), deleting...", xbmc.LOGINFO)
                 webshare.delete_file(f['ident'])
+                time.sleep(0.5)
                 
         # Pauza, aby Webshare stačil zpracovat smazání před nahráváním nového souboru
-        time.sleep(2)
+        time.sleep(3)
         
         success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
         if success:
@@ -219,6 +221,7 @@ def sync_history():
         for f in remote_history_files:
             xbmc.log(f"StreamContinuum: Deleting old remote history file {f['name']} ({f['ident']})", xbmc.LOGINFO)
             webshare.delete_file(f['ident'])
+            time.sleep(0.5)
             
         # Also delete all history files from public root just in case
         public_files = webshare.get_user_files()
@@ -227,9 +230,10 @@ def sync_history():
             if name.startswith('streamcontinuum_history') and name.endswith('.json'):
                 xbmc.log(f"StreamContinuum: Deleting old remote history in root {name} ({f['ident']})", xbmc.LOGINFO)
                 webshare.delete_file(f['ident'])
+                time.sleep(0.5)
                 
         # Pauza, aby Webshare stačil zpracovat smazání před nahráváním nové historie
-        time.sleep(2)
+        time.sleep(3)
         
         success = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
         if success:

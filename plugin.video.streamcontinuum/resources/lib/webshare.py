@@ -1,4 +1,5 @@
 import requests
+import time
 # This is a virtual module provided by Kodi, it must be imported for the addon to function.
 import xbmc
 import xbmcaddon
@@ -136,12 +137,25 @@ def upload_file(filepath, filename):
             if url_node is not None and url_node.text:
                 upload_url = url_node.text
                 
-                with open(filepath, 'rb') as f:
-                    files = {'file': (filename, f)}
-                    upload_data = {'wst': token}
-                    up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=30)
-                    if up_resp.status_code == 200:
-                        return True
+                # Retry upload up to 3 times in case of temporary network/server congestion
+                for attempt in range(3):
+                    try:
+                        xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (attempt {attempt + 1}/3)...", xbmc.LOGINFO)
+                        with open(filepath, 'rb') as f:
+                            files = {'file': (filename, f)}
+                            upload_data = {'wst': token}
+                            # Increased timeout to 60 seconds for slower upload servers
+                            up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60)
+                            if up_resp.status_code == 200:
+                                xbmc.log(f"StreamContinuum: Upload of {filename} successful on attempt {attempt + 1}", xbmc.LOGINFO)
+                                return True
+                            else:
+                                xbmc.log(f"StreamContinuum: Upload of {filename} failed with status {up_resp.status_code}", xbmc.LOGWARNING)
+                    except Exception as e:
+                        xbmc.log(f"StreamContinuum: Webshare upload_file attempt {attempt + 1} failed: {e}", xbmc.LOGWARNING)
+                        if attempt < 2:
+                            time.sleep(2)  # Wait 2 seconds before retrying
+                
     except Exception as e:
         xbmc.log(f"Webshare upload_file error: {e}", xbmc.LOGERROR)
     return False

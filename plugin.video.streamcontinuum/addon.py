@@ -351,7 +351,11 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.3.1[/B]\n"
+    changelog = "[B]Verze 1.3.2[/B]\n"
+    changelog += "- Přidána ochrana proti přetížení API (pauza 0.5s mezi mazáním jednotlivých souborů v cyklu).\n"
+    changelog += "- Robustnější nahrávání souborů na Webshare (zvýšen timeout na 60s, implementováno 3x opakování při chybě s 2s prodlevou).\n\n"
+
+    changelog += "[B]Verze 1.3.1[/B]\n"
     changelog += "- Odstraněna varování (deprecated warnings) v Kodi logu pomocí přechodu na nové InfoTagVideo API.\n"
     changelog += "- Oprava mazání souborů na Webshare (změna API endpointu na správný remove_file).\n\n"
 
