@@ -48,6 +48,10 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.3.0**
+- Stabilizace otevírání oken a přidání spolehlivých časových limitů pro zavření přehrávače.
+- Oprava a stabilizace mazání souborů na Webshare (přidána 2s pauza a validace XML odpovědí).
+
 **Verze 1.2.9**
 - Dynamická aktualizace zobrazení verze v nastavení doplňku.
 - Oprava pádu doplňku při synchronizaci historie (KeyError: 'title').
