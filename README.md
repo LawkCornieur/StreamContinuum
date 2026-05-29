@@ -48,6 +48,10 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.3.2**
+- Přidána ochrana proti přetížení API (pauza 0.5s mezi mazáním jednotlivých souborů v cyklu).
+- Robustnější nahrávání souborů na Webshare (zvýšen timeout na 60s, implementováno 3x opakování při chybě s 2s prodlevou).
+
 **Verze 1.3.1**
 - Odstraněna varování (deprecated warnings) v Kodi logu pomocí přechodu na nové InfoTagVideo API.
 - Oprava mazání souborů na Webshare (změna API endpointu na správný remove_file).
