@@ -1,6 +1,7 @@
 import os
 import json
 import hashlib
+import time
 try:
     from Crypto.Cipher import AES
     from Crypto.Util.Padding import pad, unpad
@@ -76,6 +77,9 @@ def export_settings(pin):
                 xbmc.log(f"StreamContinuum: Found old settings in root {name} ({f['ident']}), deleting...", xbmc.LOGINFO)
                 webshare.delete_file(f['ident'])
                 
+        # Pauza, aby Webshare stačil zpracovat smazání před nahráváním nového souboru
+        time.sleep(2)
+        
         success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
         if success:
             moved = webshare.move_to_sync('streamcontinuum_settings.enc')
@@ -224,6 +228,9 @@ def sync_history():
                 xbmc.log(f"StreamContinuum: Deleting old remote history in root {name} ({f['ident']})", xbmc.LOGINFO)
                 webshare.delete_file(f['ident'])
                 
+        # Pauza, aby Webshare stačil zpracovat smazání před nahráváním nové historie
+        time.sleep(2)
+        
         success = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
         if success:
             moved = webshare.move_to_sync('streamcontinuum_history.json')

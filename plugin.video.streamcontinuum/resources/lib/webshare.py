@@ -181,9 +181,16 @@ def delete_file(ident):
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10)
         if response.status_code == 200:
-            return True
+            root = ElementTree.fromstring(response.content)
+            status = root.find('status')
+            if status is not None and status.text == 'OK':
+                xbmc.log(f"Webshare: delete_file {ident} OK", xbmc.LOGINFO)
+                return True
+            else:
+                xbmc.log(f"Webshare: delete_file {ident} failed, response: {response.text}", xbmc.LOGERROR)
+                return False
     except Exception as e:
-        print(f"Webshare delete_file error: {e}")
+        xbmc.log(f"Webshare delete_file error: {e}", xbmc.LOGERROR)
     return False
 
 def get_sync_files():
@@ -226,7 +233,16 @@ def move_to_sync(filename):
     }
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10)
-        return response.status_code == 200
+        if response.status_code == 200:
+            root = ElementTree.fromstring(response.content)
+            status = root.find('status')
+            if status is not None and status.text == 'OK':
+                xbmc.log(f"Webshare: move_to_sync '{filename}' OK", xbmc.LOGINFO)
+                return True
+            else:
+                xbmc.log(f"Webshare: move_to_sync '{filename}' failed: {response.text}", xbmc.LOGERROR)
+                return False
+        xbmc.log(f"Webshare: move_to_sync HTTP error {response.status_code}", xbmc.LOGERROR)
     except Exception as e:
-        print(f"Webshare move_to_sync error: {e}")
+        xbmc.log(f"Webshare move_to_sync error: {e}", xbmc.LOGERROR)
     return False
