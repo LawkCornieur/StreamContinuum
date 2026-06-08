@@ -49,12 +49,12 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 ## Seznam změn
 
 **Verze 1.3.3**
-- Pridana sekce CSFD.cz: TV tipy dne, Premiery VOD, Premiery DVD a Blu-ray.
-- U serialu v CSFD i Trakt.tv navigace pres Serie -> Epizody -> hledani na Webshare.
-- Pridan katalog Trakt.tv: Trendy, Popularni, Doporucene filmy i serialy.
-- Bohatsi zobrazeni metadat (plakat, fanart, zanry, hodnoceni, delka, popis).
+- Přidána sekce ČSFD.cz: TV tipy dne, Premiéry VOD, Premiéry DVD a Blu-ray.
+- U seriálů v ČSFD i Trakt.tv navigace přes Série -> Epizody -> hledaní na Webshare.
+- Přidány katalogy Trakt.tv: Trendy, Popularní, Doporučené filmy i seriály.
+- Bohatší zobrazeni metadat (plakát, fanart, žánry, hodnocení, délka, popis).
 - Doplnění překladů pro Angličtinu a Němčinu.
-- Volitelna integrace obrazků přes Trakt.tv (vyžaduje nastavené Trakt API).
+- Integrace obrazků přes Trakt.tv (vyžaduje nastavené Trakt API).
 
 **Verze 1.3.2**
 - Přidána ochrana proti přetížení API (pauza 0.5s mezi mazáním jednotlivých souborů v cyklu).
