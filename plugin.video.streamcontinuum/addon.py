@@ -1081,6 +1081,7 @@ def show_trakt_discover(list_type, media_type, offset=0):
     xbmcplugin.endOfDirectory(HANDLE)
 
 
+def run():
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
     
