@@ -451,12 +451,12 @@ def trakt_search(query=None):
 
 def show_changelog():
     changelog = "[B]Verze 1.3.3[/B]\n"
-    changelog += "- Pridana sekce CSFD.cz: TV tipy dne, Premiery VOD, Premiery DVD a Blu-ray.\n"
-    changelog += "- U serialu v CSFD i Trakt.tv navigace pres Serie -> Epizody -> hledani na Webshare.\n"
-    changelog += "- Pridan katalog Trakt.tv: Trendy, Popularni, Doporucene filmy i serialy.\n"
-    changelog += "- Bohatsi zobrazeni metadat (plakat, fanart, zanry, hodnoceni, delka, popis).\n"
+    changelog += "- Přidána sekce ČSFD.cz: TV tipy dne, Premiéry VOD, Premiéry DVD a Blu-ray.\n"
+    changelog += "- U seriálů v ČSFD i Trakt.tv navigace přes Série -> Epizody -> hledaní na Webshare.\n"
+    changelog += "- Přidány katalogy Trakt.tv: Trendy, Popularní, Doporučené filmy i seriály.\n"
+    changelog += "- Bohatší zobrazeni metadat (plakát, fanart, žánry, hodnocení, délka, popis).\n"
     changelog += "- Doplnění překladů pro Angličtinu a Němčinu.\n"
-    changelog += "- Volitelna integrace obrazků přes Trakt.tv (vyžaduje nastavené Trakt API).\n\n"
+    changelog += "- Integrace obrazků přes Trakt.tv (vyžaduje nastavené Trakt API).\n\n"
 
     changelog += "[B]Verze 1.3.2[/B]\n"
     changelog += "- Přidána ochrana proti přetížení API (pauza 0.5s mezi mazáním jednotlivých souborů v cyklu).\n"
