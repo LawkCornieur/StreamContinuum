@@ -290,3 +290,95 @@ msgstr "History of searched"
 msgctxt "#30095"
 msgid "Prefilled search"
 msgstr "Prefilled search (dialog witch text)"
+
+msgctxt "#30096"
+msgid "TV tips of the day"
+msgstr "TV tips of the day"
+
+msgctxt "#30097"
+msgid "VOD premieres"
+msgstr "VOD premieres"
+
+msgctxt "#30098"
+msgid "DVD/Blu-ray premieres"
+msgstr "DVD/Blu-ray premieres"
+
+msgctxt "#30099"
+msgid "Catalog"
+msgstr "Catalog"
+
+msgctxt "#30100"
+msgid "CSFD.cz - TV tips of the day"
+msgstr "CSFD.cz - TV tips of the day"
+
+msgctxt "#30101"
+msgid "CSFD.cz - VOD premieres"
+msgstr "CSFD.cz - VOD premieres"
+
+msgctxt "#30102"
+msgid "CSFD.cz - DVD and Blu-ray premieres"
+msgstr "CSFD.cz - DVD and Blu-ray premieres"
+
+msgctxt "#30103"
+msgid "CSFD module is not available."
+msgstr "CSFD module is not available."
+
+msgctxt "#30104"
+msgid "Failed to load items. Please try again."
+msgstr "Failed to load items. Please try again."
+
+msgctxt "#30105"
+msgid "Series"
+msgstr "Series"
+
+msgctxt "#30106"
+msgid "Failed to load seasons."
+msgstr "Failed to load seasons."
+
+msgctxt "#30107"
+msgid "Failed to load episodes."
+msgstr "Failed to load episodes."
+
+msgctxt "#30108"
+msgid "Episode {0}"
+msgstr "Episode {0}"
+
+msgctxt "#30109"
+msgid "Trakt.tv - Catalog"
+msgstr "Trakt.tv - Catalog"
+
+msgctxt "#30110"
+msgid "Popular movies"
+msgstr "Popular movies"
+
+msgctxt "#30111"
+msgid "Recommended movies"
+msgstr "Recommended movies"
+
+msgctxt "#30112"
+msgid "Popular shows"
+msgstr "Popular shows"
+
+msgctxt "#30113"
+msgid "Recommended shows"
+msgstr "Recommended shows"
+
+msgctxt "#30114"
+msgid "Genres"
+msgstr "Genres"
+
+msgctxt "#30115"
+msgid "Duration"
+msgstr "Duration"
+
+msgctxt "#30116"
+msgid "Status"
+msgstr "Status"
+
+msgctxt "#30117"
+msgid "Next page"
+msgstr "Next page"
+
+msgctxt "#30118"
+msgid "Failed to load items. Check the connection."
+msgstr "Failed to load items. Check the connection."

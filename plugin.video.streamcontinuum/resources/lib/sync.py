@@ -84,6 +84,8 @@ def export_settings(pin):
         
         success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
         if success:
+            # Sleep 2 seconds to allow Webshare backend indexing to complete
+            time.sleep(2)
             moved = webshare.move_to_sync('streamcontinuum_settings.enc')
             if not moved:
                 return False, "Chyba při přesunu nastavení do složky StreamContinuum_Sync."
@@ -237,6 +239,8 @@ def sync_history():
         
         success = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
         if success:
+            # Sleep 2 seconds to allow Webshare backend indexing to complete
+            time.sleep(2)
             moved = webshare.move_to_sync('streamcontinuum_history.json')
             if not moved:
                 xbmc.log("StreamContinuum: Failed to move history file to StreamContinuum_Sync", xbmc.LOGERROR)

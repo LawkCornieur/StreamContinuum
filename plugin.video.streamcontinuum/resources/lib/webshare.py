@@ -147,8 +147,18 @@ def upload_file(filepath, filename):
                             # Increased timeout to 60 seconds for slower upload servers
                             up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60)
                             if up_resp.status_code == 200:
-                                xbmc.log(f"StreamContinuum: Upload of {filename} successful on attempt {attempt + 1}", xbmc.LOGINFO)
-                                return True
+                                try:
+                                    root = ElementTree.fromstring(up_resp.content)
+                                    status = root.find('status')
+                                    if status is not None and status.text == 'OK':
+                                        xbmc.log(f"StreamContinuum: Upload of {filename} successful on attempt {attempt + 1}", xbmc.LOGINFO)
+                                        return True
+                                    else:
+                                        xbmc.log(f"StreamContinuum: Upload of {filename} failed XML status: {up_resp.text}", xbmc.LOGWARNING)
+                                except Exception as parse_err:
+                                    # Fallback: if it's 200 but not parseable as XML, treat as successful (or log)
+                                    xbmc.log(f"StreamContinuum: Upload of {filename} succeeded with HTTP 200 but failed to parse response XML: {parse_err}. Content: {up_resp.text}", xbmc.LOGWARNING)
+                                    return True
                             else:
                                 xbmc.log(f"StreamContinuum: Upload of {filename} failed with status {up_resp.status_code}", xbmc.LOGWARNING)
                     except Exception as e:

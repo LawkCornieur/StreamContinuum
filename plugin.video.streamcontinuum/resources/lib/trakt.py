@@ -1,7 +1,9 @@
+import xbmc
 import xbmcgui
 import xbmcaddon
 import requests
 import time
+import urllib.parse
 
 ADDON = xbmcaddon.Addon()
 
@@ -85,6 +87,31 @@ def get_headers():
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
+
+def get_images(trakt_id, media_type):
+    if not trakt_id:
+        return '', ''
+    endpoint = 'movies' if media_type in ('movie', 'Movie') else 'shows'
+    url = f"https://api.trakt.tv/{endpoint}/{trakt_id}?extended=images"
+    try:
+        res = requests.get(url, headers=get_headers(), timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            images = data.get('images', {}) or {}
+            poster = (images.get('poster', {}).get('full') or
+                      images.get('poster', {}).get('medium') or
+                      images.get('poster', {}).get('thumb') or
+                      data.get('image', ''))
+            fanart = (images.get('fanart', {}).get('full') or
+                      images.get('fanart', {}).get('medium') or
+                      images.get('backdrop', {}).get('full') or
+                      images.get('banner', {}).get('full') or
+                      images.get('clearart', {}).get('full') or
+                      '')
+            return poster, fanart
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Trakt image fetch error: {e}", xbmc.LOGWARNING)
+    return '', ''
 
 def get_user_info():
     url = "https://api.trakt.tv/users/me"
@@ -185,4 +212,55 @@ def mark_unwatched(media_type, trakt_id):
     except:
         return False
 
-import urllib.parse
+def get_trending(media_type):
+    # media_type can be 'movies' or 'shows'
+    url = f"https://api.trakt.tv/{media_type}/trending?extended=full"
+    try:
+        res = requests.get(url, headers=get_headers(), timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: get_trending error: {e}", xbmc.LOGERROR)
+    return []
+
+def get_popular(media_type):
+    # media_type can be 'movies' or 'shows'
+    url = f"https://api.trakt.tv/{media_type}/popular?extended=full"
+    try:
+        res = requests.get(url, headers=get_headers(), timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: get_popular error: {e}", xbmc.LOGERROR)
+    return []
+
+def get_recommended(media_type):
+    # media_type can be 'movies' or 'shows'
+    url = f"https://api.trakt.tv/recommendations/{media_type}?extended=full&limit=30"
+    try:
+        res = requests.get(url, headers=get_headers(), timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: get_recommended error: {e}", xbmc.LOGERROR)
+    return []
+
+def get_seasons(show_id):
+    url = f"https://api.trakt.tv/shows/{show_id}/seasons?extended=full"
+    try:
+        res = requests.get(url, headers=get_headers(), timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: get_seasons error: {e}", xbmc.LOGERROR)
+    return []
+
+def get_episodes(show_id, season):
+    url = f"https://api.trakt.tv/shows/{show_id}/seasons/{season}?extended=full"
+    try:
+        res = requests.get(url, headers=get_headers(), timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: get_episodes error: {e}", xbmc.LOGERROR)
+    return []
