@@ -450,7 +450,11 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.3.3[/B]\n"
+    changelog = "[B]Verze 1.3.4[/B]\n"
+    changelog += "- Oprava navigace ČSFD a Trakt.tv katalogů (oprava chybějícího směrování v run()).\n"
+    changelog += "- Odstranění TMDB klíče z nastavení a oprava načítání obrázků (plakáty a pozadí se načítají automaticky z TMDB na pozadí podle ID z Trakt.tv).\n\n"
+
+    changelog += "[B]Verze 1.3.3[/B]\n"
     changelog += "- Přidána sekce ČSFD.cz: TV tipy dne, Premiéry VOD, Premiéry DVD a Blu-ray.\n"
     changelog += "- U seriálů v ČSFD i Trakt.tv navigace přes Série -> Epizody -> hledaní na Webshare.\n"
     changelog += "- Přidány katalogy Trakt.tv: Trendy, Popularní, Doporučené filmy i seriály.\n"
@@ -1205,6 +1209,20 @@ def run():
                 import history
                 history.update_history_item(old_query, new_query) # Simple update
                 xbmc.executebuiltin('Container.Refresh')
+    elif action == 'csfd_menu':
+        show_csfd_menu()
+    elif action == 'csfd_category':
+        show_csfd_category(params.get('category'), params.get('offset', 0))
+    elif action == 'csfd_show_seasons':
+        show_csfd_show_seasons(params.get('title', ''), params.get('year', ''))
+    elif action == 'show_seasons':
+        show_seasons(params.get('show_title', ''), params.get('trakt_id', ''), params.get('poster', ''), params.get('fanart', ''))
+    elif action == 'show_episodes':
+        show_episodes(params.get('show_title', ''), params.get('trakt_id', ''), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
+    elif action == 'trakt_discover_menu':
+        show_trakt_discover_menu()
+    elif action == 'trakt_discover':
+        show_trakt_discover(params.get('list_type', 'trending'), params.get('media_type', 'movies'), params.get('offset', 0))
     elif action == 'show_changelog':
         show_changelog()
     else:

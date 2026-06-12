@@ -92,25 +92,25 @@ def get_images(trakt_id, media_type):
     if not trakt_id:
         return '', ''
     endpoint = 'movies' if media_type in ('movie', 'Movie') else 'shows'
-    url = f"https://api.trakt.tv/{endpoint}/{trakt_id}?extended=images"
+    tmdb_media_type = 'movie' if media_type in ('movie', 'Movie') else 'tv'
+    url = f"https://api.trakt.tv/{endpoint}/{trakt_id}"
     try:
         res = requests.get(url, headers=get_headers(), timeout=10)
         if res.status_code == 200:
             data = res.json()
-            images = data.get('images', {}) or {}
-            poster = (images.get('poster', {}).get('full') or
-                      images.get('poster', {}).get('medium') or
-                      images.get('poster', {}).get('thumb') or
-                      data.get('image', ''))
-            fanart = (images.get('fanart', {}).get('full') or
-                      images.get('fanart', {}).get('medium') or
-                      images.get('backdrop', {}).get('full') or
-                      images.get('banner', {}).get('full') or
-                      images.get('clearart', {}).get('full') or
-                      '')
-            return poster, fanart
+            tmdb_id = data.get('ids', {}).get('tmdb')
+            if tmdb_id:
+                tmdb_url = f"https://api.themoviedb.org/3/{tmdb_media_type}/{tmdb_id}?api_key=f08c3447b5fb018b69da46fa54cf63d3"
+                tmdb_res = requests.get(tmdb_url, timeout=10)
+                if tmdb_res.status_code == 200:
+                    tmdb_data = tmdb_res.json()
+                    poster_path = tmdb_data.get('poster_path')
+                    backdrop_path = tmdb_data.get('backdrop_path')
+                    poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                    fanart = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
+                    return poster, fanart
     except Exception as e:
-        xbmc.log(f"StreamContinuum: Trakt image fetch error: {e}", xbmc.LOGWARNING)
+        xbmc.log(f"StreamContinuum: Trakt/TMDB image fetch error: {e}", xbmc.LOGWARNING)
     return '', ''
 
 def get_user_info():

@@ -48,6 +48,10 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.3.4**
+- Oprava navigace ČSFD a Trakt.tv katalogů (oprava chybějícího směrování v run()).
+- Odstranění TMDB klíče z nastavení a oprava načítání obrázků (plakáty a pozadí se načítají automaticky z TMDB na pozadí podle ID z Trakt.tv).
+
 **Verze 1.3.3**
 - Přidána sekce ČSFD.cz: TV tipy dne, Premiéry VOD, Premiéry DVD a Blu-ray.
 - U seriálů v ČSFD i Trakt.tv navigace přes Série -> Epizody -> hledaní na Webshare.
