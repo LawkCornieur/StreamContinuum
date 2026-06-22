@@ -450,7 +450,11 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.3.5[/B]\n"
+    changelog = "[B]Verze 1.3.6[/B]\n"
+    changelog += "- Oprava synchronizace historie na Webshare (soubory se nahrávají a přesouvají korektně jako privátní).\n"
+    changelog += "- Přidáno uživatelské nastavení a dialogové potvrzení pro vypnutí ověřování SSL certifikátů při chybě připojení k ČSFD.\n\n"
+
+    changelog += "[B]Verze 1.3.5[/B]\n"
     changelog += "- Oprava parsování a načítání sekce ČSFD (odolnější regulární výrazy a ignorování SSL chyb).\n\n"
 
     changelog += "[B]Verze 1.3.4[/B]\n"

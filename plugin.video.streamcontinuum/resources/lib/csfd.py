@@ -6,6 +6,7 @@ import requests
 from xml.etree import ElementTree
 import xbmc
 import xbmcaddon
+import xbmcgui
 import xbmcvfs
 
 ADDON = xbmcaddon.Addon()
@@ -40,11 +41,39 @@ def get_cached_or_fetch(url, cache_filename, ttl_seconds=21600):
                 
     # Fetch from web
     xbmc.log(f"StreamContinuum: Fetching ČSFD page: {url}", xbmc.LOGINFO)
-    try:
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        response = requests.get(url, headers=HEADERS, timeout=15, verify=False)
-        if response.status_code == 200:
+    ssl_verify = ADDON.getSettingBool('ssl_verify') if hasattr(ADDON, 'getSettingBool') else (ADDON.getSetting('ssl_verify') != 'false')
+    # Helper to fetch URL with SSL handling and retry on timeout
+    def _fetch_url(target_url):
+        ssl_verify = ADDON.getSettingBool('ssl_verify') if hasattr(ADDON, 'getSettingBool') else (ADDON.getSetting('ssl_verify') != 'false')
+        for attempt in range(2):
+            try:
+                if not ssl_verify:
+                    import urllib3
+                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                response = requests.get(target_url, headers=HEADERS, timeout=30, verify=ssl_verify)
+                return response
+            except requests.exceptions.SSLError as ssl_err:
+                if ssl_verify:
+                    xbmc.log(f"StreamContinuum: ČSFD SSL verify failed: {ssl_err}", xbmc.LOGERROR)
+                    dialog = xbmcgui.Dialog()
+                    if dialog.confirm("StreamContinuum", "ČSFD SSL certifikát nelze ověřit. Chcete vypnout ověřování SSL certifikátů v nastavení doplňku?"):
+                        ADDON.setSetting('ssl_verify', 'false')
+                        ssl_verify = False
+                        continue
+                raise ssl_err
+            except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout) as timeout_err:
+                xbmc.log(f"StreamContinuum: ČSFD request timeout (30s): {timeout_err}", xbmc.LOGWARNING)
+                if attempt == 0:
+                    xbmc.log("StreamContinuum: Retrying request...", xbmc.LOGINFO)
+                    continue
+                raise
+            except Exception as e:
+                xbmc.log(f"StreamContinuum: ČSFD fetch error: {e}", xbmc.LOGERROR)
+                raise
+        return None
+
+        response = _fetch_url(url)
+        if response and response.status_code == 200:
             items = parse_articles(response.text)
             try:
                 with open(cache_path, 'w', encoding='utf-8') as f:

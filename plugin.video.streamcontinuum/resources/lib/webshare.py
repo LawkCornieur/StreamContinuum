@@ -143,7 +143,10 @@ def upload_file(filepath, filename):
                         xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (attempt {attempt + 1}/3)...", xbmc.LOGINFO)
                         with open(filepath, 'rb') as f:
                             files = {'file': (filename, f)}
-                            upload_data = {'wst': token}
+                            upload_data = {
+                                'wst': token,
+                                'private': 1
+                            }
                             # Increased timeout to 60 seconds for slower upload servers
                             up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60)
                             if up_resp.status_code == 200:
@@ -252,7 +255,7 @@ def move_to_sync(filename):
         'wst': token,
         'src': f'/{filename}',
         'dest': '/StreamContinuum_Sync/',
-        'src_private': 0,
+        'src_private': 1,
         'dest_private': 1
     }
     try:
