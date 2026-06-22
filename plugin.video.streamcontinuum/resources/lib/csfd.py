@@ -71,6 +71,95 @@ def get_cached_or_fetch(url, cache_filename, ttl_seconds=21600):
     return []
 
 def parse_articles(html):
+    # Primary pattern – old CSFD markup
+    article_blocks = re.findall(r'<article\b[^>]*>(.*?)</article>', html, re.DOTALL)
+
+    # Fallback – current CSFD layout (TV tips, VOD, disks)
+    if not article_blocks:
+        article_blocks = re.findall(
+            r'<div[^>]*class="[^"]*\\bfilm\\b[^"]*"[^>]*>(.*?)</div>',
+            html, re.DOTALL)
+
+    if not article_blocks:
+        xbmc.log("StreamContinuum: ČSFD parsing: no article or film blocks found", xbmc.LOGWARNING)
+        return []
+
+    items = []
+    for block in article_blocks:
+        # Title + URL – try the specific class first, then a generic <a> fallback
+        title_match = re.search(
+            r'<a[^>]*class="[^"]*film-title-name[^"]*"[^>]*href="([^\"]+)"[^>]*>([^<]+)</a>',
+            block)
+        if not title_match:
+            title_match = re.search(r'<a[^>]*href="([^\"]+)"[^>]*>([^<]+)</a>', block, re.DOTALL)
+        if not title_match:
+            continue
+        url = title_match.group(1).strip()
+        if url.startswith('/'):
+            url = 'https://www.csfd.cz' + url
+        title = title_match.group(2).strip()
+
+        # Image
+        img_match = re.search(r'<img[^>]*src="([^\"]+)"', block)
+        img = img_match.group(1).strip() if img_match else ''
+        if img.startswith('//'):
+            img = 'https:' + img
+
+        # Year
+        year_match = re.search(r'<span class="film-title-info".*?<span class="info">(\d{4})</span>', block, re.DOTALL)
+        year = year_match.group(1).strip() if year_match else ''
+
+        # Genres / Country
+        genres_match = re.search(r'<p class="film-origins-genres"[^>]*>(.*?)</p>', block, re.DOTALL)
+        genres = ''
+        if genres_match:
+            genres = re.sub(r'<[^>]*>', '', genres_match.group(1)).replace('\n', ' ').strip()
+            genres = re.sub(r'\s+', ' ', genres)
+
+        # Description – TV‑tips specific, with fallback
+        desc_match = re.search(r'<p class="p-tvtips-2row[^\"]*"(?:[^>]*?)>(.*?)</p>', block, re.DOTALL)
+        if not desc_match:
+            desc_match = re.search(r'<p class="film-description"(?:[^>]*?)>(.*?)</p>', block, re.DOTALL)
+        desc = ''
+        if desc_match:
+            desc = re.sub(r'<[^>]*>', '', desc_match.group(1)).replace('\n', ' ').strip()
+            desc = re.sub(r'\s+', ' ', desc)
+
+        # Creator info
+        creators_blocks = re.findall(r'<p class="film-creators"(?:[^>]*?)>(.*?)</p>', block, re.DOTALL)
+        creators = ''
+        if creators_blocks:
+            cleaned = [re.sub(r'<[^>]*>', '', c).strip() for c in creators_blocks]
+            creators = ' | '.join(cleaned)
+
+        if not desc and creators:
+            desc = creators
+        elif creators:
+            desc += f'\n\n{creators}'
+
+        # Rating
+        rating_match = re.search(r'<span class="rating-average">([^<]+)</span>', block)
+        rating = rating_match.group(1).strip() if rating_match else ''
+        raw_title = title
+        if rating:
+            title = f'[{rating}] {title}'
+
+        # Show vs. movie detection
+        is_show = False
+        if 'seriál' in genres.lower() or 'epizod' in genres.lower() or 'seriál' in block.lower():
+            is_show = True
+
+        items.append({
+            'title': title,
+            'clean_title': raw_title,
+            'year': year,
+            'url': url,
+            'img': img,
+            'info': genres,
+            'plot': desc,
+            'type': 'show' if is_show else 'movie'
+        })
+    return items
     # Find all articles
     article_blocks = re.findall(r'<article\b[^>]*>(.*?)</article>', html, re.DOTALL)
     items = []
