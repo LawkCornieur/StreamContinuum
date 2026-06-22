@@ -30,15 +30,20 @@ def get_cached_or_fetch(url, cache_filename, ttl_seconds=21600):
             try:
                 with open(cache_path, 'r', encoding='utf-8') as f:
                     cached_data = json.load(f)
-                    xbmc.log(f"StreamContinuum: Loaded ČSFD data from cache: {cache_filename}", xbmc.LOGINFO)
-                    return cached_data
+                    if cached_data:
+                        xbmc.log(f"StreamContinuum: Loaded ČSFD data from cache: {cache_filename}", xbmc.LOGINFO)
+                        return cached_data
+                    else:
+                        xbmc.log(f"StreamContinuum: Cached data for {cache_filename} is empty, refetching...", xbmc.LOGINFO)
             except Exception as e:
                 xbmc.log(f"StreamContinuum: Error reading cache {cache_filename}: {e}", xbmc.LOGWARNING)
                 
     # Fetch from web
     xbmc.log(f"StreamContinuum: Fetching ČSFD page: {url}", xbmc.LOGINFO)
     try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        response = requests.get(url, headers=HEADERS, timeout=15, verify=False)
         if response.status_code == 200:
             items = parse_articles(response.text)
             try:
@@ -56,7 +61,7 @@ def get_cached_or_fetch(url, cache_filename, ttl_seconds=21600):
 
 def parse_articles(html):
     # Find all articles
-    article_blocks = re.findall(r'<article[^>]*class="[^"]*article[^"]*">(.*?)</article>', html, re.DOTALL)
+    article_blocks = re.findall(r'<article\b[^>]*>(.*?)</article>', html, re.DOTALL)
     items = []
     for block in article_blocks:
         # Title and URL

@@ -450,7 +450,10 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.3.4[/B]\n"
+    changelog = "[B]Verze 1.3.5[/B]\n"
+    changelog += "- Oprava parsování a načítání sekce ČSFD (odolnější regulární výrazy a ignorování SSL chyb).\n\n"
+
+    changelog += "[B]Verze 1.3.4[/B]\n"
     changelog += "- Oprava navigace ČSFD a Trakt.tv katalogů (oprava chybějícího směrování v run()).\n"
     changelog += "- Odstranění TMDB klíče z nastavení a oprava načítání obrázků (plakáty a pozadí se načítají automaticky z TMDB na pozadí podle ID z Trakt.tv).\n\n"
 
@@ -1161,6 +1164,7 @@ def run():
             xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30084))
     elif action == 'settings':
         ADDON.openSettings()
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
     elif action == 'search':
         search(params.get('query'))
     elif action == 'search_prefill':

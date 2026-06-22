@@ -48,6 +48,9 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.3.5**
+- Oprava parsování a načítání sekce ČSFD (odolnější regulární výrazy a ignorování SSL chyb).
+
 **Verze 1.3.4**
 - Oprava navigace ČSFD a Trakt.tv katalogů (oprava chybějícího směrování v run()).
 - Odstranění TMDB klíče z nastavení a oprava načítání obrázků (plakáty a pozadí se načítají automaticky z TMDB na pozadí podle ID z Trakt.tv).
