@@ -71,14 +71,12 @@ def get_cached_or_fetch(url, cache_filename, ttl_seconds=21600):
     return []
 
 def parse_articles(html):
-    # Primary pattern – old CSFD markup
-    article_blocks = re.findall(r'<article\b[^>]*>(.*?)</article>', html, re.DOTALL)
+    # Primary pattern – old CSFD markup (any <article> tag)
+    article_blocks = re.findall(r'<article[^>]*>(.*?)</article>', html, re.DOTALL)
 
-    # Fallback – current CSFD layout (TV tips, VOD, disks)
+    # Fallback – current CSFD layout (any <div> with class containing "film")
     if not article_blocks:
-        article_blocks = re.findall(
-            r'<div[^>]*class="[^"]*\\bfilm\\b[^"]*"[^>]*>(.*?)</div>',
-            html, re.DOTALL)
+        article_blocks = re.findall(r'<div[^>]*class="[^">]*film[^">]*"[^>]*>(.*?)</div>', html, re.DOTALL)
 
     if not article_blocks:
         xbmc.log("StreamContinuum: ČSFD parsing: no article or film blocks found", xbmc.LOGWARNING)
