@@ -72,22 +72,24 @@ def get_cached_or_fetch(url, cache_filename, ttl_seconds=21600):
                 raise
         return None
 
-        try:
-            response = _fetch_url(url)
-            if response and response.status_code == 200:
-                items = parse_articles(response.text)
-                try:
-                    with open(cache_path, 'w', encoding='utf-8') as f:
-                        json.dump(items, f, ensure_ascii=False, indent=4)
-                except Exception as e:
-                    xbmc.log(f"StreamContinuum: Error writing cache {cache_filename}: {e}", xbmc.LOGWARNING)
-                return items
-            else:
-                xbmc.log(f"StreamContinuum: ČSFD HTTP error {response.status_code} for {url}", xbmc.LOGERROR)
-        except Exception as e:
-            xbmc.log(f"StreamContinuum: ČSFD fetch error: {e}", xbmc.LOGERROR)
+    try:
+        response = _fetch_url(url)
+        if response and response.status_code == 200:
+            items = parse_articles(response.text)
+            if not items:
+                xbmc.log(f"StreamContinuum: ČSFD parsing returned no items for {url}", xbmc.LOGWARNING)
+            try:
+                with open(cache_path, 'w', encoding='utf-8') as f:
+                    json.dump(items, f, ensure_ascii=False, indent=4)
+            except Exception as e:
+                xbmc.log(f"StreamContinuum: Error writing cache {cache_filename}: {e}", xbmc.LOGWARNING)
+            return items
+        else:
+            xbmc.log(f"StreamContinuum: ČSFD HTTP error {response.status_code if response else 'None'} for {url}", xbmc.LOGERROR)
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: ČSFD fetch error: {e}", xbmc.LOGERROR)
 
-        return []
+    return []
 
 def parse_articles(html):
     # Find all articles
