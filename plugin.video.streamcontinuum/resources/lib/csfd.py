@@ -85,7 +85,7 @@ def parse_articles(html):
 
     items = []
     for block in article_blocks:
-        # Title + URL – try the specific class first, then a generic <a> fallback
+        # Title + URL - try the specific class first, then a generic <a> fallback
         title_match = re.search(
             r'<a[^>]*class="[^"]*film-title-name[^"]*"[^>]*href="([^\"]+)"[^>]*>([^<]+)</a>',
             block)
