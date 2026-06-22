@@ -83,7 +83,7 @@ def parse_articles(html):
         if not title_match:
             continue
             
-        url = title_match.group(1).strip()
+        url = 'https://www.csfd.cz' + title_match.group(1).strip() if title_match.group(1).startswith('/') else title_match.group(1).strip()
         title = title_match.group(2).strip()
         
         # Image
@@ -105,6 +105,9 @@ def parse_articles(html):
             
         # Description
         desc_match = re.search(r'<p class="p-tvtips-2row[^"]*">(.*?)</p>', block, re.DOTALL)
+        if not desc_match:
+            desc_match = re.search(r'<p class="film-description">(.*?)</p>', block, re.DOTALL)
+        
         desc = ""
         if desc_match:
             desc = re.sub(r'<[^>]*>', '', desc_match.group(1)).replace('\n', ' ').strip()
