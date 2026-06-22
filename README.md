@@ -48,6 +48,10 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.3.6**
+- Oprava synchronizace historie na Webshare (soubory se nahrávají a přesouvají korektně jako privátní).
+- Přidáno uživatelské nastavení a dialogové potvrzení pro vypnutí ověřování SSL certifikátů při chybě připojení k ČSFD.
+
 **Verze 1.3.5**
 - Oprava parsování a načítání sekce ČSFD (odolnější regulární výrazy a ignorování SSL chyb).
 
