@@ -88,30 +88,74 @@ def get_headers():
         headers["Authorization"] = f"Bearer {token}"
     return headers
 
-def get_images(trakt_id, media_type):
+def get_localized_metadata(trakt_id, media_type):
+    """Načte lokalizovaná (česká) metadata a obrázky z TMDb pro daný Trakt ID."""
     if not trakt_id:
-        return '', ''
+        return {}
+    
     endpoint = 'movies' if media_type in ('movie', 'Movie') else 'shows'
     tmdb_media_type = 'movie' if media_type in ('movie', 'Movie') else 'tv'
     url = f"https://api.trakt.tv/{endpoint}/{trakt_id}"
+    
     try:
+        # Získání tmdb_id z Trakt.tv
         res = requests.get(url, headers=get_headers(), timeout=10)
         if res.status_code == 200:
             data = res.json()
             tmdb_id = data.get('ids', {}).get('tmdb')
             if tmdb_id:
-                tmdb_url = f"https://api.themoviedb.org/3/{tmdb_media_type}/{tmdb_id}?api_key=f08c3447b5fb018b69da46fa54cf63d3"
-                tmdb_res = requests.get(tmdb_url, timeout=10)
-                if tmdb_res.status_code == 200:
+                # Získání českých metadat z TMDb s rotací API klíčů
+                import tmdb
+                tmdb_url_template = f"https://api.themoviedb.org/3/{tmdb_media_type}/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
+                tmdb_res = tmdb.make_tmdb_request(tmdb_url_template)
+                
+                if tmdb_res and tmdb_res.status_code == 200:
                     tmdb_data = tmdb_res.json()
+                    
+                    # Obrázky
                     poster_path = tmdb_data.get('poster_path')
                     backdrop_path = tmdb_data.get('backdrop_path')
                     poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
                     fanart = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
-                    return poster, fanart
+                    
+                    # Lokalizovaný název a popisek
+                    title = tmdb_data.get('title') if tmdb_media_type == 'movie' else tmdb_data.get('name')
+                    overview = tmdb_data.get('overview')
+                    
+                    # Fallback na původní název, pokud chybí český
+                    if not title:
+                        title = data.get('title', '')
+                    if not overview:
+                        overview = data.get('overview', '')
+                        
+                    # Další detaily
+                    genres_list = [g.get('name') for g in tmdb_data.get('genres', []) if g.get('name')]
+                    rating = tmdb_data.get('vote_average', 0)
+                    runtime = tmdb_data.get('runtime', 0) if tmdb_media_type == 'movie' else tmdb_data.get('episode_run_time', [0])[0]
+                    status = tmdb_data.get('status', '')
+                    
+                    return {
+                        'title': title,
+                        'overview': overview,
+                        'poster': poster,
+                        'fanart': fanart,
+                        'genres': genres_list,
+                        'rating': rating,
+                        'runtime': runtime,
+                        'status': status
+                    }
     except Exception as e:
-        xbmc.log(f"StreamContinuum: Trakt/TMDB image fetch error: {e}", xbmc.LOGWARNING)
+        xbmc.log(f"StreamContinuum: Trakt/TMDB metadata fetch error (id={trakt_id}): {e}", xbmc.LOGWARNING)
+        
+    return {}
+
+def get_images(trakt_id, media_type):
+    """Zpětně kompatibilní získání plakátu a fanartu."""
+    meta = get_localized_metadata(trakt_id, media_type)
+    if meta:
+        return meta.get('poster', ''), meta.get('fanart', '')
     return '', ''
+
 
 def get_user_info():
     url = "https://api.trakt.tv/users/me"

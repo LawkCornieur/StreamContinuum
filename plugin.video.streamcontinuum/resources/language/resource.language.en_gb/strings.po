@@ -308,20 +308,20 @@ msgid "Catalog"
 msgstr "Catalog"
 
 msgctxt "#30100"
-msgid "CSFD.cz - TV tips of the day"
-msgstr "CSFD.cz - TV tips of the day"
+msgid "TMDb - TV tips of the day"
+msgstr "TMDb - TV tips of the day"
 
 msgctxt "#30101"
-msgid "CSFD.cz - VOD premieres"
-msgstr "CSFD.cz - VOD premieres"
+msgid "TMDb - VOD premieres"
+msgstr "TMDb - VOD premieres"
 
 msgctxt "#30102"
-msgid "CSFD.cz - DVD and Blu-ray premieres"
-msgstr "CSFD.cz - DVD and Blu-ray premieres"
+msgid "TMDb - DVD and Blu-ray premieres"
+msgstr "TMDb - DVD and Blu-ray premieres"
 
 msgctxt "#30103"
-msgid "CSFD module is not available."
-msgstr "CSFD module is not available."
+msgid "TMDb module is not available."
+msgstr "TMDb module is not available."
 
 msgctxt "#30104"
 msgid "Failed to load items. Please try again."

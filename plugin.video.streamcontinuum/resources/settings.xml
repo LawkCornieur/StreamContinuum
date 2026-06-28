@@ -28,8 +28,11 @@
         <setting id="auto_start" type="bool" label="Automaticky spustit doplněk po startu Kodi" default="true" />
         <setting id="ssl_verify" type="bool" label="Ověřovat SSL certifikáty" default="true" />
     </category>
+    <category label="TMDb">
+        <setting id="tmdb_api_key" type="text" label="TMDb API klíč (volitelný)" default="" />
+    </category>
     <category label="30040">
-        <setting id="about_version" type="text" label="30041" default="1.3.6" enable="false" />
+        <setting id="about_version" type="text" label="30041" default="1.3.7" enable="false" />
         <setting id="about_changelog" type="action" label="30042" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=show_changelog)" />
     </category>
 </settings>
