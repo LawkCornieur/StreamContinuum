@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+    <category label="30000">
+        <setting id="trakt_username" type="text" label="30003" default="30048" enable="false" />
+        <setting id="trakt_auth_btn" type="action" label="30004" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_auth)" />
+        <setting id="trakt_refresh" type="action" label="30043" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_refresh)" />
+        <setting id="trakt_token" type="text" label="" visible="false" default="" />
+        <setting id="trakt_client_id" type="text" label="30031" default="" />
+        <setting id="trakt_id_paste" type="action" label="30044" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=paste_from_clipboard&amp;target=trakt_client_id)" />
+        <setting id="trakt_client_secret" type="text" label="30032" option="hidden" default="" />
+        <setting id="trakt_secret_paste" type="action" label="30045" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=paste_from_clipboard&amp;target=trakt_client_secret)" />
+        <setting id="trakt_logout" type="action" label="30046" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_logout)" />
+    </category>
+    <category label="30010">
+        <setting id="ws_username" type="text" label="30012" default="" />
+        <setting id="ws_password" type="text" label="30013" option="hidden" default="" />
+        <setting id="ws_pass_paste" type="action" label="30047" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=paste_from_clipboard&amp;target=ws_password)" />
+        <setting id="ws_token" type="text" label="" visible="false" default="" />
+        <setting id="ws_sync_history" type="action" label="Synchronizovat historii na Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=sync_history)" />
+        <setting id="ws_export_settings" type="action" label="Exportovat nastavení na Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=export_settings)" />
+        <setting id="ws_import_settings" type="action" label="Importovat nastavení z Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=import_settings)" />
+    </category>
+    <category label="30020">
+        <setting id="autoplay_next" type="bool" label="30022" default="true" />
+        <setting id="optimize_results" type="bool" label="30088" default="true" />
+        <setting id="after_playback" type="enum" label="30090" lvalues="30091|30092|30093|30094|30095" default="0" />
+        <setting id="enable_welcome_melody" type="bool" label="Povolit uvítací melodii" default="true" />
+        <setting id="auto_start" type="bool" label="Automaticky spustit doplněk po startu Kodi" default="true" />
+        <setting id="ssl_verify" type="bool" label="Ověřovat SSL certifikáty" default="true" />
+    </category>
+    <category label="TMDb">
+        <setting id="tmdb_api_key" type="text" label="TMDb API klíč (volitelný)" default="" />
+    </category>
+    <category label="30040">
+        <setting id="about_version" type="text" label="30041" default="1.3.7" enable="false" />
+        <setting id="about_changelog" type="action" label="30042" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=show_changelog)" />
+    </category>
+</settings>

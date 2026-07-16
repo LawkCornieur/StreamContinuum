@@ -1,0 +1,384 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgctxt "#30000"
+msgid "Trakt.tv"
+msgstr "Trakt.tv"
+
+msgctxt "#30001"
+msgid "Account"
+msgstr "Konto"
+
+msgctxt "#30002"
+msgid "Token"
+msgstr "Token"
+
+msgctxt "#30003"
+msgid "User"
+msgstr "Benutzer"
+
+msgctxt "#30004"
+msgid "Activate Device"
+msgstr "Gerät aktivieren"
+
+msgctxt "#30010"
+msgid "Webshare"
+msgstr "Webshare"
+
+msgctxt "#30011"
+msgid "Credentials"
+msgstr "Anmeldeinformationen"
+
+msgctxt "#30012"
+msgid "Username"
+msgstr "Benutzername"
+
+msgctxt "#30013"
+msgid "Password"
+msgstr "Passwort"
+
+msgctxt "#30014"
+msgid "Token"
+msgstr "Token"
+
+msgctxt "#30020"
+msgid "General"
+msgstr "Allgemein"
+
+msgctxt "#30021"
+msgid "Playback"
+msgstr "Wiedergabe"
+
+msgctxt "#30022"
+msgid "Autoplay next"
+msgstr "Nächstes automatisch abspielen"
+
+msgctxt "#30023"
+msgid "Max resolution"
+msgstr "Maximale Auflösung"
+
+msgctxt "#30030"
+msgid "API Settings"
+msgstr "API-Einstellungen"
+
+msgctxt "#30031"
+msgid "Client ID"
+msgstr "Client ID"
+
+msgctxt "#30032"
+msgid "Client Secret"
+msgstr "Client Secret"
+
+msgctxt "#30040"
+msgid "About"
+msgstr "Über"
+
+msgctxt "#30041"
+msgid "Version"
+msgstr "Version"
+
+msgctxt "#30042"
+msgid "Changelog"
+msgstr "Änderungsprotokoll"
+
+msgctxt "#30043"
+msgid "Refresh Trakt.tv status"
+msgstr "Trakt.tv Status aktualisieren"
+
+msgctxt "#30044"
+msgid "Paste Client ID from clipboard"
+msgstr "Client ID aus der Zwischenablage einfügen"
+
+msgctxt "#30045"
+msgid "Paste Client Secret from clipboard"
+msgstr "Client Secret aus der Zwischenablage einfügen"
+
+msgctxt "#30046"
+msgid "Logout from Trakt.tv"
+msgstr "Von Trakt.tv abmelden"
+
+msgctxt "#30047"
+msgid "Paste password from clipboard"
+msgstr "Passwort aus der Zwischenablage einfügen"
+
+msgctxt "#30048"
+msgid "Not connected"
+msgstr "Nicht verbunden"
+
+msgctxt "#30050"
+msgid "Continue watching"
+msgstr "Weiterschauen"
+
+msgctxt "#30051"
+msgid "Watchlist"
+msgstr "Merkliste"
+
+msgctxt "#30052"
+msgid "Search"
+msgstr "Suchen"
+
+msgctxt "#30053"
+msgid "History"
+msgstr "Verlauf"
+
+msgctxt "#30054"
+msgid "Settings"
+msgstr "Einstellungen"
+
+msgctxt "#30055"
+msgid "Trending Movies"
+msgstr "Trendfilme"
+
+msgctxt "#30056"
+msgid "Trending Shows"
+msgstr "Trendserien"
+
+msgctxt "#30057"
+msgid "Search on Webshare"
+msgstr "Auf Webshare suchen"
+
+msgctxt "#30058"
+msgid "No results found"
+msgstr "Keine Ergebnisse gefunden"
+
+msgctxt "#30059"
+msgid "Size"
+msgstr "Größe"
+
+msgctxt "#30060"
+msgid "Quality"
+msgstr "Qualität"
+
+msgctxt "#30061"
+msgid "Failed to get playback link"
+msgstr "Wiedergabelink konnte nicht abgerufen werden"
+
+msgctxt "#30062"
+msgid "History is empty"
+msgstr "Verlauf ist leer"
+
+msgctxt "#30063"
+msgid "Searched"
+msgstr "Gesucht"
+
+msgctxt "#30064"
+msgid "Options"
+msgstr "Optionen"
+
+msgctxt "#30065"
+msgid "Edit"
+msgstr "Bearbeiten"
+
+msgctxt "#30066"
+msgid "Delete"
+msgstr "Löschen"
+
+msgctxt "#30067"
+msgid "Search on Trakt.tv"
+msgstr "Auf Trakt.tv suchen"
+
+msgctxt "#30068"
+msgid "Next episode"
+msgstr "Nächste Episode"
+
+msgctxt "#30069"
+msgid "Previous episode"
+msgstr "Vorherige Episode"
+
+msgctxt "#30070"
+msgid "Next season"
+msgstr "Nächste Staffel"
+
+msgctxt "#30071"
+msgid "Previous season"
+msgstr "Vorherige Staffel"
+
+msgctxt "#30072"
+msgid "Mark as watched"
+msgstr "Als gesehen markieren"
+
+msgctxt "#30073"
+msgid "Mark as unwatched"
+msgstr "Als ungesehen markieren"
+
+msgctxt "#30074"
+msgid "Watchlist is empty"
+msgstr "Merkliste ist leer"
+
+msgctxt "#30075"
+msgid "No items in progress"
+msgstr "Keine laufenden Elemente"
+
+msgctxt "#30076"
+msgid "Search next episode"
+msgstr "Nächste Episode suchen"
+
+msgctxt "#30077"
+msgid "Connected"
+msgstr "Verbunden"
+
+msgctxt "#30078"
+msgid "Status refreshed"
+msgstr "Status aktualisiert"
+
+msgctxt "#30079"
+msgid "Failed to refresh status"
+msgstr "Status konnte nicht aktualisiert werden"
+
+msgctxt "#30080"
+msgid "Logged out"
+msgstr "Abgemeldet"
+
+msgctxt "#30081"
+msgid "Pasted to"
+msgstr "Eingefügt in"
+
+msgctxt "#30082"
+msgid "Error"
+msgstr "Fehler"
+
+msgctxt "#30083"
+msgid "Clipboard is empty."
+msgstr "Zwischenablage ist leer."
+
+msgctxt "#30084"
+msgid "Your Kodi version does not support direct clipboard access. Use the system keyboard."
+msgstr "Ihre Kodi-Version unterstützt keinen direkten Zugriff auf die Zwischenablage. Verwenden Sie die Systemtastatur."
+
+msgctxt "#30085"
+msgid "Successfully updated"
+msgstr "Erfolgreich aktualisiert"
+
+msgctxt "#30086"
+msgid "Error updating"
+msgstr "Fehler beim Aktualisieren"
+
+msgctxt "#30087"
+msgid "Edit search"
+msgstr "Suche bearbeiten"
+
+msgctxt "#30088"
+msgid "Optimize search results"
+msgstr "Suchergebnisse optimieren"
+
+msgctxt "#30089"
+msgid "Extension"
+msgstr "Erweiterung"
+
+msgctxt "#30090"
+msgid "After playback"
+msgstr "Nach der Wiedergabe"
+
+msgctxt "#30091"
+msgid "Original search"
+msgstr "Originalsuche (automatisch)"
+
+msgctxt "#30092"
+msgid "Empty search"
+msgstr "Leere Suche (Dialog)"
+
+msgctxt "#30093"
+msgid "Last results"
+msgstr "Letzte Ergebnisse (in Liste bleiben)"
+
+msgctxt "#30094"
+msgid "History"
+msgstr "Suchverlauf"
+
+msgctxt "#30095"
+msgid "Prefilled search"
+msgstr "Vorausgefüllte Suche (Dialog mit Text)"
+
+msgctxt "#30096"
+msgid "TV tips of the day"
+msgstr "TV-Tipps des Tages"
+
+msgctxt "#30097"
+msgid "VOD premieres"
+msgstr "VOD-Premieren"
+
+msgctxt "#30098"
+msgid "DVD/Blu-ray premieres"
+msgstr "DVD-/Blu-ray-Premieren"
+
+msgctxt "#30099"
+msgid "Catalog"
+msgstr "Katalog"
+
+msgctxt "#30100"
+msgid "TMDb - TV tips of the day"
+msgstr "TMDb - TV-Tipps des Tages"
+
+msgctxt "#30101"
+msgid "TMDb - VOD premieres"
+msgstr "TMDb - VOD-Premieren"
+
+msgctxt "#30102"
+msgid "TMDb - DVD and Blu-ray premieres"
+msgstr "TMDb - DVD- und Blu-ray-Premieren"
+
+msgctxt "#30103"
+msgid "TMDb module is not available."
+msgstr "TMDb-Modul ist nicht verfügbar."
+
+msgctxt "#30104"
+msgid "Failed to load items. Please try again."
+msgstr "Elemente konnten nicht geladen werden. Bitte versuchen Sie es erneut."
+
+msgctxt "#30105"
+msgid "Series"
+msgstr "Staffel"
+
+msgctxt "#30106"
+msgid "Failed to load seasons."
+msgstr "Episoden konnten nicht geladen werden."
+
+msgctxt "#30107"
+msgid "Failed to load episodes."
+msgstr "Folgen konnten nicht geladen werden."
+
+msgctxt "#30108"
+msgid "Episode {0}"
+msgstr "Episode {0}"
+
+msgctxt "#30109"
+msgid "Trakt.tv - Catalog"
+msgstr "Trakt.tv - Katalog"
+
+msgctxt "#30110"
+msgid "Popular movies"
+msgstr "Beliebte Filme"
+
+msgctxt "#30111"
+msgid "Recommended movies"
+msgstr "Empfohlene Filme"
+
+msgctxt "#30112"
+msgid "Popular shows"
+msgstr "Beliebte Serien"
+
+msgctxt "#30113"
+msgid "Recommended shows"
+msgstr "Empfohlene Serien"
+
+msgctxt "#30114"
+msgid "Genres"
+msgstr "Genres"
+
+msgctxt "#30115"
+msgid "Duration"
+msgstr "Dauer"
+
+msgctxt "#30116"
+msgid "Status"
+msgstr "Status"
+
+msgctxt "#30117"
+msgid "Next page"
+msgstr "Nächste Seite"
+
+msgctxt "#30118"
+msgid "Failed to load items. Check the connection."
+msgstr "Elemente konnten nicht geladen werden. Überprüfen Sie die Verbindung."
