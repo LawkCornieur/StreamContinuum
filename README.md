@@ -31,6 +31,14 @@ Jednoduchý stream doplněk pro Kodi s integrací Trakt.tv a Webshare.cz.
 1. Po instalaci přejděte do nastavení doplňku.
 2. V sekci **Webshare** zadejte své uživatelské jméno a heslo.
 
+### TMDb (API Nastavení)
+Doplněk má v sobě integrovaný výchozí TMDb klíč pro načítání obrázků a metadat.
+Pokud byste v budoucnu potřebovali použít vlastní klíč (např. kvůli omezením API):
+1. Vytvořte si bezplatný účet na [themoviedb.org](https://www.themoviedb.org/).
+2. Přejděte do nastavení účtu do sekce **API** a požádejte o klíč (typ Developer).
+3. Vygenerovaný **API Key (v3 auth)** zkopírujte.
+4. V nastavení doplňku StreamContinuum přejděte do sekce **TMDb** a vložte jej do pole **TMDb API klíč**.
+
 ### Trakt.tv (API Nastavení)
 Pro fungování Trakt.tv integrace si musí každý uživatel vytvořit vlastní API aplikaci:
 1. Přihlaste se na [trakt.tv](https://trakt.tv).

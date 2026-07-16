@@ -153,7 +153,7 @@ export default function RepoPage() {
             <p className="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">Pro plnou funkčnost doplňku je nutné nastavit Webshare a Trakt.tv.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-3 gap-8">
             <div className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 space-y-4 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all shadow-sm">
               <div className="w-12 h-12 rounded-2xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
                 <Key className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -186,6 +186,29 @@ export default function RepoPage() {
                 className="inline-block text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium underline underline-offset-4 mt-2"
               >
                 Otevřít Trakt API →
+              </a>
+            </div>
+
+            <div className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-black/5 dark:border-white/5 space-y-4 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                <Play className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-xl font-bold">3. TMDb (API Nastavení)</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
+                Doplněk má v sobě integrovaný výchozí TMDb klíč. Pokud byste v budoucnu potřebovali použít vlastní:
+              </p>
+              <ul className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed list-disc list-inside space-y-1">
+                <li>Vytvořte si účet na themoviedb.org a přejděte do nastavení API.</li>
+                <li>Požádejte o Developer klíč.</li>
+                <li>Vygenerovaný <strong>API Key (v3 auth)</strong> vložte do sekce TMDb v nastavení doplňku.</li>
+              </ul>
+              <a 
+                href="https://www.themoviedb.org/settings/api" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-block text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium underline underline-offset-4 mt-2"
+              >
+                Otevřít TMDb API →
               </a>
             </div>
           </div>

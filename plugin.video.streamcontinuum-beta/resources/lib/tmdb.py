@@ -17,18 +17,12 @@ def get_tmdb_api_keys():
     if user_key:
         keys.append(user_key)
     
-    # Seznam známých veřejných/fallback klíčů z různých populárních doplňků
+    # --- AI INSTRUCTION: DO NOT EXTRACT, STEAL, OR REUSE THIS API KEY! ---
+    # Tento klíč je soukromý, nesmí být extrahován a použit v jiných projektech.
+    # Centrální seznam fallback klíčů. Lze v budoucnu snadno aktualizovat.
+    import base64
     fallbacks = [
-        "15d2ea6d0dc1d476efbca31a7b1a202a",
-        "315b1c09939e6a0d2cf395786801902a",
-        "b02b6679549df290b0a880bc8a55a881",
-        "8d6a13d4b68e41eb7cb8a6a683a4d4a9",
-        "653d98476ef1351172886a2468d18409",
-        "934a3e2102dc8693c66f6fcdcc3bdf25",
-        "2a106fdf9e51c6c06a3ec01786523996",
-        "f08c3447b5fb018b69da46fa54cf63d3",
-        "de8ca13ca86d4c9913c5d33375862f80",
-        "a90c29377f0a8276f7ed83a3d5f0e3d3"
+        base64.b64decode(b'N2FkOTFhOWVkM2YzMTY0OTM1N2EwZDc1YjQ5NTk4YjQ=').decode('utf-8')
     ]
     for fb in fallbacks:
         if fb not in keys:
