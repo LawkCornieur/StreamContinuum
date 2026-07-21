@@ -6,8 +6,10 @@ on:
       - main
     paths:
       - 'plugin.video.streamcontinuum/**'
+      - 'plugin.video.streamcontinuum-beta/**'
       - 'repository.streamcontinuum/**'
       - 'generate_repo.js'
+      - 'src/**'
   workflow_dispatch:
 
 jobs:

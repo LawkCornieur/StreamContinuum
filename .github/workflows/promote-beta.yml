@@ -7,6 +7,19 @@ on:
         description: 'Type "yes" to confirm promotion of beta to stable release.'
         required: true
         default: 'no'
+      bump_type:
+        description: 'Version bump (patch, minor, major)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      changelog:
+        description: 'Changelog entry for this release (use \n for newlines, max 1 paragraph)'
+        required: false
+        default: ''
 
 jobs:
   promote:
@@ -27,11 +40,76 @@ jobs:
           # Copy beta content into stable directory
           cp -a plugin.video.streamcontinuum-beta/. plugin.video.streamcontinuum/
 
+      - name: Update versions and changelog
+        run: |
+          python3 -c "
+          import os, re
+          bump = '${{ github.event.inputs.bump_type }}'
+          changelog = '${{ github.event.inputs.changelog }}'.replace('\\\\n', '\\n').replace('\\n', '\\n')
+          
+          def bump_version(v, t):
+              p = list(map(int, v.split('.')))
+              if t == 'major': return f'{p[0]+1}.0.0'
+              elif t == 'minor': return f'{p[0]}.{p[1]+1}.0'
+              else: return f'{p[0]}.{p[1]}.{p[2]+1}'
+              
+          beta_xml = 'plugin.video.streamcontinuum-beta/addon.xml'
+          stable_xml = 'plugin.video.streamcontinuum/addon.xml'
+          
+          with open(stable_xml, 'r', encoding='utf-8') as f:
+              s_xml = f.read()
+          m_s = re.search(r'version=\"([^\"]+)\"', s_xml)
+          current_stable = m_s.group(1)
+          
+          # Usually, current_stable in the file is already bumped if it was copied from beta,
+          # BUT beta version was just beta version. 
+          # Let's read the old stable version from git
+          import subprocess
+          old_stable_xml = subprocess.check_output(['git', 'show', 'HEAD:plugin.video.streamcontinuum/addon.xml']).decode('utf-8')
+          m_old_s = re.search(r'version=\"([^\"]+)\"', old_stable_xml)
+          real_current_stable = m_old_s.group(1)
+          
+          new_stable = bump_version(real_current_stable, bump)
+          new_beta = bump_version(new_stable, 'patch')
+          
+          # Update stable xml to new_stable
+          with open(stable_xml, 'r', encoding='utf-8') as f: s_data = f.read()
+          s_data = re.sub(r'(<addon[^>]*version=\")[^\"]+(\")', fr'\g<1>{new_stable}\g<2>', s_data, 1)
+          with open(stable_xml, 'w', encoding='utf-8') as f: f.write(s_data)
+          
+          # Update beta xml to new_beta
+          with open(beta_xml, 'r', encoding='utf-8') as f: b_data = f.read()
+          b_data = re.sub(r'(<addon[^>]*version=\")[^\"]+(\")', fr'\g<1>{new_beta}\g<2>', b_data, 1)
+          with open(beta_xml, 'w', encoding='utf-8') as f: f.write(b_data)
+          
+          # Update settings.xml for both
+          for path, v in [('plugin.video.streamcontinuum/resources/settings.xml', new_stable), ('plugin.video.streamcontinuum-beta/resources/settings.xml', new_beta)]:
+              if os.path.exists(path):
+                  with open(path, 'r', encoding='utf-8') as f: d = f.read()
+                  d = re.sub(r'(id=\"about_version\"[^>]*default=\")[^\"]+(\")', fr'\g<1>{v}\g<2>', d)
+                  with open(path, 'w', encoding='utf-8') as f: f.write(d)
+          
+          # Update changelog in addon.py
+          if changelog.strip():
+              for path, v in [('plugin.video.streamcontinuum/addon.py', new_stable), ('plugin.video.streamcontinuum-beta/addon.py', new_beta)]:
+                  with open(path, 'r', encoding='utf-8') as f: d = f.read()
+                  
+                  # Create the changelog lines
+                  ch_lines = ''.join([f'    changelog += \"- {line.strip()}\\n\"\n' for line in changelog.split('\\n') if line.strip()])
+                  ch_entry = f'    changelog = \"[B]Verze {v}[/B]\\n\"\n{ch_lines}    changelog += \"\\n\"\n\n    changelog += \"'
+                  
+                  # Replace the first assignment
+                  d = re.sub(r'    changelog = \"', ch_entry, d, count=1)
+                  with open(path, 'w', encoding='utf-8') as f: f.write(d)
+                  
+          print(f'Stable version updated to {new_stable}, Beta bumped to {new_beta}')
+          "
+
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add plugin.video.streamcontinuum/
-          git commit -m "Promote beta to stable release" || echo "No changes to commit"
+          git add plugin.video.streamcontinuum/ plugin.video.streamcontinuum-beta/
+          git commit -m "Promote beta to stable release (${{ github.event.inputs.bump_type }}) and bump beta version" || echo "No changes to commit"
           git pull --rebase --autostash origin main
           git push
