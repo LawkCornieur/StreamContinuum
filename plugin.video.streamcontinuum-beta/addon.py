@@ -169,10 +169,13 @@ def trakt_menu():
 
 def search(query=None):
     if not query:
-        keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30057))
+        last_query = ADDON.getSetting('last_search_query')
+        keyboard = xbmc.Keyboard(last_query, ADDON.getLocalizedString(30057))
         keyboard.doModal()
         if keyboard.isConfirmed():
             query = keyboard.getText()
+            if query:
+                ADDON.setSetting('last_search_query', query) # Save new query
         else:
             xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
             return
@@ -800,6 +803,8 @@ def search_prefill(query):
     if keyboard.isConfirmed():
         new_query = keyboard.getText()
         if new_query:
+            # Save the new query to settings if it's confirmed from prefilled dialog
+            ADDON.setSetting('last_search_query', new_query)
             search(new_query)
         else:
             xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -1372,6 +1377,8 @@ def run():
             if new_query:
                 import history
                 history.update_history_item(old_query, new_query) # Simple update
+                # Also update last search query if it was edited from history
+                ADDON.setSetting('last_search_query', new_query)
                 xbmc.executebuiltin('Container.Refresh')
     elif action == 'tmdb_menu':
         show_tmdb_menu()
@@ -1382,7 +1389,7 @@ def run():
     elif action == 'tmdb_search':
         show_tmdb_search(params.get('query'))
     elif action == 'show_seasons':
-        show_seasons(params.get('show_title', ''), params.get('trakt_id', ''), params.get('poster', ''), params.get('fanart', ''))
+        show_seasons(params.get('show_title', ''), params.get('trakt_id', ''), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
     elif action == 'show_episodes':
         show_episodes(params.get('show_title', ''), params.get('trakt_id', ''), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
     elif action == 'trakt_discover_menu':
