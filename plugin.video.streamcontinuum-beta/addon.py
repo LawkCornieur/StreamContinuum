@@ -322,16 +322,12 @@ def play(ident, query=None):
         safe_query = urllib.parse.quote(query) if query else ""
         
         if after == '0' and query: # Původní hledání (automaticky)
-            xbmc.sleep(1500)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
         elif after == '1': # Prázdné hledání (dialog)
-            xbmc.sleep(1500)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search,replace)')
         elif after == '3': # Historie
-            xbmc.sleep(1500)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
         elif after == '4' and query: # Předvyplněné hledání (dialog s textem)
-            xbmc.sleep(1500)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query},replace)')
         # case 2 is "Last results", which is default behavior in Kodi
 
@@ -660,7 +656,7 @@ def show_trakt_watchlist():
             plot = episode.get('overview') or meta.get('overview') or ''
             genres_str = ', '.join(meta.get('genres', [])) if meta.get('genres') else ''
             rating = episode.get('rating') or meta.get('rating') or 0
-            runtime = meta.get('runtime') or 0
+            runtime = episode.get('runtime') or 0
             meta_type = 'episode'
         else:
             continue
@@ -767,7 +763,7 @@ def show_trakt_playback():
             plot = episode.get('overview') or meta.get('overview') or ''
             genres_str = ', '.join(meta.get('genres', [])) if meta.get('genres') else ''
             rating = episode.get('rating') or meta.get('rating') or 0
-            runtime = meta.get('runtime') or 0
+            runtime = episode.get('runtime') or 0
             meta_type = 'episode'
         else:
             continue
