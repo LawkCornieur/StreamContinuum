@@ -465,139 +465,15 @@ def trakt_search(query=None):
         xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
-    changelog = "[B]Verze 1.3.7[/B]\n"
-    changelog += "- Přejmenování všech položek z ČSFD na TMDb.\n"
-    changelog += "- Přidáno vyhledávání přímo v kategorii TMDb stejně jako na Trakt.tv.\n"
-    changelog += "- Oprava navigace po zavření nastavení (již se nevrací do prázdné složky).\n"
-    changelog += "- Přidána samostatná záložka pro TMDb nastavení.\n\n"
-
-    changelog += "[B]Verze 1.3.6[/B]\n"
-    changelog += "- Oprava synchronizace historie na Webshare (soubory se nahrávají a přesouvají korektně jako privátní).\n"
-    changelog += "- Přidáno uživatelské nastavení a dialogové potvrzení pro vypnutí ověřování SSL certifikátů při chybě připojení k ČSFD.\n\n"
-
-    changelog += "[B]Verze 1.3.5[/B]\n"
-    changelog += "- Oprava parsování a načítání sekce ČSFD (odolnější regulární výrazy a ignorování SSL chyb).\n\n"
-
-    changelog += "[B]Verze 1.3.4[/B]\n"
-    changelog += "- Oprava navigace ČSFD a Trakt.tv katalogů (oprava chybějícího směrování v run()).\n"
-    changelog += "- Odstranění TMDB klíče z nastavení a oprava načítání obrázků (plakáty a pozadí se načítají automaticky z TMDB na pozadí podle ID z Trakt.tv).\n\n"
-
-    changelog += "[B]Verze 1.3.3[/B]\n"
-    changelog += "- Přidána sekce ČSFD.cz: TV tipy dne, Premiéry VOD, Premiéry DVD a Blu-ray.\n"
-    changelog += "- U seriálů v ČSFD i Trakt.tv navigace přes Série -> Epizody -> hledaní na Webshare.\n"
-    changelog += "- Přidány katalogy Trakt.tv: Trendy, Popularní, Doporučené filmy i seriály.\n"
-    changelog += "- Bohatší zobrazeni metadat (plakát, fanart, žánry, hodnocení, délka, popis).\n"
-    changelog += "- Doplnění překladů pro Angličtinu a Němčinu.\n"
-    changelog += "- Integrace obrazků přes Trakt.tv (vyžaduje nastavené Trakt API).\n\n"
-
-    changelog += "[B]Verze 1.3.2[/B]\n"
-    changelog += "- Přidána ochrana proti přetížení API (pauza 0.5s mezi mazáním jednotlivých souborů v cyklu).\n"
-    changelog += "- Robustnější nahrávání souborů na Webshare (zvýšen timeout na 60s, implementováno 3x opakování při chybě s 2s prodlevou).\n\n"
-
-    changelog += "[B]Verze 1.3.1[/B]\n"
-    changelog += "- Odstraněna varování (deprecated warnings) v Kodi logu pomocí přechodu na nové InfoTagVideo API.\n"
-    changelog += "- Oprava mazání souborů na Webshare (změna API endpointu na správný remove_file).\n\n"
-
-    changelog += "[B]Verze 1.3.0[/B]\n"
-    changelog += "- Stabilizace otevírání oken a přidání spolehlivých časových limitů pro zavření přehrávače.\n"
-    changelog += "- Oprava a stabilizace mazání souborů na Webshare (přidána 2s pauza a validace XML odpovědí).\n\n"
-
-    changelog += "[B]Verze 1.2.9[/B]\n"
-    changelog += "- Dynamická aktualizace zobrazení verze v nastavení doplňku.\n"
-    changelog += "- Oprava pádu doplňku při synchronizaci historie (KeyError: 'title').\n"
-    changelog += "- Opraveny chybové hlášky ohledně zastaralých metod při spouštění přehrávání.\n\n"
-
-    changelog += "[B]Verze 1.2.8[/B]\n"
-    changelog += "- Oprava filtrování epizod stejného seriálu v historii vyhledávání.\n"
-    changelog += "- Úprava Trakt.tv menu a oprava řazení seriálů (nově se zobrazují skutečně nejnovější sledované jako první).\n\n"
-
-    changelog += "[B]Verze 1.2.7[/B]\n"
-    changelog += "- Oprava exportu nastavení a záloha Trakt.tv credentials (upload_url) na Webshare \n"
-    changelog += "- Oprava pádu kvůli zamknutému souboru při aktualizaci doplňku pod Windows.\n\n"
+    changelog_path = os.path.join(ADDON_PATH, "changelog.txt")
+    try:
+        with open(changelog_path, 'r', encoding='utf-8') as f:
+            changelog = f.read()
+    except Exception:
+        changelog = "Changelog nenalezen."
     
-    changelog += "[B]Verze 1.2.6[/B]\n"
-    changelog += "- Přepracování historie vyhledávání, možnost úpravy položky.\n"
-    changelog += "- Úprava přesměrování po přehrání položky do historie ihned.\n\n"
+    xbmcgui.Dialog().textviewer(ADDON_NAME + ' - Changelog', changelog)
 
-    changelog += "[B]Verze 1.2.5[/B]\n"
-    changelog += "- Oprava a doplnění anglického překladu\n"
-    changelog += "- Přidán něměcký překlad\n\n"
-    
-    changelog += "[B]Verze 1.2.4[/B]\n"
-    changelog += "- Oprava exportu nastavení na Webshare (přidáno logování a stabilizace)\n"
-    changelog += "- Přidána možnost automatického spuštění doplňku po startu Kodi\n"
-    changelog += "- Oprava poškození binárních souborů na GitHubu (úprava .gitattributes)\n\n"
-
-    changelog += "[B]Verze 1.2.3[/B]\n"
-    changelog += "- Aktualizace grafických aktiv a audio souborů z media-src\n"
-    changelog += "- Stabilizace procesu synchronizace s GitHubem\n"
-    changelog += "- Pročištění starých verzí archivů\n\n"
-
-    changelog += "[B]Verze 1.2.2[/B]\n"
-    changelog += "- Oprava automatického sestavení na GitHub Actions (vyřešen konflikt s 'unstaged changes')\n"
-    changelog += "- Sjednocení procesu nahrávání vygenerovaných souborů do repozitáře\n\n"
-
-    changelog += "[B]Verze 1.2.1[/B]\n"
-    changelog += "- Oprava poškození grafických souborů při nahrávání z AI Studia (vypnuto LFS)\n"
-    changelog += "- Oprava konfliktů při automatickém sestavení repozitáře na GitHubu\n\n"
-
-    changelog += "[B]Verze 1.2.0[/B]\n"
-    changelog += "- Oprava exportu nastavení (kompatibilita s novějšími verzemi šifrovací knihovny)\n"
-    changelog += "- Zvýšení spolehlivosti předvyplněného hledání po přehrání\n"
-    changelog += "- Oprava synchronizace verze a seznamu změn v repozitáři\n\n"
-
-    changelog += "[B]Verze 1.1.9[/B]\n"
-    changelog += "- Oprava cesty ke grafickým souborům\n"
-    changelog += "- Odstraněna nefunkční volba maximálního rozlišení\n"
-    changelog += "- Oprava a rozšíření voleb po skončení přehrávání\n"
-    changelog += "- Přidána volba předvyplněného hledání po přehrání\n"
-    changelog += "- Přidána uvítací melodie při startu Kodi (lze vypnout v nastavení)\n\n"
-    
-    changelog += "[B]Verze 1.1.8[/B]\n"
-    changelog += "- Oprava automatického návratu po přehrání\n"
-    changelog += "- Oprava poškození obrázků při nahrávání na GitHub\n"
-    changelog += "- Výchozí akce po přehrání nastavena na původní hledání\n\n"
-    
-    changelog += "[B]Verze 1.1.7[/B]\n"
-    changelog += "- Přidána možnost volby akce po skončení přehrávání\n"
-    changelog += "- Přidána funkce zálohování a obnovy nastavení na Webshare\n"
-    changelog += "- Odstraněno nefunkční tlačítko návodu na webu\n"
-    changelog += "- Přechod na jednotný zdroj obrázků z media-src\n"
-    changelog += "- Odstraněny staré skripty pro stahování z Google Drive\n\n"
-    
-    changelog += "[B]Verze 1.1.6[/B]\n"
-    changelog += "- Vylepšení zobrazení výsledků hledání z Webshare\n"
-    changelog += "- Přidána možnost optimalizace názvů souborů\n"
-    changelog += "- Přepočet velikosti nad 1000 MB na GB\n"
-    changelog += "- Oprava zobrazení obrázků v doplňku i na webu\n\n"
-    
-    changelog += "[B]Verze 1.1.5[/B]\n"
-    changelog += "- Kompletní lokalizace do angličtiny a češtiny\n"
-    changelog += "- Přidána podpora pro tmavý režim na webu repozitáře\n"
-    changelog += "- Oprava aktualizačního mechanismu doplňku\n\n"
-    
-    changelog += "[B]Verze 1.1.4[/B]\n"
-    changelog += "- Oprava vyhledávání z historie (automatické spuštění)\n"
-    changelog += "- Synchronizace verze s repozitářem\n\n"
-    
-    changelog += "[B]Verze 1.1.3[/B]\n"
-    changelog += "- Oprava hlavního menu (odstranění nefunkční hlavičky)\n"
-    changelog += "- Přidány navigační drobky (nadpisy sekcí)\n"
-    changelog += "- Vylepšení ikon v menu\n"
-    changelog += "- Oprava zobrazení historie změn\n\n"
-    
-    changelog += "[B]Verze 1.1.2[/B]\n"
-    changelog += "- Modernizované hlavní menu\n"
-    changelog += "- Rozšířené možnosti v historii (E+1, S+1, Trakt search)\n"
-    changelog += "- Možnost označit/odznačit zhlédnuté na Trakt.tv\n"
-    changelog += "- Optimalizace historie\n\n"
-    
-    changelog += "[B]Verze 1.1.1[/B]\n"
-    changelog += "- Oprava vyhledávání na Webshare\n"
-    changelog += "- Podpora pro Trakt.tv watchlist\n"
-    changelog += "- Základní historie hledání\n"
-    
-    xbmcgui.Dialog().textviewer(f"StreamContinuum - {ADDON.getLocalizedString(30042)}", changelog)
 
 def show_trakt_watchlist():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30051))

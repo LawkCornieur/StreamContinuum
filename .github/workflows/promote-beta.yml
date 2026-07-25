@@ -15,13 +15,16 @@ on:
       changelog:
         description: 'Záznam do changelogu'
         required: true
-        default: 'Menší opravy a vylepšení.'
+        default: 'Opravy a vylepšení.'
 
 jobs:
   promote:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -109,10 +112,16 @@ jobs:
                       existing_changelog = f.read()
               
               date_str = datetime.now().strftime("%Y-%m-%d")
-              new_entry = f"[v{new_version}] - {date_str}\n- {changelog_msg}\n\n"
+              new_entry = f"[B]Verze {new_version}[/B] - {date_str}\n- {changelog_msg}\n\n"
               
               with open(changelog_path, "w", encoding="utf-8") as f:
                   f.write(new_entry + existing_changelog)
+
+            # Update beta changelog if beta exists and we promoted from it
+            if os.path.exists(beta_dir) and source_dir != beta_dir:
+                beta_changelog_path = os.path.join(beta_dir, "changelog.txt")
+                with open(beta_changelog_path, "w", encoding="utf-8") as f:
+                    f.write(new_entry + existing_changelog)
                   
               print("Changelog byl úspěšně aktualizován.")
           else:
@@ -126,6 +135,12 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add plugin.video.streamcontinuum/
-          git commit -m "🚀 Promote beta to production (v${{ github.event.inputs.version_type }}) [skip ci]" || echo "No changes to commit"
+          git add plugin.video.streamcontinuum/ plugin.video.streamcontinuum.beta/ 2>/dev/null || true
+          git commit -m "🚀 Promote beta to production (v${{ github.event.inputs.version_type }})" || echo "No changes to commit"
           git push
+
+      - name: Trigger Kodi Repo Workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run kodi-repo.yml --ref main

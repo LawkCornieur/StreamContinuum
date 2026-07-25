@@ -42,31 +42,11 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     
     // Extract changelog from addon.py
     let changelog = '';
-    const addonPyPath = path.join('plugin.video.streamcontinuum', 'addon.py');
-    if (fs.existsSync(addonPyPath)) {
-        const addonPy = fs.readFileSync(addonPyPath, 'utf-8');
-        // Match both single and double quotes, and handle potential whitespace
-        const changelogMatch = addonPy.match(/def show_changelog\(\):[\s\S]*?changelog\s*=\s*(["'])([\s\S]*?)\1/);
-        if (changelogMatch) {
-            changelog = changelogMatch[2].replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
-            // Extract the rest of the changelog lines
-            const lines = addonPy.split('\n');
-            let inChangelog = false;
-            for (const line of lines) {
-                if (line.includes('def show_changelog():')) inChangelog = true;
-                if (inChangelog && (line.includes('changelog += "') || line.includes("changelog += '"))) {
-                    // Match the outer quotes by checking which one is used first
-                    const quote = line.includes('changelog += "') ? '"' : "'";
-                    const startIdx = line.indexOf(quote);
-                    const endIdx = line.lastIndexOf(quote);
-                    if (startIdx !== -1 && endIdx !== -1 && startIdx !== endIdx) {
-                        const content = line.substring(startIdx + 1, endIdx);
-                        changelog += content.replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**').replace(/\\n/g, '\n');
-                    }
-                }
-                if (inChangelog && line.includes('xbmcgui.Dialog().textviewer')) break;
-            }
-        }
+    const changelogPath = path.join('plugin.video.streamcontinuum', 'changelog.txt');
+    if (fs.existsSync(changelogPath)) {
+        changelog = fs.readFileSync(changelogPath, 'utf-8');
+        // Convert Kodi formatting to Markdown if needed
+        changelog = changelog.replace(/\[B\]/g, '**').replace(/\[\/B\]/g, '**');
     }
 
     const dirs = fs.readdirSync(addonsDir).filter(f => {
@@ -76,7 +56,6 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     
     let latestPluginVersion = '1.0.0';
     let latestRepoVersion = '1.0.0';
-    let latestBetaVersion = null;
 
     for (const addonId of dirs) {
         const addonXmlFile = path.join(addonId, 'addon.xml');
@@ -85,11 +64,12 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 console.log(`Processing ${addonId}...`);
                 
                 // Sync images from media-src to addon directory and public
+                // Intelligent copy: Only copies if source exists (e.g. on GitHub with LFS)
                 const mediaSrc = 'media-src';
                 
                 // Main Icon
                 const iconPath = findAsset('icon.png');
-                if (iconPath) {
+                if (iconPath && fs.existsSync(iconPath)) {
                     // Copy to resources for plugin
                     const iconResources = path.join(addonId, 'resources', 'icon.png');
                     if (!fs.existsSync(path.dirname(iconResources))) fs.mkdirSync(path.dirname(iconResources), { recursive: true });
@@ -102,7 +82,7 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 
                 // Main Fanart
                 const fanartPath = findAsset('fa.png');
-                if (fanartPath) {
+                if (fanartPath && fs.existsSync(fanartPath)) {
                     // Copy to resources for plugin
                     const fanartResources = path.join(addonId, 'resources', 'fa.png');
                     if (!fs.existsSync(path.dirname(fanartResources))) fs.mkdirSync(path.dirname(fanartResources), { recursive: true });
@@ -133,7 +113,7 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
 
                 for (const [src, dest] of Object.entries(sectionMedia)) {
                     const sectionPath = findAsset(src);
-                    if (sectionPath) {
+                    if (sectionPath && fs.existsSync(sectionPath)) {
                         const destPath = path.join(addonId, 'resources', 'media', dest);
                         if (!fs.existsSync(path.dirname(destPath))) fs.mkdirSync(path.dirname(destPath), { recursive: true });
                         fs.copyFileSync(sectionPath, destPath);
@@ -146,10 +126,13 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 if (fs.existsSync(faviconSrc)) {
                     const favicons = fs.readdirSync(faviconSrc);
                     for (const fav of favicons) {
-                        fs.copyFileSync(path.join(faviconSrc, fav), path.join(publicDir, fav));
-                        // Also copy to root for git tracking if it's not a build artifact
-                        if (!fav.endsWith('.json') && !fav.endsWith('.html')) {
-                            fs.copyFileSync(path.join(faviconSrc, fav), path.join('.', fav));
+                        const fSrc = path.join(faviconSrc, fav);
+                        if (fs.existsSync(fSrc) && fs.statSync(fSrc).isFile()) {
+                            fs.copyFileSync(fSrc, path.join(publicDir, fav));
+                            // Also copy to root for git tracking if it's not a build artifact
+                            if (!fav.endsWith('.json') && !fav.endsWith('.html')) {
+                                fs.copyFileSync(fSrc, path.join('.', fav));
+                            }
                         }
                     }
                 }
@@ -171,11 +154,14 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 const version = versionMatch[1];
                 console.log(`Found version ${version} for ${addonId}`);
                 
-                // Remove hardcoded version forcing config to allow dynamic reading
+                // CRITICAL: Ensure version is 1.2.4 for the main plugin
                 if (addonId === 'plugin.video.streamcontinuum') {
-                    latestPluginVersion = version;
-                } else if (addonId === 'plugin.video.streamcontinuum-beta') {
-                    latestBetaVersion = version;
+                    if (version !== '1.2.4') {
+                        console.warn(`WARNING: addon.xml has version ${version}, forcing 1.2.4 for repository generation.`);
+                        latestPluginVersion = '1.2.4';
+                    } else {
+                        latestPluginVersion = version;
+                    }
                 }
 
                 // Prevent accidental downgrades in metadata strings
@@ -187,12 +173,7 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
 
                 // Remove XML declaration
                 content = content.replace(/<\?xml[^?]*\?>/g, '').trim();
-                
-                // Do not add beta to addons.xml
-                if (addonId !== 'plugin.video.streamcontinuum-beta') {
-                    addonsXml += content + '\n';
-                }
-
+                addonsXml += content + '\n';
                 
                 // Sync version to settings.xml if it's the main plugin
                 if (addonId === 'plugin.video.streamcontinuum') {
@@ -236,9 +217,6 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                     archive.pipe(output);
 
                     // Add everything in the addon directory to the zip, but under a folder named addonId
-                    // For the beta plugin, zip it under the regular plugin folder name so Kodi installs it correctly
-                    const zipFolder = addonId === 'plugin.video.streamcontinuum-beta' ? 'plugin.video.streamcontinuum' : addonId;
-
                     const addonFiles = fs.readdirSync(addonId);
                     for (const file of addonFiles) {
                         if (file.endsWith('.zip')) continue;
@@ -247,9 +225,9 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                         const stats = fs.statSync(filePath);
                         
                         if (stats.isDirectory()) {
-                            archive.directory(filePath, path.join(zipFolder, file));
+                            archive.directory(filePath, path.join(addonId, file));
                         } else {
-                            archive.file(filePath, { name: path.join(zipFolder, file) });
+                            archive.file(filePath, { name: path.join(addonId, file) });
                         }
                     }
 
@@ -318,40 +296,11 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     const repoData = {
         latestPluginVersion,
         latestRepoVersion,
-        latestBetaVersion,
         changelog,
         updatedAt: new Date().toISOString()
     };
     fs.writeFileSync(repoDataPath, JSON.stringify(repoData, null, 2));
     console.log('Updated src/repo_data.json');
-
-    // Update template.html kodi-listing section ONLY
-    const templatePath = 'template.html';
-    if (fs.existsSync(templatePath)) {
-        let templateContent = fs.readFileSync(templatePath, 'utf-8');
-        
-        const listingStart = '<div id="kodi-listing" style="display:none">';
-        const listingEnd = '</div>';
-        
-        let betaLink = '';
-        if (latestBetaVersion) {
-            betaLink = `\n      <a href="plugin.video.streamcontinuum-beta-${latestBetaVersion}.zip">plugin.video.streamcontinuum-beta-${latestBetaVersion}.zip</a>`;
-        }
-
-        const newListing = `${listingStart}
-      <a href="addons.xml">addons.xml</a>
-      <a href="addons.xml.md5">addons.xml.md5</a>
-      <a href="plugin.video.streamcontinuum-${latestPluginVersion}.zip">plugin.video.streamcontinuum-${latestPluginVersion}.zip</a>${betaLink}
-      <a href="repository.streamcontinuum-${latestRepoVersion}.zip">repository.streamcontinuum-${latestRepoVersion}.zip</a>
-    ${listingEnd}`;
-
-        const regex = new RegExp(`${listingStart}[\\s\\S]*?${listingEnd}`);
-        if (templateContent.match(regex)) {
-            templateContent = templateContent.replace(regex, newListing);
-            fs.writeFileSync(templatePath, templateContent);
-            console.log('Updated template.html kodi-listing section.');
-        }
-    }
 }
 
 generateRepo();
