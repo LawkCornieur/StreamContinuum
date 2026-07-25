@@ -45,7 +45,7 @@ jobs:
           import shutil
           from datetime import datetime
 
-          beta_dir = "plugin.video.streamcontinuum.beta"
+          beta_dir = "plugin.video.streamcontinuum-beta"
           prod_dir = "plugin.video.streamcontinuum"
 
           # 1. Překopírování bety do produkce
@@ -67,7 +67,7 @@ jobs:
               print("Chyba: addon.xml nenalezen!")
               sys.exit(1)
 
-          # 2. Povýšení verze
+          # 2. Povýšení verze produkce
           tree = ET.parse(addon_xml)
           root = tree.getroot()
           version = root.get("version")
@@ -75,12 +75,12 @@ jobs:
           if not version:
               print("Chyba: Verze nenalezena v addon.xml")
               sys.exit(1)
-
+          
           parts = version.split(".")
           if len(parts) != 3:
               print(f"Chyba: Neplatný formát verze: {version} (očekáváno X.Y.Z)")
               sys.exit(1)
-
+          
           bump_type = os.environ.get("INPUT_VERSION_TYPE", "patch")
           if bump_type == "patch":
               parts[2] = str(int(parts[2]) + 1)
@@ -95,7 +95,7 @@ jobs:
           new_version = ".".join(parts)
           root.set("version", new_version)
           
-          if root.get("id") == "plugin.video.streamcontinuum.beta":
+          if root.get("id") == "plugin.video.streamcontinuum-beta":
               root.set("id", "plugin.video.streamcontinuum")
               root.set("name", "StreamContinuum")
           
@@ -116,16 +116,33 @@ jobs:
               
               with open(changelog_path, "w", encoding="utf-8") as f:
                   f.write(new_entry + existing_changelog)
-
-            # Update beta changelog if beta exists and we promoted from it
-            if os.path.exists(beta_dir) and source_dir != beta_dir:
-                beta_changelog_path = os.path.join(beta_dir, "changelog.txt")
-                with open(beta_changelog_path, "w", encoding="utf-8") as f:
-                    f.write(new_entry + existing_changelog)
-                  
+              
               print("Changelog byl úspěšně aktualizován.")
           else:
               print("Varování: Záznam do changelogu nebyl poskytnut.")
+
+          # 4. Povýšení verze budoucí bety
+          if os.path.exists(beta_dir) and source_dir != beta_dir:
+              # Aktualizace changelogu i v betě
+              if changelog_msg:
+                  beta_changelog_path = os.path.join(beta_dir, "changelog.txt")
+                  with open(beta_changelog_path, "w", encoding="utf-8") as f:
+                      f.write(new_entry + existing_changelog)
+              
+              # Povýšení verze bety (o jeden patch level výše než nová produkce)
+              beta_addon_xml = os.path.join(beta_dir, "addon.xml")
+              if os.path.exists(beta_addon_xml):
+                  beta_tree = ET.parse(beta_addon_xml)
+                  beta_root = beta_tree.getroot()
+                  
+                  # Vytvoření nové verze pro betu
+                  beta_parts = new_version.split(".")
+                  beta_parts[2] = str(int(beta_parts[2]) + 1)
+                  next_beta_version = ".".join(beta_parts)
+                  
+                  beta_root.set("version", next_beta_version)
+                  beta_tree.write(beta_addon_xml, encoding="UTF-8", xml_declaration=True)
+                  print(f"Verze budoucí bety byla povýšena na {next_beta_version}")
           '
         env:
           INPUT_VERSION_TYPE: ${{ github.event.inputs.version_type }}
@@ -135,7 +152,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add plugin.video.streamcontinuum/ plugin.video.streamcontinuum.beta/ 2>/dev/null || true
+          git add plugin.video.streamcontinuum/ plugin.video.streamcontinuum-beta/ 2>/dev/null || true
           git commit -m "🚀 Promote beta to production (v${{ github.event.inputs.version_type }})" || echo "No changes to commit"
           git push
 
