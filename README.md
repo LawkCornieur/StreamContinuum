@@ -56,6 +56,9 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.3.11** - 2026-07-25
+- Oprava vydávání beta verze.
+
 **Verze 1.3.9** - 2026-07-25
 - Přidán TMDb klíč (prosím nekrást), opravena záloha jeho nastavení. Nastavena kratší prodleva po přehrání a způsob zachycení ukončení přehrávání.
 
