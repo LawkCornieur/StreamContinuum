@@ -56,6 +56,10 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.3.8** - 2026-07-25
+- Přidán TMDb klíč (prosím nekrást), opravena záloha jeho nastavení.
+- Nastavena kratší prodleva po přehrání a způsob zachycení ukončení přehrávání.
+
 **Verze 1.3.7**
 - Přejmenování všech položek z ČSFD na TMDb.
 - Přidáno vyhledávání přímo v kategorii TMDb stejně jako na Trakt.tv.
@@ -116,74 +120,3 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 **Verze 1.2.4**
 - Oprava exportu nastavení na Webshare (přidáno logování a stabilizace)
-- Přidána možnost automatického spuštění doplňku po startu Kodi
-- Oprava poškození binárních souborů na GitHubu (úprava .gitattributes)
-
-**Verze 1.2.3**
-- Aktualizace grafických aktiv a audio souborů z media-src
-- Stabilizace procesu synchronizace s GitHubem
-- Pročištění starých verzí archivů
-
-**Verze 1.2.2**
-- Oprava automatického sestavení na GitHub Actions (vyřešen konflikt s 'unstaged changes')
-- Sjednocení procesu nahrávání vygenerovaných souborů do repozitáře
-
-**Verze 1.2.1**
-- Oprava poškození grafických souborů při nahrávání z AI Studia (vypnuto LFS)
-- Oprava konfliktů při automatickém sestavení repozitáře na GitHubu
-
-**Verze 1.2.0**
-- Oprava exportu nastavení (kompatibilita s novějšími verzemi šifrovací knihovny)
-- Zvýšení spolehlivosti předvyplněného hledání po přehrání
-- Oprava synchronizace verze a seznamu změn v repozitáři
-
-**Verze 1.1.9**
-- Oprava cesty ke grafickým souborům
-- Odstraněna nefunkční volba maximálního rozlišení
-- Oprava a rozšíření voleb po skončení přehrávání
-- Přidána volba předvyplněného hledání po přehrání
-- Přidána uvítací melodie při startu Kodi (lze vypnout v nastavení)
-
-**Verze 1.1.8**
-- Oprava automatického návratu po přehrání
-- Oprava poškození obrázků při nahrávání na GitHub
-- Výchozí akce po přehrání nastavena na původní hledání
-
-**Verze 1.1.7**
-- Přidána možnost volby akce po skončení přehrávání
-- Přidána funkce zálohování a obnovy nastavení na Webshare
-- Odstraněno nefunkční tlačítko návodu na webu
-- Přechod na jednotný zdroj obrázků z media-src
-- Odstraněny staré skripty pro stahování z Google Drive
-
-**Verze 1.1.6**
-- Vylepšení zobrazení výsledků hledání z Webshare
-- Přidána možnost optimalizace názvů souborů
-- Přepočet velikosti nad 1000 MB na GB
-- Oprava zobrazení obrázků v doplňku i na webu
-
-**Verze 1.1.5**
-- Kompletní lokalizace do angličtiny a češtiny
-- Přidána podpora pro tmavý režim na webu repozitáře
-- Oprava aktualizačního mechanismu doplňku
-
-**Verze 1.1.4**
-- Oprava vyhledávání z historie (automatické spuštění)
-- Synchronizace verze s repozitářem
-
-**Verze 1.1.3**
-- Oprava hlavního menu (odstranění nefunkční hlavičky)
-- Přidány navigační drobky (nadpisy sekcí)
-- Vylepšení ikon v menu
-- Oprava zobrazení historie změn
-
-**Verze 1.1.2**
-- Modernizované hlavní menu
-- Rozšířené možnosti v historii (E+1, S+1, Trakt search)
-- Možnost označit/odznačit zhlédnuté na Trakt.tv
-- Optimalizace historie
-
-**Verze 1.1.1**
-- Oprava vyhledávání na Webshare
-- Podpora pro Trakt.tv watchlist
-- Základní historie hledání
