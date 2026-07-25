@@ -1,4 +1,4 @@
-name: Promote Beta to Production
+name: Povýšení Beta verze na produkční
 
 on:
   workflow_dispatch:
@@ -12,6 +12,10 @@ on:
           - patch
           - minor
           - major
+      changelog:
+        description: 'Záznam do changelogu'
+        required: true
+        default: 'Menší opravy a vylepšení.'
 
 jobs:
   promote:
@@ -29,15 +33,15 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Promote and Bump Version
+      - name: Promote, Bump Version and Write Changelog
         run: |
           python3 -c '
           import xml.etree.ElementTree as ET
           import os
           import sys
           import shutil
+          from datetime import datetime
 
-          # Nastavení složek (uprav podle struktury, pokud se liší)
           beta_dir = "plugin.video.streamcontinuum.beta"
           prod_dir = "plugin.video.streamcontinuum"
 
@@ -88,22 +92,40 @@ jobs:
           new_version = ".".join(parts)
           root.set("version", new_version)
           
-          # Pro jistotu, pokud kopírujeme z bety, opravíme ID doplňku zpět na produkční
           if root.get("id") == "plugin.video.streamcontinuum.beta":
               root.set("id", "plugin.video.streamcontinuum")
               root.set("name", "StreamContinuum")
           
           tree.write(addon_xml, encoding="UTF-8", xml_declaration=True)
           print(f"Úspěšně povýšeno na verzi {new_version}")
+
+          # 3. Zápis do changelog.txt
+          changelog_msg = os.environ.get("INPUT_CHANGELOG", "").strip()
+          if changelog_msg:
+              changelog_path = os.path.join(source_dir, "changelog.txt")
+              existing_changelog = ""
+              if os.path.exists(changelog_path):
+                  with open(changelog_path, "r", encoding="utf-8") as f:
+                      existing_changelog = f.read()
+              
+              date_str = datetime.now().strftime("%Y-%m-%d")
+              new_entry = f"[v{new_version}] - {date_str}\n- {changelog_msg}\n\n"
+              
+              with open(changelog_path, "w", encoding="utf-8") as f:
+                  f.write(new_entry + existing_changelog)
+                  
+              print("Changelog byl úspěšně aktualizován.")
+          else:
+              print("Varování: Záznam do changelogu nebyl poskytnut.")
           '
         env:
           INPUT_VERSION_TYPE: ${{ github.event.inputs.version_type }}
+          INPUT_CHANGELOG: ${{ github.event.inputs.changelog }}
 
       - name: Commit and Push
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add plugin.video.streamcontinuum/
-          # Operátor || true zabrání chybě 'exit code 1', pokud nedošlo k žádné změně (např. git status je prázdný)
-          git commit -m "🚀 Promote beta to production version [skip ci]" || echo "No changes to commit"
+          git commit -m "🚀 Promote beta to production (v${{ github.event.inputs.version_type }}) [skip ci]" || echo "No changes to commit"
           git push
