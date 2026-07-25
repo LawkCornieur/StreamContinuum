@@ -154,14 +154,8 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 const version = versionMatch[1];
                 console.log(`Found version ${version} for ${addonId}`);
                 
-                // CRITICAL: Ensure version is 1.2.4 for the main plugin
                 if (addonId === 'plugin.video.streamcontinuum') {
-                    if (version !== '1.2.4') {
-                        console.warn(`WARNING: addon.xml has version ${version}, forcing 1.2.4 for repository generation.`);
-                        latestPluginVersion = '1.2.4';
-                    } else {
-                        latestPluginVersion = version;
-                    }
+                    latestPluginVersion = version;
                 }
 
                 // Prevent accidental downgrades in metadata strings
@@ -289,6 +283,16 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
         
         fs.writeFileSync(readmePath, readmeContent);
         console.log('Updated README.md with latest version and changelog.');
+    }
+
+    // Update template.html
+    const templatePath = 'template.html';
+    if (fs.existsSync(templatePath)) {
+        let templateContent = fs.readFileSync(templatePath, 'utf-8');
+        templateContent = templateContent.replace(/plugin\.video\.streamcontinuum-[\d.]+\.zip/g, `plugin.video.streamcontinuum-${latestPluginVersion}.zip`);
+        templateContent = templateContent.replace(/repository\.streamcontinuum-[\d.]+\.zip/g, `repository.streamcontinuum-${latestRepoVersion}.zip`);
+        fs.writeFileSync(templatePath, templateContent);
+        console.log('Updated template.html with latest zip versions.');
     }
 
     // Update repo_data.json for the React app
