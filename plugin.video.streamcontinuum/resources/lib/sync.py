@@ -46,7 +46,7 @@ def export_settings(pin):
             return False, "Není vyplněno uživatelské jméno nebo heslo pro Webshare."
 
         settings = {}
-        for key in ['ws_username', 'ws_password', 'trakt_token', 'trakt_username', 'trakt_client_id', 'trakt_client_secret']:
+        for key in ['ws_username', 'ws_password', 'trakt_token', 'trakt_username', 'trakt_client_id', 'trakt_client_secret', 'tmdb_api_key']:
             settings[key] = ADDON.getSetting(key)
         
         data = json.dumps(settings)
