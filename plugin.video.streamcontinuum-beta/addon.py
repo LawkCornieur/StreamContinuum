@@ -1295,7 +1295,7 @@ def run():
     elif action == 'tmdb_search':
         show_tmdb_search(params.get('query'))
     elif action == 'show_seasons':
-        show_seasons(params.get('show_title', ''), params.get('trakt_id', ''), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
+        show_seasons(params.get('show_title', ''), params.get('trakt_id', ''), params.get('poster', ''), params.get('fanart', ''))
     elif action == 'show_episodes':
         show_episodes(params.get('show_title', ''), params.get('trakt_id', ''), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
     elif action == 'trakt_discover_menu':
