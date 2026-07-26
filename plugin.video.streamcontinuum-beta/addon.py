@@ -1112,7 +1112,7 @@ def show_trakt_discover(list_type, media_type, offset=0):
         fanart = meta.get('fanart') or ''
 
         label = f"{title} ({year})" if year else title
-        genres_str = ', '.'.join(genres[:3]) if genres else ''
+        genres_str = ', '.join(genres[:3]) if genres else ''
 
         plot_parts = []
         if overview:
