@@ -201,8 +201,8 @@ def get_progress():
         
         progress_list = []
         # For each show, get the next episode
-        # To avoid too many requests, we only take the top 15 recently watched
-        for item in watched_shows[:15]:
+        # To avoid too many requests, we take up to 100 recently watched shows
+        for item in watched_shows[:100]: # Changed from [:15] to [:100]
             show = item.get('show')
             show_id = show.get('ids', {}).get('trakt')
             if not show_id:
