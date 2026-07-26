@@ -55,6 +55,7 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     });
     
     let latestPluginVersion = '1.0.0';
+    let latestBetaVersion = null;
     let latestRepoVersion = '1.0.0';
 
     for (const addonId of dirs) {
@@ -94,13 +95,13 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 }
 
                 // Welcome Melody
-                if (addonId === 'plugin.video.streamcontinuum') {
+                if (addonId === 'plugin.video.streamcontinuum' || addonId === 'plugin.video.streamcontinuum-beta') {
                     const welcomeSrc = path.join(mediaSrc, 'StreamContinuum.mp3');
                     if (fs.existsSync(welcomeSrc)) {
                         const welcomeDest = path.join(addonId, 'resources', 'media', 'welcome.mp3');
                         if (!fs.existsSync(path.dirname(welcomeDest))) fs.mkdirSync(path.dirname(welcomeDest), { recursive: true });
                         fs.copyFileSync(welcomeSrc, welcomeDest);
-                        console.log('Synced welcome melody to resources/media/welcome.mp3');
+                        console.log(`Synced welcome melody to ${addonId}/resources/media/welcome.mp3`);
                     }
                 }
 
@@ -156,6 +157,10 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 
                 if (addonId === 'plugin.video.streamcontinuum') {
                     latestPluginVersion = version;
+                } else if (addonId === 'plugin.video.streamcontinuum-beta') {
+                    latestBetaVersion = version;
+                } else if (addonId === 'repository.streamcontinuum') {
+                    latestRepoVersion = version;
                 }
 
                 // Prevent accidental downgrades in metadata strings
@@ -163,21 +168,22 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                     console.error('CRITICAL: Detected downgrade to 1.1.6 in addon.xml! Stopping build.');
                     process.exit(1);
                 }
-                if (addonId === 'repository.streamcontinuum') latestRepoVersion = version;
 
-                // Remove XML declaration
-                content = content.replace(/<\?xml[^?]*\?>/g, '').trim();
-                addonsXml += content + '\n';
+                // ONLY add to addons.xml if it's NOT the beta folder (Beta is ZIP-only for manual install)
+                if (addonId !== 'plugin.video.streamcontinuum-beta') {
+                    const xmlContent = content.replace(/<\?xml[^?]*\?>/g, '').trim();
+                    addonsXml += xmlContent + '\n';
+                }
                 
-                // Sync version to settings.xml if it's the main plugin
-                if (addonId === 'plugin.video.streamcontinuum') {
+                // Sync version to settings.xml if it's the main plugin or beta
+                if (addonId === 'plugin.video.streamcontinuum' || addonId === 'plugin.video.streamcontinuum-beta') {
                     const settingsPath = path.join(addonId, 'resources', 'settings.xml');
                     if (fs.existsSync(settingsPath)) {
                         let settingsContent = fs.readFileSync(settingsPath, 'utf-8');
                         const updatedSettings = settingsContent.replace(/(<setting id="about_version"[^>]*default=")[^"]+(")/, `$1${version}$2`);
                         if (settingsContent !== updatedSettings) {
                             fs.writeFileSync(settingsPath, updatedSettings);
-                            console.log(`Updated version to ${version} in settings.xml`);
+                            console.log(`Updated version to ${version} in ${addonId}/resources/settings.xml`);
                         }
                     }
                 }
@@ -193,6 +199,9 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 }
                 
                 // Use archiver
+                // Note: For beta zip, we pack under top-level folder 'plugin.video.streamcontinuum' so Kodi overwrites the main plugin upon install
+                const innerArchiveFolder = (addonId === 'plugin.video.streamcontinuum-beta') ? 'plugin.video.streamcontinuum' : addonId;
+
                 await new Promise((resolve, reject) => {
                     const output = fs.createWriteStream(zipPath);
                     const archive = archiver('zip', {
@@ -210,7 +219,6 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
 
                     archive.pipe(output);
 
-                    // Add everything in the addon directory to the zip, but under a folder named addonId
                     const addonFiles = fs.readdirSync(addonId);
                     for (const file of addonFiles) {
                         if (file.endsWith('.zip')) continue;
@@ -219,9 +227,9 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                         const stats = fs.statSync(filePath);
                         
                         if (stats.isDirectory()) {
-                            archive.directory(filePath, path.join(addonId, file));
+                            archive.directory(filePath, path.join(innerArchiveFolder, file));
                         } else {
-                            archive.file(filePath, { name: path.join(addonId, file) });
+                            archive.file(filePath, { name: path.join(innerArchiveFolder, file) });
                         }
                     }
 
@@ -289,10 +297,11 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
     const templatePath = 'template.html';
     if (fs.existsSync(templatePath)) {
         let templateContent = fs.readFileSync(templatePath, 'utf-8');
-        templateContent = templateContent.replace(/plugin\.video\.streamcontinuum-[\d.]+\.zip/g, `plugin.video.streamcontinuum-${latestPluginVersion}.zip`);
-        templateContent = templateContent.replace(/repository\.streamcontinuum-[\d.]+\.zip/g, `repository.streamcontinuum-${latestRepoVersion}.zip`);
+        const betaLinkHtml = latestBetaVersion ? `\n      <a href="plugin.video.streamcontinuum-beta-${latestBetaVersion}.zip">plugin.video.streamcontinuum-beta-${latestBetaVersion}.zip</a>` : '';
+        const kodiListing = `<div id="kodi-listing" style="display:none">\n      <a href="addons.xml">addons.xml</a>\n      <a href="addons.xml.md5">addons.xml.md5</a>\n      <a href="plugin.video.streamcontinuum-${latestPluginVersion}.zip">plugin.video.streamcontinuum-${latestPluginVersion}.zip</a>${betaLinkHtml}\n      <a href="repository.streamcontinuum-${latestRepoVersion}.zip">repository.streamcontinuum-${latestRepoVersion}.zip</a>\n    </div>`;
+        templateContent = templateContent.replace(/<div id="kodi-listing"[\s\S]*?<\/div>/, kodiListing);
         fs.writeFileSync(templatePath, templateContent);
-        console.log('Updated template.html with latest zip versions.');
+        console.log('Updated template.html with latest kodi-listing links.');
     }
 
     // Update repo_data.json for the React app

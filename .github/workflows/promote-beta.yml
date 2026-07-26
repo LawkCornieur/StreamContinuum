@@ -138,8 +138,8 @@ jobs:
                   beta_parts[2] = str(int(beta_parts[2]) + 1)
                   next_beta_version = ".".join(beta_parts)
                   
-                  beta_root.set("id", "plugin.video.streamcontinuum-beta")
-                  beta_root.set("name", "StreamContinuum Beta")
+                  beta_root.set("id", "plugin.video.streamcontinuum")
+                  beta_root.set("name", "StreamContinuum")
                   beta_root.set("version", next_beta_version)
                   beta_tree.write(beta_addon_xml, encoding="UTF-8", xml_declaration=True)
                   print(f"Verze budoucí bety byla povýšena na {next_beta_version}")
