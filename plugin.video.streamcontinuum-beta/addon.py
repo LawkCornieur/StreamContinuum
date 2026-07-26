@@ -148,7 +148,7 @@ def trakt_menu():
     fanart = get_asset('fa-trakt.png')
     
     items = [
-        (ADDON.getLocalizedString(30050), 'trakt_playback', 'DefaultRecentlyAddedEpisodes.png'),
+        (ADDON.getLocalizedString(30050), 'trakt_playback&offset=0', 'DefaultRecentlyAddedEpisodes.png'), # Added offset=0 for pagination
         (ADDON.getLocalizedString(30051), 'trakt_watchlist', 'DefaultWatchlist.png'),
         ('Katalog', 'trakt_discover_menu', 'DefaultAddonVideo.png'),
         (ADDON.getLocalizedString(30067), 'trakt_search_menu', 'DefaultAddonsSearch.png'),
@@ -522,6 +522,7 @@ def show_trakt_watchlist():
             genres_str = ', '.join(meta.get('genres', [])) if meta.get('genres') else ''
             rating = meta.get('rating') or 0
             runtime = meta.get('runtime') or 0
+            meta_type = 'episode'
         elif media_type == 'episode':
             show = item.get('show')
             episode = item.get('episode')
@@ -567,46 +568,56 @@ def show_trakt_watchlist():
     xbmcplugin.endOfDirectory(HANDLE)
 
 
-def show_trakt_playback():
+def show_trakt_playback(offset=0):
+    """Display paginated Trakt.tv 'Continue watching' items."""
+    offset = int(offset)
+    PAGE_SIZE = 20 # Number of items to show per page
+
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30050))
-    # Combine playback (paused) and progress (next episodes)
+    
     playback_items = trakt.get_playback()
     progress_items = trakt.get_progress()
     
-    # Use a set to avoid duplicates if something is in both
-    seen_ids = set()
-    items = []
+    combined_items = []
+    seen_ids = set() # To avoid duplicates
     
+    # Add playback items (currently paused movies/episodes)
     for item in playback_items:
         media_type = item.get('type')
+        trakt_id = None
         if media_type == 'movie':
-            movie = item.get('movie')
-            trakt_id = movie.get('ids', {}).get('trakt')
-            if trakt_id not in seen_ids:
-                items.append(item)
-                seen_ids.add(trakt_id)
+            trakt_id = item.get('movie', {}).get('ids', {}).get('trakt')
+            id_key = f"movie_{trakt_id}"
         elif media_type == 'episode':
-            episode = item.get('episode')
-            trakt_id = episode.get('ids', {}).get('trakt')
-            if trakt_id not in seen_ids:
-                items.append(item)
-                seen_ids.add(trakt_id)
-                
+            trakt_id = item.get('episode', {}).get('ids', {}).get('trakt')
+            id_key = f"episode_{trakt_id}"
+        
+        if trakt_id and id_key not in seen_ids:
+            combined_items.append(item)
+            seen_ids.add(id_key)
+            
+    # Add progress items (next episodes for watched shows)
     for item in progress_items:
+        # Progress items are always episodes by current implementation of get_progress
         episode = item.get('episode')
         trakt_id = episode.get('ids', {}).get('trakt')
-        if trakt_id not in seen_ids:
-            items.append(item)
-            seen_ids.add(trakt_id)
+        id_key = f"episode_{trakt_id}" 
+        
+        if trakt_id and id_key not in seen_ids:
+            combined_items.append(item)
+            seen_ids.add(id_key)
 
-    if not items:
+    if not combined_items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30075), xbmcgui.NOTIFICATION_INFO, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
         
-    for item in items:
+    # Apply pagination
+    page_items = combined_items[offset:offset + PAGE_SIZE]
+
+    for item in page_items:
         media_type = item.get('type')
-        meta_type = media_type
+        meta_type = media_type # Used to determine Kodi content type
         rating = 0
         runtime = 0
         genres_str = ''
@@ -633,17 +644,23 @@ def show_trakt_playback():
             show = item.get('show')
             episode = item.get('episode')
             show_trakt_id = show.get('ids', {}).get('trakt')
-            meta = get_trakt_localized(show_trakt_id, 'show') if show_trakt_id else {}
-            show_title = meta.get('title') or show.get('title')
-            title = f"{show_title} S{episode.get('season'):02d}E{episode.get('number'):02d}"
-            query = title
-            label = title
-            poster = meta.get('poster') or 'DefaultRecentlyAddedEpisodes.png'
-            fanart = meta.get('fanart') or ''
-            plot = episode.get('overview') or meta.get('overview') or ''
-            genres_str = ', '.join(meta.get('genres', [])) if meta.get('genres') else ''
-            rating = episode.get('rating') or meta.get('rating') or 0
-            runtime = episode.get('runtime') or 0
+            
+            # Fetch show metadata for common details (title, year, poster, fanart, genres)
+            show_meta = get_trakt_localized(show_trakt_id, 'show') if show_trakt_id else {}
+            
+            show_title = show_meta.get('title') or show.get('title')
+            show_year = show_meta.get('year') or show.get('year', '')
+            episode_title = episode.get('title', ADDON.getLocalizedString(30108).format(episode.get('number', 0)))
+            
+            label = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d} - {episode_title}"
+            query = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d}"
+            year = show_year # Use show's year for episodes
+            poster = show_meta.get('poster') or 'DefaultRecentlyAddedEpisodes.png'
+            fanart = show_meta.get('fanart') or ''
+            plot = episode.get('overview') or show_meta.get('overview') or '' # Prioritize episode-specific overview
+            genres_str = ', '.join(show_meta.get('genres', [])) if show_meta.get('genres') else ''
+            rating = episode.get('rating') or show_meta.get('rating') or 0 # Prioritize episode rating
+            runtime = episode.get('runtime') or show_meta.get('runtime') or 0 # Episode runtime
             meta_type = 'episode'
         else:
             continue
@@ -658,19 +675,35 @@ def show_trakt_playback():
             runtime_min=runtime,
             poster=poster,
             fanart=fanart,
-            media_type='movie' if meta_type == 'movie' else 'tvshow'
+            media_type='movie' if meta_type == 'movie' else 'tvshow' # Kodi type for episodes is 'tvshow'
         )
         
         cm = []
-        cm.append((ADDON.getLocalizedString(30052), f'RunPlugin({sys.argv[0]}?action=search&query={urllib.parse.quote(query)})'))
-        trakt_id = item.get(media_type, {}).get('ids', {}).get('trakt')
-        if trakt_id:
-            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
-            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
+        # Determine the Trakt ID for the item (movie or episode) to mark watched/unwatched
+        if media_type == 'movie':
+            trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt')
+        elif media_type == 'episode':
+            trakt_item_id = item.get('episode', {}).get('ids', {}).get('trakt')
+        else:
+            trakt_item_id = None
+
+        if trakt_item_id:
+            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
         list_item.addContextMenuItems(cm)
         
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
+    # Add next-page button if more items exist
+    if len(combined_items) > offset + PAGE_SIZE:
+        next_offset = offset + PAGE_SIZE
+        next_url = f"{sys.argv[0]}?action=trakt_playback&offset={next_offset}"
+        next_label = ADDON.getLocalizedString(30117)
+        li_next = xbmcgui.ListItem(label=f"[COLOR gray]>> {next_label} ({next_offset + 1}-{min(len(combined_items), next_offset + PAGE_SIZE)})[/COLOR]")
+        li_next.setArt({'icon': 'DefaultFolder.png', 'thumb': 'DefaultFolder.png'})
+        xbmcplugin.addDirectoryItem(HANDLE, next_url, li_next, isFolder=True)
+
+    xbmcplugin.setContent(HANDLE, 'videos') # Set content type for better Kodi integration
     xbmcplugin.endOfDirectory(HANDLE)
 
 
@@ -1220,7 +1253,7 @@ def run():
     elif action == 'trakt_watchlist':
         show_trakt_watchlist()
     elif action == 'trakt_playback':
-        show_trakt_playback()
+        show_trakt_playback(params.get('offset', 0)) # Pass offset parameter
     elif action == 'trakt_search':
         trakt_search(params.get('query', ''))
     elif action == 'trakt_mark':
