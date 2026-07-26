@@ -199,8 +199,7 @@ const addonsXmlMd5Path = path.join(publicDir, 'addons.xml.md5');
                 }
                 
                 // Use archiver
-                // Note: For beta zip, we pack under top-level folder 'plugin.video.streamcontinuum' so Kodi overwrites the main plugin upon install
-                const innerArchiveFolder = (addonId === 'plugin.video.streamcontinuum-beta') ? 'plugin.video.streamcontinuum' : addonId;
+                const innerArchiveFolder = addonId;
 
                 await new Promise((resolve, reject) => {
                     const output = fs.createWriteStream(zipPath);
