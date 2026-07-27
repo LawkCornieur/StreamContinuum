@@ -317,6 +317,9 @@ def play(ident, query=None):
             xbmc.sleep(100)
             timeout -= 1
             
+        # Close any lingering dialogs to prevent unexpected behavior during navigation.
+        xbmc.executebuiltin('Dialog.Close(all)')
+        
         # After playback logic
         after = ADDON.getSetting('after_playback')
         safe_query = urllib.parse.quote(query) if query else ""
