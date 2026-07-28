@@ -121,7 +121,8 @@ def get_localized_metadata(trakt_id, media_type, season_num=None, episode_num=No
     elif media_type == 'show':
         tmdb_url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
     elif media_type == 'season' and season_num is not None:
-        tmdb_url_template = f"https://themoviedb.org/3/tv/{tmdb_id}/season/{season_num}?api_key={{api_key}}&language=cs-CZ"
+        # FIX: Corrected URL prefix from 'themoviedb.org' to 'api.themoviedb.org'
+        tmdb_url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_num}?api_key={{api_key}}&language=cs-CZ"
     elif media_type == 'episode' and season_num is not None and episode_num is not None:
         tmdb_url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_num}/episode/{episode_num}?api_key={{api_key}}&language=cs-CZ"
     
