@@ -88,66 +88,120 @@ def get_headers():
         headers["Authorization"] = f"Bearer {token}"
     return headers
 
-def get_localized_metadata(trakt_id, media_type):
-    """Načte lokalizovaná (česká) metadata a obrázky z TMDb pro daný Trakt ID."""
+def get_localized_metadata(trakt_id, media_type, season_num=None, episode_num=None):
+    """Načte lokalizovaná (česká) metadata a obrázky z TMDb pro daný Trakt ID, včetně sezón a epizod."""
     if not trakt_id:
         return {}
+
+    # Initial Trakt API call to get TMDb ID for the show/movie.
+    # For episodes/seasons, trakt_id is the show's trakt_id.
+    trakt_endpoint_type = 'movies' if media_type == 'movie' else 'shows'
+    url = f"https://api.trakt.tv/{trakt_endpoint_type}/{trakt_id}"
     
-    endpoint = 'movies' if media_type in ('movie', 'Movie') else 'shows'
-    tmdb_media_type = 'movie' if media_type in ('movie', 'Movie') else 'tv'
-    url = f"https://api.trakt.tv/{endpoint}/{trakt_id}"
-    
+    tmdb_id = None
+    trakt_item_data = {} # To store original Trakt data for fallback if TMDb fails
     try:
-        # Získání tmdb_id z Trakt.tv
         res = requests.get(url, headers=get_headers(), timeout=10)
         if res.status_code == 200:
-            data = res.json()
-            tmdb_id = data.get('ids', {}).get('tmdb')
-            if tmdb_id:
-                # Získání českých metadat z TMDb s rotací API klíčů
-                import tmdb
-                tmdb_url_template = f"https://api.themoviedb.org/3/{tmdb_media_type}/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
-                tmdb_res = tmdb.make_tmdb_request(tmdb_url_template)
-                
-                if tmdb_res and tmdb_res.status_code == 200:
-                    tmdb_data = tmdb_res.json()
-                    
-                    # Obrázky
-                    poster_path = tmdb_data.get('poster_path')
-                    backdrop_path = tmdb_data.get('backdrop_path')
-                    poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
-                    fanart = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
-                    
-                    # Lokalizovaný název a popisek
-                    title = tmdb_data.get('title') if tmdb_media_type == 'movie' else tmdb_data.get('name')
-                    overview = tmdb_data.get('overview')
-                    
-                    # Fallback na původní název, pokud chybí český
-                    if not title:
-                        title = data.get('title', '')
-                    if not overview:
-                        overview = data.get('overview', '')
-                        
-                    # Další detaily
-                    genres_list = [g.get('name') for g in tmdb_data.get('genres', []) if g.get('name')]
-                    rating = tmdb_data.get('vote_average', 0)
-                    runtime = tmdb_data.get('runtime', 0) if tmdb_media_type == 'movie' else tmdb_data.get('episode_run_time', [0])[0]
-                    status = tmdb_data.get('status', '')
-                    
-                    return {
-                        'title': title,
-                        'overview': overview,
-                        'poster': poster,
-                        'fanart': fanart,
-                        'genres': genres_list,
-                        'rating': rating,
-                        'runtime': runtime,
-                        'status': status
-                    }
+            trakt_item_data = res.json()
+            tmdb_id = trakt_item_data.get('ids', {}).get('tmdb')
+        else:
+            xbmc.log(f"StreamContinuum: Trakt API failed to get TMDb ID for {media_type} id={trakt_id} (S{season_num}E{episode_num}), status={res.status_code}", xbmc.LOGWARNING)
+            return {}
     except Exception as e:
-        xbmc.log(f"StreamContinuum: Trakt/TMDB metadata fetch error (id={trakt_id}): {e}", xbmc.LOGWARNING)
+        xbmc.log(f"StreamContinuum: Trakt API error getting TMDb ID for {media_type} id={trakt_id} (S{season_num}E{episode_num}): {e}", xbmc.LOGWARNING)
+        return {}
+
+    if not tmdb_id:
+        return {}
+
+    tmdb_url_template = None
+    if media_type == 'movie':
+        tmdb_url_template = f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
+    elif media_type == 'show':
+        tmdb_url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
+    elif media_type == 'season' and season_num is not None:
+        tmdb_url_template = f"https://themoviedb.org/3/tv/{tmdb_id}/season/{season_num}?api_key={{api_key}}&language=cs-CZ"
+    elif media_type == 'episode' and season_num is not None and episode_num is not None:
+        tmdb_url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_num}/episode/{episode_num}?api_key={{api_key}}&language=cs-CZ"
+    
+    if not tmdb_url_template:
+        xbmc.log(f"StreamContinuum: Invalid media_type '{media_type}' or missing season/episode numbers for TMDb lookup.", xbmc.LOGWARNING)
+        return {}
+
+    try:
+        import tmdb
+        tmdb_res = tmdb.make_tmdb_request(tmdb_url_template)
         
-    return {}
+        if tmdb_res and tmdb_res.status_code == 200:
+            tmdb_data = tmdb_res.json()
+            
+            result = {}
+            # Generic fields, localized from TMDb, falling back to Trakt if TMDb CS is empty
+            if media_type == 'movie':
+                result['title'] = tmdb_data.get('title') or trakt_item_data.get('title')
+                result['overview'] = tmdb_data.get('overview') or trakt_item_data.get('overview')
+                result['year'] = tmdb_data.get('release_date', '')[:4] or trakt_item_data.get('year', '')
+            elif media_type == 'show':
+                result['title'] = tmdb_data.get('name') or trakt_item_data.get('title')
+                result['overview'] = tmdb_data.get('overview') or trakt_item_data.get('overview')
+                result['year'] = tmdb_data.get('first_air_date', '')[:4] or trakt_item_data.get('year', '')
+                result['status'] = tmdb_data.get('status') or trakt_item_data.get('status', '') # Add status for shows
+            elif media_type == 'season':
+                # For season, name is e.g. "Season 1", overview is plot
+                result['title'] = tmdb_data.get('name') or f"Season {season_num}" # Fallback to generic name
+                result['overview'] = tmdb_data.get('overview') or trakt_item_data.get('overview')
+                result['episode_count'] = tmdb_data.get('episode_count', 0)
+            elif media_type == 'episode':
+                result['title'] = tmdb_data.get('name') or trakt_item_data.get('title')
+                result['overview'] = tmdb_data.get('overview') or trakt_item_data.get('overview')
+                result['runtime'] = tmdb_data.get('runtime', 0) # Episode runtime from TMDb
+            
+            # Common fields (artwork, genres, rating)
+            if media_type in ('movie', 'show'): # Poster/Fanart are typically at movie/show level
+                poster_path = tmdb_data.get('poster_path')
+                backdrop_path = tmdb_data.get('backdrop_path')
+                result['poster'] = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                result['fanart'] = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
+                result['genres'] = [g.get('name') for g in tmdb_data.get('genres', []) if g.get('name')]
+                result['rating'] = tmdb_data.get('vote_average', 0) # TMDb rating
+                if media_type == 'movie':
+                    result['runtime'] = tmdb_data.get('runtime', 0)
+                else:
+                    result['runtime'] = tmdb_data.get('episode_run_time', [0])[0] if tmdb_data.get('episode_run_time') else 0
+
+            elif media_type in ('season', 'episode'):
+                 result['rating'] = tmdb_data.get('vote_average', 0)
+            
+            return result
+        else:
+            xbmc.log(f"StreamContinuum: TMDb API failed to get localized data for {media_type} id={tmdb_id} (S{season_num}E{episode_num}), status={tmdb_res.status_code}", xbmc.LOGWARNING)
+            # Fallback to just Trakt data if TMDb fails completely, still useful
+            return {
+                'title': trakt_item_data.get('title'),
+                'overview': trakt_item_data.get('overview'),
+                'year': trakt_item_data.get('year'),
+                'poster': '', # No TMDb poster on error
+                'fanart': '', # No TMDb fanart on error
+                'genres': trakt_item_data.get('genres', []),
+                'rating': trakt_item_data.get('rating', 0),
+                'runtime': trakt_item_data.get('runtime', 0),
+                'status': trakt_item_data.get('status', '')
+            }
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: TMDb API error getting localized data for {media_type} id={tmdb_id} (S{season_num}E{episode_num}): {e}", xbmc.LOGERROR)
+        # Fallback to Trakt data on exception
+        return {
+            'title': trakt_item_data.get('title'),
+            'overview': trakt_item_data.get('overview'),
+            'year': trakt_item_data.get('year'),
+            'poster': '',
+            'fanart': '',
+            'genres': trakt_item_data.get('genres', []),
+            'rating': trakt_item_data.get('rating', 0),
+            'runtime': trakt_item_data.get('runtime', 0),
+            'status': trakt_item_data.get('status', '')
+        }
 
 def get_images(trakt_id, media_type):
     """Zpětně kompatibilní získání plakátu a fanartu."""
@@ -201,8 +255,8 @@ def get_progress():
         
         progress_list = []
         # For each show, get the next episode
-        # To avoid too many requests, we take up to 100 recently watched shows
-        for item in watched_shows[:100]: # Changed from [:15] to [:100]
+        # To avoid too many requests, we take up to 20 recently watched shows for progress calculation
+        for item in watched_shows[:20]: # Changed from [:100] to [:20] for performance
             show = item.get('show')
             show_id = show.get('ids', {}).get('trakt')
             if not show_id:
