@@ -32,7 +32,7 @@ def get_asset(name):
         return os.path.join(ADDON_PATH, 'resources', name)
     return os.path.join(ADDON_PATH, 'resources', 'media', name)
 
-def get_trakt_localized(trakt_id, media_type):
+def get_trakt_localized(trakt_id, media_type, season_num=None, episode_num=None):
     """Fetch localized metadata and artwork from TMDb via Trakt.
     Uses in-memory cache within a session.
     Returns dict with metadata or empty dict.
@@ -40,31 +40,36 @@ def get_trakt_localized(trakt_id, media_type):
     global _trakt_meta_cache
     if not trakt_id:
         return {}
-    cache_key = f"{media_type}_{trakt_id}"
+
+    # Generate a more specific cache key for seasons/episodes
+    if media_type == 'season' and season_num is not None:
+        cache_key = f"{media_type}_{trakt_id}_S{season_num}"
+    elif media_type == 'episode' and season_num is not None and episode_num is not None:
+        cache_key = f"{media_type}_{trakt_id}_S{season_num}E{episode_num}"
+    else: # movie or show
+        cache_key = f"{media_type}_{trakt_id}"
+
     if cache_key in _trakt_meta_cache:
         return _trakt_meta_cache[cache_key]
 
     try:
-        result = trakt.get_localized_metadata(trakt_id, media_type)
+        # Pass additional parameters to trakt.get_localized_metadata
+        result = trakt.get_localized_metadata(trakt_id, media_type, season_num, episode_num)
         if result:
             _trakt_meta_cache[cache_key] = result
-            xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id}", xbmc.LOGDEBUG)
+            # Log with episode/season info if available
+            if season_num is not None and episode_num is not None:
+                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={{trakt_id}} S{season_num}E{episode_num}", xbmc.LOGDEBUG)
+            elif season_num is not None:
+                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={{trakt_id}} S{season_num}", xbmc.LOGDEBUG)
+            else:
+                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id}", xbmc.LOGDEBUG)
             return result
     except Exception as e:
-        xbmc.log(f"StreamContinuum: Trakt localized fetch error (id={trakt_id}): {e}", xbmc.LOGWARNING)
+        xbmc.log(f"StreamContinuum: Trakt localized fetch error (id={trakt_id} S{season_num}E{episode_num}): {e}", xbmc.LOGWARNING)
 
     _trakt_meta_cache[cache_key] = {}
     return {}
-
-def get_trakt_images(trakt_id, media_type):
-    """Fetch poster and fanart URLs from Trakt.tv API.
-    Uses in-memory cache within a session.
-    Returns (poster_url, fanart_url) – both empty strings if unavailable.
-    """
-    meta = get_trakt_localized(trakt_id, media_type)
-    if meta:
-        return meta.get('poster', ''), meta.get('fanart', '')
-    return '', ''
 
 
 def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, poster, fanart, media_type='movie'):
@@ -419,16 +424,21 @@ def trakt_search(query=None):
         for item in results:
             media_type = item.get('type')  # 'movie' or 'show'
             data = item.get(media_type, {})
-            title = data.get('title', '')
-            year = data.get('year', '')
             trakt_id = data.get('ids', {}).get('trakt')
-            overview = data.get('overview', '')
-            genres = data.get('genres', [])
-            rating = data.get('rating', 0)
-            runtime = data.get('runtime', 0)
 
-            # Fetch artwork from Trakt.tv
-            poster, fanart = get_trakt_images(trakt_id, media_type) if trakt_id else ('', '')
+            meta = get_trakt_localized(trakt_id, media_type) if trakt_id else {}
+            
+            # Use localized meta data, fallback to original Trakt data
+            title = meta.get('title') or data.get('title', '')
+            year = meta.get('year') or data.get('year', '')
+            overview = meta.get('overview') or data.get('overview', '')
+            genres = meta.get('genres', []) or data.get('genres', [])
+            rating = meta.get('rating') or data.get('rating', 0)
+            runtime = meta.get('runtime') or data.get('runtime', 0)
+            status = meta.get('status') or data.get('status', '')
+
+            poster = meta.get('poster') or ('DefaultMovies.png' if media_type == 'movie' else 'DefaultTVShows.png')
+            fanart = meta.get('fanart') or ''
 
             label = f"{title} ({year})" if year else title
             kodi_media_type = 'movie' if media_type == 'movie' else 'tvshow'
@@ -443,6 +453,8 @@ def trakt_search(query=None):
             if runtime:
                 unit = 'min/ep' if media_type == 'show' else 'min'
                 plot_parts.append(f"[B]{ADDON.getLocalizedString(30115)}:[/B] {runtime} {unit}")
+            if status:
+                plot_parts.append(f"[B]{ADDON.getLocalizedString(30116)}:[/B] {status}")
             combined_plot = '\n'.join(plot_parts)
 
             list_item = _make_media_list_item(label, year, combined_plot, genres_str, rating, runtime, poster, fanart, kodi_media_type)
@@ -488,7 +500,7 @@ def show_trakt_watchlist():
         
     for item in items:
         media_type = item.get('type')
-        meta_type = media_type
+        meta_type = media_type 
         rating = 0
         runtime = 0
         genres_str = ''
@@ -496,13 +508,16 @@ def show_trakt_watchlist():
         poster = ''
         fanart = ''
         year = ''
-        
+        label = ''
+        query = ''
+
         if media_type == 'movie':
             movie = item.get('movie')
             trakt_id = movie.get('ids', {}).get('trakt')
             meta = get_trakt_localized(trakt_id, 'movie') if trakt_id else {}
+            
             title = meta.get('title') or movie.get('title')
-            year = movie.get('year')
+            year = meta.get('year') or movie.get('year')
             query = f"{title} {year}" if year else title
             label = f"{title} ({year})" if year else title
             poster = meta.get('poster') or 'DefaultMovies.png'
@@ -515,8 +530,9 @@ def show_trakt_watchlist():
             show = item.get('show')
             trakt_id = show.get('ids', {}).get('trakt')
             meta = get_trakt_localized(trakt_id, 'show') if trakt_id else {}
+            
             title = meta.get('title') or show.get('title')
-            year = show.get('year')
+            year = meta.get('year') or show.get('year')
             query = title
             label = f"{title} ({year})" if year else title
             poster = meta.get('poster') or 'DefaultTVShows.png'
@@ -525,23 +541,39 @@ def show_trakt_watchlist():
             genres_str = ', '.join(meta.get('genres', [])) if meta.get('genres') else ''
             rating = meta.get('rating') or 0
             runtime = meta.get('runtime') or 0
-            meta_type = 'episode'
+            meta_type = 'tvshow' # Kodi media type for shows
         elif media_type == 'episode':
             show = item.get('show')
             episode = item.get('episode')
             show_trakt_id = show.get('ids', {}).get('trakt')
-            meta = get_trakt_localized(show_trakt_id, 'show') if show_trakt_id else {}
-            show_title = meta.get('title') or show.get('title')
-            title = f"{show_title} S{episode.get('season'):02d}E{episode.get('number'):02d}"
-            query = title
-            label = title
-            poster = meta.get('poster') or 'DefaultRecentlyAddedEpisodes.png'
-            fanart = meta.get('fanart') or ''
-            plot = episode.get('overview') or meta.get('overview') or ''
-            genres_str = ', '.join(meta.get('genres', [])) if meta.get('genres') else ''
-            rating = episode.get('rating') or meta.get('rating') or 0
-            runtime = episode.get('runtime') or 0
-            meta_type = 'episode'
+            
+            # Fetch show metadata for artwork and fallback details
+            show_meta = get_trakt_localized(show_trakt_id, 'show') if show_trakt_id else {}
+            # Fetch episode-specific localized metadata
+            episode_meta = get_trakt_localized(
+                show_trakt_id, # Use show_trakt_id as the primary ID for episode lookup in Trakt.py
+                'episode', 
+                season_num=episode.get('season'), 
+                episode_num=episode.get('number')
+            ) if show_trakt_id and episode.get('season') and episode.get('number') else {}
+
+            show_title = show_meta.get('title') or show.get('title')
+            show_year = show_meta.get('year') or show.get('year', '')
+            
+            # Prioritize episode_meta for title and overview
+            ep_title_localized = episode_meta.get('title') or episode.get('title', ADDON.getLocalizedString(30108).format(episode.get('number', 0)))
+            ep_overview_localized = episode_meta.get('overview') or episode.get('overview') or show_meta.get('overview') or ''
+
+            label = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d} - {ep_title_localized}"
+            query = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d}"
+            year = show_year # Use show's year for episodes
+            poster = show_meta.get('poster') or 'DefaultRecentlyAddedEpisodes.png'
+            fanart = show_meta.get('fanart') or ''
+            plot = ep_overview_localized
+            genres_str = ', '.join(show_meta.get('genres', [])) if show_meta.get('genres') else ''
+            rating = episode_meta.get('rating') or episode.get('rating') or show_meta.get('rating') or 0
+            runtime = episode_meta.get('runtime') or episode.get('runtime') or show_meta.get('runtime') or 0
+            meta_type = 'tvshow' # Kodi type for episodes is 'tvshow'
         else:
             continue
             
@@ -560,10 +592,12 @@ def show_trakt_watchlist():
         
         cm = []
         cm.append((ADDON.getLocalizedString(30052), f'RunPlugin({sys.argv[0]}?action=search&query={urllib.parse.quote(query)})'))
-        trakt_id = item.get(media_type, {}).get('ids', {}).get('trakt')
-        if trakt_id:
-            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
-            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
+        # Use show_trakt_id for episodes if episode_trakt_id is missing, but prefer episode's ID for marking watched.
+        trakt_id_to_mark = item.get(media_type, {}).get('ids', {}).get('trakt') if media_type != 'episode' else episode.get('ids', {}).get('trakt')
+
+        if trakt_id_to_mark:
+            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id_to_mark}&watched=1)'))
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id_to_mark}&watched=0)'))
         list_item.addContextMenuItems(cm)
         
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
@@ -628,13 +662,16 @@ def show_trakt_playback(offset=0):
         poster = ''
         fanart = ''
         year = ''
+        label = ''
+        query = ''
         
         if media_type == 'movie':
             movie = item.get('movie')
             trakt_id = movie.get('ids', {}).get('trakt')
             meta = get_trakt_localized(trakt_id, 'movie') if trakt_id else {}
+            
             title = meta.get('title') or movie.get('title')
-            year = movie.get('year')
+            year = meta.get('year') or movie.get('year')
             query = f"{title} {year}" if year else title
             label = f"{title} ({year})" if year else title
             poster = meta.get('poster') or 'DefaultMovies.png'
@@ -648,23 +685,33 @@ def show_trakt_playback(offset=0):
             episode = item.get('episode')
             show_trakt_id = show.get('ids', {}).get('trakt')
             
-            # Fetch show metadata for common details (title, year, poster, fanart, genres)
+            # Fetch show metadata for artwork and fallback details
             show_meta = get_trakt_localized(show_trakt_id, 'show') if show_trakt_id else {}
+            # Fetch episode-specific localized metadata
+            episode_meta = get_trakt_localized(
+                show_trakt_id, # Use show_trakt_id as the primary ID for episode lookup in Trakt.py
+                'episode', 
+                season_num=episode.get('season'), 
+                episode_num=episode.get('number')
+            ) if show_trakt_id and episode.get('season') and episode.get('number') else {}
             
             show_title = show_meta.get('title') or show.get('title')
             show_year = show_meta.get('year') or show.get('year', '')
-            episode_title = episode.get('title', ADDON.getLocalizedString(30108).format(episode.get('number', 0)))
             
-            label = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d} - {episode_title}"
+            # Prioritize episode_meta for title and overview
+            ep_title_localized = episode_meta.get('title') or episode.get('title', ADDON.getLocalizedString(30108).format(episode.get('number', 0)))
+            ep_overview_localized = episode_meta.get('overview') or episode.get('overview') or show_meta.get('overview') or ''
+
+            label = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d} - {ep_title_localized}"
             query = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d}"
             year = show_year # Use show's year for episodes
             poster = show_meta.get('poster') or 'DefaultRecentlyAddedEpisodes.png'
             fanart = show_meta.get('fanart') or ''
-            plot = episode.get('overview') or show_meta.get('overview') or '' # Prioritize episode-specific overview
+            plot = ep_overview_localized
             genres_str = ', '.join(show_meta.get('genres', [])) if show_meta.get('genres') else ''
-            rating = episode.get('rating') or show_meta.get('rating') or 0 # Prioritize episode rating
-            runtime = episode.get('runtime') or show_meta.get('runtime') or 0 # Episode runtime
-            meta_type = 'episode'
+            rating = episode_meta.get('rating') or episode.get('rating') or show_meta.get('rating') or 0
+            runtime = episode_meta.get('runtime') or episode.get('runtime') or show_meta.get('runtime') or 0
+            meta_type = 'tvshow' # Kodi type for episodes is 'tvshow'
         else:
             continue
             
@@ -683,6 +730,7 @@ def show_trakt_playback(offset=0):
         
         cm = []
         # Determine the Trakt ID for the item (movie or episode) to mark watched/unwatched
+        trakt_item_id = None
         if media_type == 'movie':
             trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt')
         elif media_type == 'episode':
@@ -845,7 +893,10 @@ def show_tmdb_show_seasons(title, year=''):
                 if r_title == title.lower() or title.lower() in r_title or r_title in title.lower():
                     trakt_id = show.get('ids', {}).get('trakt')
                     if trakt_id:
-                        poster, fanart = get_trakt_images(trakt_id, 'show')
+                        # Fetch artwork using the new get_trakt_localized method
+                        show_meta = get_trakt_localized(trakt_id, 'show')
+                        poster = show_meta.get('poster', '')
+                        fanart = show_meta.get('fanart', '')
                     break
 
         if not trakt_id:
@@ -855,7 +906,10 @@ def show_tmdb_show_seasons(title, year=''):
                     show = result.get('show', {})
                     trakt_id = show.get('ids', {}).get('trakt')
                     if trakt_id:
-                        poster, fanart = get_trakt_images(trakt_id, 'show')
+                        # Fetch artwork using the new get_trakt_localized method
+                        show_meta = get_trakt_localized(trakt_id, 'show')
+                        poster = show_meta.get('poster', '')
+                        fanart = show_meta.get('fanart', '')
                     break
 
     if not trakt_id:
@@ -939,17 +993,22 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
         season_num = season.get('number', 0)
         if season_num == 0:
             continue  # Skip specials/season 0
-        ep_count = season.get('episode_count', 0)
-        rating = season.get('rating', 0)
-        overview = season.get('overview', '')
+        
+        # Fetch localized season metadata
+        season_meta = get_trakt_localized(trakt_id, 'season', season_num=season_num) # trakt_id is show's trakt_id
 
-        label = f"{ADDON.getLocalizedString(30105)} {season_num}"
+        ep_count = season_meta.get('episode_count') or season.get('episode_count', 0)
+        rating = season_meta.get('rating') or season.get('rating', 0)
+        overview = season_meta.get('overview') or season.get('overview', '')
+        season_title = season_meta.get('title') or f"{ADDON.getLocalizedString(30105)} {season_num}"
+
+        label = season_title
         if ep_count:
             label += f"  ({ep_count})"
 
         li = xbmcgui.ListItem(label=label)
         art = {}
-        if poster:
+        if poster: # Use show's poster for seasons
             art['poster'] = poster
             art['thumb'] = poster
             art['icon'] = poster
@@ -957,18 +1016,18 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
         li.setArt(art)
 
         info_tag = li.getVideoInfoTag()
-        info_tag.setTitle(label)
+        info_tag.setTitle(season_title) # Use localized season title
         info_tag.setMediaType('season')
         info_tag.setSeason(season_num)
         if overview:
-            info_tag.setPlot(overview)
+            info_tag.setPlot(overview) # Use localized season overview
         if rating:
             try:
                 info_tag.setRating(float(rating))
             except (ValueError, TypeError):
                 pass
         if ep_count:
-            info_tag.setEpisode(ep_count)
+            info_tag.setEpisodeCount(ep_count) # Corrected from setEpisode to setEpisodeCount
 
         url = (f"{sys.argv[0]}?action=show_episodes"
                f"&show_title={urllib.parse.quote(show_title)}"
@@ -995,17 +1054,22 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
 
     for episode in episodes:
         ep_num = episode.get('number', 0)
-        ep_title = episode.get('title', ADDON.getLocalizedString(30108).format(ep_num))
-        overview = episode.get('overview', '')
-        rating = episode.get('rating', 0)
-        runtime = episode.get('runtime', 0)
+        
+        # Fetch localized episode metadata
+        episode_meta = get_trakt_localized(trakt_id, 'episode', season_num=season_num, episode_num=ep_num) # trakt_id is show's trakt_id
+
+        # Prioritize localized data, fallback to original Trakt data
+        ep_title = episode_meta.get('title') or episode.get('title', ADDON.getLocalizedString(30108).format(ep_num))
+        overview = episode_meta.get('overview') or episode.get('overview', '')
+        rating = episode_meta.get('rating') or episode.get('rating', 0)
+        runtime = episode_meta.get('runtime') or episode.get('runtime', 0)
 
         ws_query = f"{show_title} S{season_num:02d}E{ep_num:02d}"
         label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}"
 
         li = xbmcgui.ListItem(label=label)
         art = {}
-        if poster:
+        if poster: # Use show's poster for episodes
             art['poster'] = poster
             art['thumb'] = poster
             art['icon'] = poster
@@ -1013,12 +1077,12 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
         li.setArt(art)
 
         info_tag = li.getVideoInfoTag()
-        info_tag.setTitle(ep_title)
+        info_tag.setTitle(ep_title) # Use localized episode title
         info_tag.setMediaType('episode')
         info_tag.setSeason(season_num)
         info_tag.setEpisode(ep_num)
         if overview:
-            info_tag.setPlot(overview)
+            info_tag.setPlot(overview) # Use localized episode overview
         if rating:
             try:
                 info_tag.setRating(float(rating))
@@ -1103,13 +1167,14 @@ def show_trakt_discover(list_type, media_type, offset=0):
         trakt_id = item.get('ids', {}).get('trakt')
         meta = get_trakt_localized(trakt_id, item_type_single) if trakt_id else {}
         
+        # Use localized meta data, fallback to original Trakt data
         title = meta.get('title') or item.get('title', '')
-        year = item.get('year', '')
+        year = meta.get('year') or item.get('year', '')
         overview = meta.get('overview') or item.get('overview', '')
-        genres = meta.get('genres') or item.get('genres', [])
+        genres = meta.get('genres', []) or item.get('genres', [])
         rating = meta.get('rating') or item.get('rating', 0)
         runtime = meta.get('runtime') or item.get('runtime', 0)
-        status = meta.get('status') or item.get('status', '')
+        status = meta.get('status') or item.get('status', '') # Only for shows
         
         poster = meta.get('poster') or ('DefaultMovies.png' if item_type_single == 'movie' else 'DefaultTVShows.png')
         fanart = meta.get('fanart') or ''
