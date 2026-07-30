@@ -5,6 +5,12 @@ import requests
 import time
 import urllib.parse
 
+try:
+    import tmdb
+except Exception as _tmdb_e:
+    xbmc.log(f"StreamContinuum: Trakt.py: TMDb module import failed: {_tmdb_e}", xbmc.LOGWARNING)
+    tmdb = None # Set tmdb to None if import fails in trakt.py
+
 ADDON = xbmcaddon.Addon()
 
 def authenticate():
@@ -113,7 +119,8 @@ def get_localized_metadata(trakt_id, media_type, season_num=None, episode_num=No
         return {}
 
     if not tmdb_id:
-        return {}
+        xbmc.log(f"StreamContinuum: No TMDb ID found for {media_type} id={trakt_id} (S{season_num}E{episode_num}). Skipping TMDb lookup.", xbmc.LOGWARNING)
+        return {} # Return empty to signal no TMDb data
 
     tmdb_url_template_cs = None
     if media_type == 'movie':
@@ -126,11 +133,26 @@ def get_localized_metadata(trakt_id, media_type, season_num=None, episode_num=No
         tmdb_url_template_cs = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_num}/episode/{episode_num}?api_key={{api_key}}&language=cs-CZ"
     
     if not tmdb_url_template_cs:
-        xbmc.log(f"StreamContinuum: Invalid media_type '{media_type}' or missing season/episode numbers for TMDb lookup.", xbmc.LOGWARNING)
+        xbmc.log(f"StreamContinuum: Invalid media_type '{media_type}' or missing season/episode numbers for TMDb lookup URL.", xbmc.LOGWARNING)
         return {}
 
+    # Check if tmdb module is actually available *here*
+    if tmdb is None:
+        xbmc.log(f"StreamContinuum: TMDb module not available in trakt.py for localized data lookup of {media_type} id={tmdb_id}. Falling back to Trakt data.", xbmc.LOGWARNING)
+        # Fallback to just Trakt data, without TMDb localization
+        return {
+            'title': trakt_item_data.get('title'),
+            'overview': trakt_item_data.get('overview'),
+            'year': trakt_item_data.get('year'),
+            'poster': '', # No TMDb, so no artwork
+            'fanart': '', # No TMDb, so no artwork
+            'genres': trakt_item_data.get('genres', []),
+            'rating': trakt_item_data.get('rating', 0),
+            'runtime': trakt_item_data.get('runtime', 0),
+            'status': trakt_item_data.get('status', '')
+        }
+
     try:
-        import tmdb
         
         # 1. Fetch data in CS-CZ
         tmdb_data_cs = {}
@@ -155,56 +177,74 @@ def get_localized_metadata(trakt_id, media_type, season_num=None, episode_num=No
                 xbmc.log(f"StreamContinuum: Error fetching EN-US fallback for {media_type} {tmdb_id} (S{season_num}E{episode_num}): {e}", xbmc.LOGDEBUG)
 
         # Helper function to get the best available string, prioritizing CS, then EN, then Trakt (if trakt_key specified)
-        def _get_best_string(cs_key_movie, cs_key_tv, en_key_movie, en_key_tv, trakt_key=None):
+        def _get_best_string(cs_key_movie, cs_key_tv, en_key_movie, en_key_tv, trakt_key=None, log_context=""):
             cs_value = tmdb_data_cs.get(cs_key_movie if media_type == 'movie' else cs_key_tv)
             if cs_value:
                 return cs_value
+            
             en_value = tmdb_data_en.get(en_key_movie if media_type == 'movie' else en_key_tv)
             if en_value:
+                xbmc.log(f"StreamContinuum: {log_context}: Fallback to EN-US for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{cs_key_movie if media_type=='movie' else cs_key_tv}'", xbmc.LOGDEBUG)
                 return en_value
+            
             if trakt_key: 
-                return trakt_item_data.get(trakt_key, '')
+                trakt_value = trakt_item_data.get(trakt_key, '')
+                if trakt_value:
+                    xbmc.log(f"StreamContinuum: {log_context}: Fallback to Trakt for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{trakt_key}'", xbmc.LOGDEBUG)
+                else:
+                    xbmc.log(f"StreamContinuum: {log_context}: Trakt data also missing for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{trakt_key}'", xbmc.LOGDEBUG)
+                return trakt_value
+            xbmc.log(f"StreamContinuum: {log_context}: No localized (CS/EN) or Trakt data found for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{cs_key_movie if media_type=='movie' else cs_key_tv}'", xbmc.LOGDEBUG)
             return '' 
 
         # Helper for year as it's date-based, not just a string key
-        def _get_best_year(cs_date_key, en_date_key, trakt_year_key=None):
-            cs_year = tmdb_data_cs.get(cs_date_key, '')[:4]
+        def _get_best_year(cs_date_key, en_date_key, trakt_year_key=None, log_context=""):
+            cs_year = tmdb_data_cs.get(cs_date_key, '')
             if cs_year:
-                return cs_year
-            en_year = tmdb_data_en.get(en_date_key, '')[:4]
+                return cs_year[:4] # Return only year part
+            
+            en_year = tmdb_data_en.get(en_date_key, '')
             if en_year:
-                return en_year
+                xbmc.log(f"StreamContinuum: {log_context}: Fallback to EN-US year for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{cs_date_key}'", xbmc.LOGDEBUG)
+                return en_year[:4]
+            
             if trakt_year_key: 
-                return trakt_item_data.get(trakt_year_key, '')
+                trakt_year = trakt_item_data.get(trakt_year_key, '')
+                if trakt_year:
+                    xbmc.log(f"StreamContinuum: {log_context}: Fallback to Trakt year for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{trakt_year_key}'", xbmc.LOGDEBUG)
+                else:
+                    xbmc.log(f"StreamContinuum: {log_context}: Trakt year also missing for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{trakt_year_key}'", xbmc.LOGDEBUG)
+                return str(trakt_year)[:4]
+            xbmc.log(f"StreamContinuum: {log_context}: No localized (CS/EN) or Trakt year found for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{cs_date_key}'", xbmc.LOGDEBUG)
             return ''
             
         result = {}
         if media_type == 'movie':
-            result['title'] = _get_best_string('title', '', 'title', '', 'title')
-            result['overview'] = _get_best_string('overview', '', 'overview', '', 'overview')
-            result['year'] = _get_best_year('release_date', 'release_date', 'year')
+            result['title'] = _get_best_string('title', '', 'title', '', 'title', log_context='Movie Title')
+            result['overview'] = _get_best_string('overview', '', 'overview', '', 'overview', log_context='Movie Overview')
+            result['year'] = _get_best_year('release_date', 'release_date', 'year', log_context='Movie Year')
             result['runtime'] = tmdb_data_cs.get('runtime', 0) or tmdb_data_en.get('runtime', 0)
         elif media_type == 'show':
-            result['title'] = _get_best_string('', 'name', '', 'name', 'title')
-            result['overview'] = _get_best_string('overview', '', 'overview', '', 'overview')
-            result['year'] = _get_best_year('first_air_date', 'first_air_date', 'year')
+            result['title'] = _get_best_string('', 'name', '', 'name', 'title', log_context='Show Title')
+            result['overview'] = _get_best_string('overview', '', 'overview', '', 'overview', log_context='Show Overview')
+            result['year'] = _get_best_year('first_air_date', 'first_air_date', 'year', log_context='Show Year')
             result['status'] = (tmdb_data_cs.get('status') or tmdb_data_en.get('status') or 
                                 trakt_item_data.get('status', ''))
             result['runtime'] = (tmdb_data_cs.get('episode_run_time', [0])[0] if tmdb_data_cs.get('episode_run_time') else 0) or \
                                 (tmdb_data_en.get('episode_run_time', [0])[0] if tmdb_data_en.get('episode_run_time') else 0)
         elif media_type == 'season':
             # trakt_key=None here so it doesn't fall back to show's title
-            result['title'] = _get_best_string('', 'name', '', 'name', None) or f"{ADDON.getLocalizedString(30105)} {season_num}"
-            result['overview'] = _get_best_string('overview', '', 'overview', '', None)
+            result['title'] = _get_best_string('', 'name', '', 'name', None, log_context=f'Season Title S{season_num}') or f"{ADDON.getLocalizedString(30105)} {season_num}"
+            result['overview'] = _get_best_string('overview', '', 'overview', '', None, log_context=f'Season Overview S{season_num}')
             result['episode_count'] = tmdb_data_cs.get('episode_count', 0) or tmdb_data_en.get('episode_count', 0)
-            result['year'] = _get_best_year('air_date', 'air_date', None) # Season air date
+            result['year'] = _get_best_year('air_date', 'air_date', None, log_context=f'Season Year S{season_num}') # Season air date
             result['rating'] = tmdb_data_cs.get('vote_average', 0) or tmdb_data_en.get('vote_average', 0)
         elif media_type == 'episode':
             # trakt_key=None here so it doesn't fall back to show's title
-            result['title'] = _get_best_string('', 'name', '', 'name', None)
-            result['overview'] = _get_best_string('overview', '', 'overview', '', None)
+            result['title'] = _get_best_string('', 'name', '', 'name', None, log_context=f'Episode Title S{season_num}E{episode_num}')
+            result['overview'] = _get_best_string('overview', '', 'overview', '', None, log_context=f'Episode Overview S{season_num}E{episode_num}')
             result['runtime'] = tmdb_data_cs.get('runtime', 0) or tmdb_data_en.get('runtime', 0) # Episode runtime from TMDb
-            result['year'] = _get_best_year('air_date', 'air_date', None) # Episode air date
+            result['year'] = _get_best_year('air_date', 'air_date', None, log_context=f'Episode Year S{season_num}E{episode_num}') # Episode air date
             result['rating'] = tmdb_data_cs.get('vote_average', 0) or tmdb_data_en.get('vote_average', 0)
 
         # Common fields (artwork, genres)
