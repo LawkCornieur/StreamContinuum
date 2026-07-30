@@ -59,9 +59,9 @@ def get_trakt_localized(trakt_id, media_type, season_num=None, episode_num=None)
             _trakt_meta_cache[cache_key] = result
             # Log with episode/season info if available
             if season_num is not None and episode_num is not None:
-                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={{trakt_id}} S{season_num}E{episode_num}", xbmc.LOGDEBUG)
+                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}E{episode_num}", xbmc.LOGDEBUG)
             elif season_num is not None:
-                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={{trakt_id}} S{season_num}", xbmc.LOGDEBUG)
+                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}", xbmc.LOGDEBUG)
             else:
                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id}", xbmc.LOGDEBUG)
             return result
