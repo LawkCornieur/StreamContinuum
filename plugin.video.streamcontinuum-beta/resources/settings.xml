@@ -28,6 +28,7 @@
         <setting id="auto_start" type="bool" label="Automaticky spustit doplněk po startu Kodi" default="true" />
         <setting id="ssl_verify" type="bool" label="Ověřovat SSL certifikáty" default="true" />
         <setting id="last_search_query" type="text" label="" visible="false" default="" />
+        <setting id="enable_trakt_menu" type="bool" label="30119" default="false" />
     </category>
     <category label="TMDb">
         <setting id="tmdb_api_key" type="text" label="TMDb API klíč (volitelný)" default="" />
