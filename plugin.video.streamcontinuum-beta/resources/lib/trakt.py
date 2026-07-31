@@ -178,6 +178,8 @@ def get_localized_metadata(trakt_id, media_type, season_num=None, episode_num=No
 
         # Helper function to get the best available string, prioritizing CS, then EN, then Trakt (if trakt_key specified)
         def _get_best_string(cs_key_movie, cs_key_tv, en_key_movie, en_key_tv, trakt_key=None, log_context=""):
+            is_title_or_overview = "Title" in log_context or "Overview" in log_context # Check if this is a title or overview field
+
             cs_value = tmdb_data_cs.get(cs_key_movie if media_type == 'movie' else cs_key_tv)
             if cs_value:
                 return cs_value
@@ -185,15 +187,20 @@ def get_localized_metadata(trakt_id, media_type, season_num=None, episode_num=No
             en_value = tmdb_data_en.get(en_key_movie if media_type == 'movie' else en_key_tv)
             if en_value:
                 xbmc.log(f"StreamContinuum: {log_context}: Fallback to EN-US for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{cs_key_movie if media_type=='movie' else cs_key_tv}'", xbmc.LOGDEBUG)
+                if is_title_or_overview:
+                    return f"[EN] {en_value}" # Prepend [EN] tag for titles/overviews
                 return en_value
             
             if trakt_key: 
                 trakt_value = trakt_item_data.get(trakt_key, '')
                 if trakt_value:
                     xbmc.log(f"StreamContinuum: {log_context}: Fallback to Trakt for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{trakt_key}'", xbmc.LOGDEBUG)
+                    if is_title_or_overview:
+                        # Prepend [TRAKT] tag if it's the raw Trakt English title and no TMDb data was found
+                        return f"[TRAKT] {trakt_value}"
+                    return trakt_value
                 else:
                     xbmc.log(f"StreamContinuum: {log_context}: Trakt data also missing for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{trakt_key}'", xbmc.LOGDEBUG)
-                return trakt_value
             xbmc.log(f"StreamContinuum: {log_context}: No localized (CS/EN) or Trakt data found for {media_type} id={trakt_id} (S{season_num}E{episode_num}) key='{cs_key_movie if media_type=='movie' else cs_key_tv}'", xbmc.LOGDEBUG)
             return '' 
 
