@@ -54,7 +54,7 @@ def get_trakt_localized(trakt_id, media_type, season_num=None, episode_num=None)
 
     try:
         # Pass additional parameters to trakt.get_localized_metadata
-        result = trakt.get_localized_metadata(trakt_id, media_type, season_num, episode_num)
+        result = trakt.get_localized_metadata(trakt_id, media_type, season_num, episode_num, id_type='trakt')
         if result:
             _trakt_meta_cache[cache_key] = result
             # Log with episode/season info if available
@@ -115,6 +115,7 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
 
 def list_categories():
     trakt_token = ADDON.getSetting('trakt_token')
+    enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu') # New setting check
     
     # Set plugin category for breadcrumbs
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
@@ -128,8 +129,9 @@ def list_categories():
         (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fa-history.png'), '#cc9900')
     ]
 
-    if trakt_token:
-        items.append(('Trakt.tv', 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fa-trakt.png'), '#9f42c6'))
+    # Only add Trakt.tv if token exists AND it's enabled in settings
+    if trakt_token and enable_trakt_menu:
+        items.append((ADDON.getLocalizedString(30119), 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fa-trakt.png'), '#9f42c6'))
 
     items.append(('TMDb', 'tmdb_menu', 'DefaultAddonVideo.png', main_fanart, '#01b4e4'))
     items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
@@ -149,7 +151,7 @@ def list_categories():
     xbmcplugin.endOfDirectory(HANDLE)
 
 def trakt_menu():
-    xbmcplugin.setPluginCategory(HANDLE, 'Trakt.tv')
+    xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30119))
     fanart = get_asset('fa-trakt.png')
     
     items = [
@@ -232,7 +234,7 @@ def search(query=None):
                 res = '2160'
             elif '1080p' in name_lower:
                 res = '1080'
-            elif '720p' in name_lower:
+            elif '720p' in name_lower or 'hd' in name_lower:
                 res = '720'
             elif '480p' in name_lower:
                 res = '480'
@@ -359,13 +361,39 @@ def show_history():
         
     for item in items:
         query = item.get('query', '')
-        title = item.get('title', '')
         
-        label = query or title
-        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query or title)}"
+        # Prioritize TMDb identified metadata for display
+        # Fallback to query if TMDb title is missing
+        title = item.get('title') or query
+        year = item.get('year')
+        plot = item.get('plot')
+        genres = item.get('genres', [])
+        rating = item.get('rating')
+        runtime = item.get('runtime')
+        poster = item.get('poster')
+        fanart = item.get('fanart')
+        media_type = item.get('media_type') or ('movie' if 'S00E00' not in query and re.search(r'\b(S\d{2}E\d{2}|\d{1}x\d{2})\b', query, re.IGNORECASE) is None else 'tvshow') # Basic guess based on query pattern
         
-        list_item = xbmcgui.ListItem(label=label)
-        list_item.setArt({'icon': 'DefaultHistory.png', 'thumb': 'DefaultHistory.png'})
+        label = f"{title} ({year})" if year else title
+        
+        # If TMDb data is available (indicated by tmdb_id and poster), create a rich list item
+        if item.get('tmdb_id') and poster:
+            list_item = _make_media_list_item(
+                label=label,
+                year=year,
+                plot=plot,
+                genres_str=', '.join(genres), # _make_media_list_item expects string
+                rating=rating,
+                runtime_min=runtime,
+                poster=poster,
+                fanart=fanart,
+                media_type=media_type
+            )
+        else: # Fallback to basic list item with default history icon
+            list_item = xbmcgui.ListItem(label=label)
+            list_item.setArt({'icon': 'DefaultHistory.png', 'thumb': 'DefaultHistory.png', 'fanart': get_asset('fa-history.png')})
+        
+        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
     xbmcplugin.endOfDirectory(HANDLE)
@@ -375,6 +403,7 @@ def history_menu(query, title=None):
     
     items = [
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
+        (ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'), # New item for TMDb identification
         (ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
         (ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'),
         (ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
@@ -399,7 +428,12 @@ def history_menu(query, title=None):
         url = f"{sys.argv[0]}?action={action_params}"
         list_item = xbmcgui.ListItem(label=label)
         list_item.setArt({'icon': icon, 'thumb': icon})
-        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True if 'search' in action_params else False)
+        # Identify with TMDb should not be a folder, it's an action to trigger search/identify
+        is_folder = True if 'search&query=' in action_params or 'trakt_search&query=' in action_params else False
+        if 'history_tmdb_identify_search' in action_params: # This action opens a list of TMDb results, so it's a folder
+            is_folder = True
+
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
         
     xbmcplugin.endOfDirectory(HANDLE)
 
@@ -1228,6 +1262,119 @@ def show_trakt_discover(list_type, media_type, offset=0):
     xbmcplugin.setContent(HANDLE, kodi_content)
     xbmcplugin.endOfDirectory(HANDLE)
 
+# ---------------------------------------------------------------------------
+# History TMDb Identification
+# ---------------------------------------------------------------------------
+
+def history_tmdb_identify_search(original_query):
+    """Performs a TMDb search based on history query and displays results for identification."""
+    if tmdb_module is None:
+        xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+
+    xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30120)}: {original_query}")
+    
+    all_items = tmdb_module.search_tmdb(original_query)
+    if not all_items:
+        xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30128), xbmcgui.NOTIFICATION_WARNING, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+
+    for item in all_items:
+        raw_title = item.get('clean_title', item.get('title', ''))
+        display_title = item.get('title', raw_title)
+        year = item.get('year', '')
+        plot = item.get('plot', '')
+        info_type = item.get('info', '') # e.g., 'Film', 'Seriál'
+        poster_from_search = item.get('img', '') # poster from initial search
+        backdrop_from_search = item.get('backdrop_path', '') # backdrop from initial search
+        is_show = item.get('type') == 'show'
+        kodi_type = 'tvshow' if is_show else 'movie'
+
+        # Fetch full localized metadata using trakt.get_localized_metadata (which uses TMDb internally)
+        full_tmdb_meta = {}
+        if item.get('id'): # item.get('id') is TMDb ID from tmdb_module.search_tmdb
+            trakt_media_type_param = item.get('media_type').replace('tv', 'show')
+            full_tmdb_meta = trakt.get_localized_metadata(
+                item_id=item.get('id'), 
+                media_type=trakt_media_type_param, 
+                id_type='tmdb'
+            )
+        
+        # Combine data: prefer full_tmdb_meta, then initial search result item
+        final_title = full_tmdb_meta.get('title') or raw_title
+        final_year = full_tmdb_meta.get('year') or year
+        final_plot = full_tmdb_meta.get('overview') or plot
+        final_genres = full_tmdb_meta.get('genres', [])
+        final_rating = full_tmdb_meta.get('rating') or item.get('vote_average')
+        final_runtime = full_tmdb_meta.get('runtime')
+        final_poster = full_tmdb_meta.get('poster') or poster_from_search
+        final_fanart = full_tmdb_meta.get('fanart') or backdrop_from_search
+
+        # Create list item for display
+        li = _make_media_list_item(
+            label=f"{final_title} ({final_year})" if final_year else final_title,
+            year=final_year,
+            plot=final_plot,
+            genres_str=', '.join(final_genres),
+            rating=final_rating,
+            runtime_min=final_runtime,
+            poster=final_poster,
+            fanart=final_fanart,
+            media_type=kodi_type
+        )
+
+        # Parameters for the identification action
+        assign_params = {
+            'action': 'assign_tmdb_data_to_history',
+            'original_query': original_query,
+            'tmdb_id': item.get('id'), # Store TMDb ID
+            'media_type': kodi_type,
+            'title': final_title,
+            'year': final_year,
+            'plot': final_plot,
+            'genres': '|'.join(final_genres), # Pass as pipe-separated string
+            'rating': final_rating,
+            'runtime': final_runtime,
+            'poster': final_poster,
+            'fanart': final_fanart
+        }
+        
+        # URL encode all values in assign_params, ensuring None becomes empty string
+        encoded_params = '&'.join(f"{key}={urllib.parse.quote_plus(str(value) if value is not None else '')}" for key, value in assign_params.items())
+        url = f"{sys.argv[0]}?{encoded_params}"
+        
+        # Clicking the item directly performs the identification
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=False)
+
+    xbmcplugin.setContent(HANDLE, 'movies' if 'movie' in [i.get('media_type') for i in all_items] else 'tvshows') # Dynamic content type
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year, plot, genres, rating, runtime, poster, fanart):
+    """Updates a history item with TMDb metadata."""
+    import history
+    tmdb_data = {
+        'tmdb_id': int(tmdb_id) if tmdb_id else None,
+        'media_type': media_type if media_type else None,
+        'title': title if title else None,
+        'year': int(year) if year else None,
+        'plot': plot if plot else None,
+        'genres': genres.split('|') if genres else [], # Convert back to list
+        'rating': float(rating) if rating else None,
+        'runtime': int(runtime) if runtime else None,
+        'poster': poster if poster else None,
+        'fanart': fanart if fanart else None
+    }
+    
+    success = history.update_history_with_tmdb_data(original_query, tmdb_data)
+    if success:
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30126), xbmcgui.NOTIFICATION_INFO, 2000)
+        # Refresh history container to show updated metadata
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
+    else:
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30127), xbmcgui.NOTIFICATION_ERROR, 3000)
+
 
 def run():
     # Force updating the visible version setting since Kodi caches the default from first install
@@ -1354,6 +1501,22 @@ def run():
                 import history
                 history.update_history_item(old_query, new_query) # Simple update
                 xbmc.executebuiltin('Container.Refresh')
+    elif action == 'history_tmdb_identify_search':
+        history_tmdb_identify_search(params.get('original_query', ''))
+    elif action == 'assign_tmdb_data_to_history':
+        assign_tmdb_data_to_history(
+            original_query=params.get('original_query'),
+            tmdb_id=params.get('tmdb_id'),
+            media_type=params.get('media_type'),
+            title=params.get('title'),
+            year=params.get('year'),
+            plot=params.get('plot'),
+            genres=params.get('genres'),
+            rating=params.get('rating'),
+            runtime=params.get('runtime'),
+            poster=params.get('poster'),
+            fanart=params.get('fanart')
+        )
     elif action == 'tmdb_menu':
         show_tmdb_menu()
     elif action == 'tmdb_category':
