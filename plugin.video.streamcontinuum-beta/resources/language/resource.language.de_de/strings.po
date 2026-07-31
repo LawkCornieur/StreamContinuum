@@ -382,3 +382,23 @@ msgstr "Nächste Seite"
 msgctxt "#30118"
 msgid "Failed to load items. Check the connection."
 msgstr "Elemente konnten nicht geladen werden. Überprüfen Sie die Verbindung."
+
+msgctxt "#30119"
+msgid "Trakt.tv (development ended)"
+msgstr "Trakt.tv (Entwicklung beendet)"
+
+msgctxt "#30120"
+msgid "Identify with TMDb"
+msgstr "Mit TMDb identifizieren"
+
+msgctxt "#30126"
+msgid "History item identified with TMDb."
+msgstr "Verlaufseintrag mit TMDb identifiziert."
+
+msgctxt "#30127"
+msgid "Failed to identify history item with TMDb."
+msgstr "Fehler beim Identifizieren des Verlaufseintrags mit TMDb."
+
+msgctxt "#30128"
+msgid "No relevant items found on TMDb. Try a different search."
+msgstr "Keine relevanten Einträge auf TMDb gefunden. Versuchen Sie eine andere Suche."
