@@ -172,7 +172,7 @@ def trakt_menu():
         })
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
-    xbmcplugin.endOfDirectory(HANDLE)
+xbmcplugin.endOfDirectory(HANDLE)
 
 def search(query=None):
     if not query:
@@ -435,7 +435,7 @@ def history_menu(query, title=None):
 
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
         
-    xbmcplugin.endOfDirectory(HANDLE)
+xbmcplugin.endOfDirectory(HANDLE)
 
 def trakt_search(query=None):
     if not query:
@@ -636,7 +636,7 @@ def show_trakt_watchlist():
         
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
-    xbmcplugin.endOfDirectory(HANDLE)
+xbmcplugin.endOfDirectory(HANDLE)
 
 
 def show_trakt_playback(offset=0):
@@ -1020,7 +1020,8 @@ def show_tmdb_search(query=None):
 
             if is_show:
                 url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
-                       f"&title={urllib.parse.quote(raw_title)}&year={year}"
+                       f"&title={urllib.parse.quote(raw_title)}"
+                       f"&year={year}"
                        f"&tmdb_id={tmdb_item_id}") # Pass TMDb ID
             else:
                 ws_query = f"{raw_title} {year}".strip()
@@ -1295,9 +1296,13 @@ def history_tmdb_identify_search(original_query):
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
+    import history
+    cleaned_query = history.get_base_name(original_query) # Use cleaned query for TMDb search
+    
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30120)}: {original_query}")
     
-    all_items = tmdb_module.search_tmdb(original_query)
+    xbmc.log(f"StreamContinuum: Searching TMDb for '{original_query}', cleaned to '{cleaned_query}'", xbmc.LOGINFO)
+    all_items = tmdb_module.search_tmdb(cleaned_query)
     if not all_items:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30128), xbmcgui.NOTIFICATION_WARNING, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
