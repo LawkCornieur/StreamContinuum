@@ -94,6 +94,41 @@ def get_headers():
         headers["Authorization"] = f"Bearer {token}"
     return headers
 
+def get_trakt_id_from_tmdb_id(tmdb_id, media_type):
+    """
+    Přeloží TMDb ID na Trakt ID pomocí Trakt API.
+    media_type: 'movie' nebo 'show'
+    Vrací Trakt ID (int) nebo None.
+    """
+    if not tmdb_id or media_type not in ('movie', 'show'):
+        return None
+
+    trakt_search_type = 'movie' if media_type == 'movie' else 'show'
+    url = f"https://api.trakt.tv/search/tmdb/{tmdb_id}?type={trakt_search_type}"
+    headers = get_headers()
+
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            results = res.json()
+            if results:
+                # Trakt search by TMDB ID returns a list of results.
+                # We expect only one relevant result for an exact TMDB ID.
+                first_result = results[0]
+                found_media_type = first_result.get('type')
+                found_item = first_result.get(found_media_type, {})
+                trakt_id = found_item.get('ids', {}).get('trakt')
+                if trakt_id:
+                    xbmc.log(f"StreamContinuum: Trakt ID {trakt_id} found for TMDb ID {tmdb_id} ({media_type})", xbmc.LOGDEBUG)
+                    return trakt_id
+            xbmc.log(f"StreamContinuum: No Trakt ID found for TMDb ID {tmdb_id} ({media_type}) via search endpoint.", xbmc.LOGDEBUG)
+        else:
+            xbmc.log(f"StreamContinuum: Trakt API search by TMDb ID {tmdb_id} failed with status {res.status_code}", xbmc.LOGWARNING)
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error getting Trakt ID for TMDb ID {tmdb_id} ({media_type}): {e}", xbmc.LOGERROR)
+
+    return None
+
 def get_localized_metadata(item_id, media_type, season_num=None, episode_num=None, id_type='trakt'):
     """Načte lokalizovaná (česká) metadata a obrázky z TMDb pro daný ID, včetně sezón a epizod.
        item_id: ID of the item (Trakt ID or TMDb ID)
