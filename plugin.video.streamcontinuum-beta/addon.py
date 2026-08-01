@@ -873,6 +873,7 @@ def show_tmdb_category(category, offset=0):
         info = item.get('info', '')
         poster = item.get('img', '')
         is_show = item.get('type') == 'show'
+        tmdb_item_id = item.get('id') # Get TMDb ID
 
         # Combine genres/origin info with description
         combined_plot = plot or ''
@@ -884,9 +885,10 @@ def show_tmdb_category(category, offset=0):
         li = _make_media_list_item(label, year, combined_plot, info, None, None, poster, '', kodi_type)
 
         if is_show:
-            # Bridge to Trakt for season/episode navigation
+            # Bridge to Trakt for season/episode navigation, pass TMDb ID
             url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
-                   f"&title={urllib.parse.quote(raw_title)}&year={year}")
+                   f"&title={urllib.parse.quote(raw_title)}&year={year}"
+                   f"&tmdb_id={tmdb_item_id}") # Pass TMDb ID
         else:
             # Movie – search Webshare directly
             ws_query = f"{raw_title} {year}".strip()
@@ -906,54 +908,72 @@ def show_tmdb_category(category, offset=0):
     xbmcplugin.endOfDirectory(HANDLE)
 
 
-def show_tmdb_show_seasons(title, year=''):
-    """Resolve a TMDb show to a Trakt show ID and navigate to seasons.
-    Falls back to a direct Webshare search if Trakt lookup fails.
+def show_tmdb_show_seasons(title, year='', tmdb_id=None):
+    """
+    Resolve a TMDb show to a Trakt show ID and navigate to seasons.
+    Prioritizes TMDb ID to Trakt ID conversion.
+    Falls back to Trakt search by title if TMDb ID is not provided or conversion fails.
     """
     xbmcplugin.setPluginCategory(HANDLE, f"{title} - {ADDON.getLocalizedString(30105)}")
-    xbmc.log(f"StreamContinuum: Hledam serial '{title}' na Trakt.tv", xbmc.LOGINFO)
+    xbmc.log(f"StreamContinuum: Hledam serial '{title}' na Trakt.tv (TMDb ID: {tmdb_id})", xbmc.LOGINFO)
 
-    results = trakt.search_trakt(title)
     trakt_id = None
     poster = ''
     fanart = ''
+    show_meta = {} # To store TMDb/Trakt metadata for artwork and plot
 
-    if results:
-        # Prefer exact title match for shows
-        for result in results:
-            if result.get('type') == 'show':
-                show = result.get('show', {})
-                r_title = show.get('title', '').lower()
-                if r_title == title.lower() or title.lower() in r_title or r_title in title.lower():
-                    trakt_id = show.get('ids', {}).get('trakt')
-                    if trakt_id:
-                        # Fetch artwork using the new get_trakt_localized method
-                        show_meta = get_trakt_localized(trakt_id, 'show')
-                        poster = show_meta.get('poster', '')
-                        fanart = show_meta.get('fanart', '')
-                    break
+    if tmdb_id:
+        # Try to resolve Trakt ID directly from TMDb ID
+        trakt_id = trakt.get_trakt_id_from_tmdb_id(tmdb_id, 'show')
+        if trakt_id:
+            xbmc.log(f"StreamContinuum: Trakt ID '{trakt_id}' found for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
+            show_meta = trakt.get_localized_metadata(trakt_id, 'show') # Get full metadata using Trakt ID
+            poster = show_meta.get('poster', '')
+            fanart = show_meta.get('fanart', '')
+        else:
+            xbmc.log(f"StreamContinuum: Nelze prelozit TMDb ID '{tmdb_id}' na Trakt ID. Pokousim se vyhledat Trakt.tv podle nazvu '{title}'.", xbmc.LOGWARNING)
 
-        if not trakt_id:
-            # Use first show result as fallback
+    if not trakt_id:
+        # Fallback to Trakt search by title if TMDb ID was not provided or conversion failed
+        results = trakt.search_trakt(title)
+        if results:
+            # Prefer exact title match for shows
             for result in results:
                 if result.get('type') == 'show':
                     show = result.get('show', {})
-                    trakt_id = show.get('ids', {}).get('trakt')
-                    if trakt_id:
-                        # Fetch artwork using the new get_trakt_localized method
-                        show_meta = get_trakt_localized(trakt_id, 'show')
-                        poster = show_meta.get('poster', '')
-                        fanart = show_meta.get('fanart', '')
-                    break
+                    r_title = show.get('title', '').lower()
+                    if r_title == title.lower() or title.lower() in r_title or r_title in title.lower():
+                        trakt_id = show.get('ids', {}).get('trakt')
+                        if trakt_id:
+                            show_meta = trakt.get_localized_metadata(trakt_id, 'show')
+                            poster = show_meta.get('poster', '')
+                            fanart = show_meta.get('fanart', '')
+                        break
+            if not trakt_id:
+                # Fallback to first show result if no exact match
+                for result in results:
+                    if result.get('type') == 'show':
+                        show = result.get('show', {})
+                        trakt_id = show.get('ids', {}).get('trakt')
+                        if trakt_id:
+                            show_meta = trakt.get_localized_metadata(trakt_id, 'show')
+                            poster = show_meta.get('poster', '')
+                            fanart = show_meta.get('fanart', '')
+                        break
 
     if not trakt_id:
-        xbmc.log(f"StreamContinuum: Serial '{title}' nenalezen na Trakt.tv – presmerovavm na Webshare", xbmc.LOGWARNING)
+        xbmc.log(f"StreamContinuum: Serial '{title}' nenalezen na Trakt.tv (ani po vyhledani ani pomoci TMDb ID) – presmerovavm na Webshare", xbmc.LOGWARNING)
         ws_query = f"{title} {year}".strip()
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
         return
 
-    show_seasons(title, str(trakt_id), poster, fanart)
+    # Use the metadata fetched via get_localized_metadata for the show
+    final_show_title = show_meta.get('title') or title
+    final_year = show_meta.get('year') or year
+    final_plot = show_meta.get('overview') or '' # Overview from show_meta
+
+    show_seasons(final_show_title, str(trakt_id), poster, fanart)
 
 
 def show_tmdb_search(query=None):
@@ -988,6 +1008,7 @@ def show_tmdb_search(query=None):
             info = item.get('info', '')
             poster = item.get('img', '')
             is_show = item.get('type') == 'show'
+            tmdb_item_id = item.get('id') # Get TMDb ID
 
             combined_plot = plot or ''
             if info and info not in combined_plot:
@@ -999,7 +1020,8 @@ def show_tmdb_search(query=None):
 
             if is_show:
                 url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
-                       f"&title={urllib.parse.quote(raw_title)}&year={year}")
+                       f"&title={urllib.parse.quote(raw_title)}&year={year}"
+                       f"&tmdb_id={tmdb_item_id}") # Pass TMDb ID
             else:
                 ws_query = f"{raw_title} {year}".strip()
                 url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
@@ -1522,7 +1544,7 @@ def run():
     elif action == 'tmdb_category':
         show_tmdb_category(params.get('category'), params.get('offset', 0))
     elif action == 'tmdb_show_seasons':
-        show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''))
+        show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''), params.get('tmdb_id')) # Add tmdb_id parameter
     elif action == 'tmdb_search':
         show_tmdb_search(params.get('query'))
     elif action == 'show_seasons':
