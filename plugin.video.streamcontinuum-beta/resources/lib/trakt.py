@@ -129,6 +129,28 @@ def get_trakt_id_from_tmdb_id(tmdb_id, media_type):
 
     return None
 
+def search_trakt(query):
+    """
+    Vyhledá filmy a seriály na Trakt.tv pomocí multi-search endpointu.
+    Vrací list of dicts, kde každý dict obsahuje 'type' (movie/show) a data položky.
+    """
+    xbmc.log(f"StreamContinuum: Trakt.tv searching for '{query}'", xbmc.LOGINFO)
+    safe_query = urllib.parse.quote(query)
+    url = f"https://api.trakt.tv/search?query={safe_query}&type=movie,show"
+    headers = get_headers()
+
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            results = res.json()
+            xbmc.log(f"StreamContinuum: Trakt.tv search for '{query}' returned {len(results)} items.", xbmc.LOGDEBUG)
+            return results
+        else:
+            xbmc.log(f"StreamContinuum: Trakt.tv search for '{query}' failed with status {res.status_code}. Response: {res.text[:200]}", xbmc.LOGERROR)
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error searching Trakt.tv for '{query}': {e}", xbmc.LOGERROR)
+    return []
+
 def get_localized_metadata(item_id, media_type, season_num=None, episode_num=None, id_type='trakt'):
     """Načte lokalizovaná (česká) metadata a obrázky z TMDb pro daný ID, včetně sezón a epizod.
        item_id: ID of the item (Trakt ID or TMDb ID)
