@@ -384,8 +384,8 @@ msgid "Failed to load items. Check the connection."
 msgstr "Failed to load items. Check the connection."
 
 msgctxt "#30119"
-msgid "Trakt.tv (development ended)"
-msgstr "Trakt.tv (development ended)"
+msgid "Trakt.tv"
+msgstr "Trakt.tv"
 
 msgctxt "#30120"
 msgid "Identify with TMDb"
