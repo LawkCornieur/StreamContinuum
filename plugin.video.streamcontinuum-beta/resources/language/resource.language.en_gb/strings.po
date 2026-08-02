@@ -402,3 +402,7 @@ msgstr "Failed to identify history item with TMDb."
 msgctxt "#30128"
 msgid "No relevant items found on TMDb. Try a different search."
 msgstr "No relevant items found on TMDb. Try a different search."
+
+msgctxt "#30129"
+msgid "No main menu items could be displayed. Please check addon settings."
+msgstr "No main menu items could be displayed. Please check addon settings."
