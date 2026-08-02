@@ -61,7 +61,7 @@ def get_trakt_localized(trakt_id, media_type, season_num=None, episode_num=None)
             if season_num is not None and episode_num is not None:
                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}E{episode_num}", xbmc.LOGDEBUG)
             elif season_num is not None:
-                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_id} id={trakt_id} S{season_num}", xbmc.LOGDEBUG)
+                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}", xbmc.LOGDEBUG)
             else:
                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id}", xbmc.LOGDEBUG)
             return result
@@ -940,8 +940,7 @@ def show_tmdb_category(category, offset=0):
 def show_tmdb_show_seasons(title, year='', tmdb_id=None):
     """
     Resolve a TMDb show to a Trakt show ID and navigate to seasons.
-    Prioritizes TMDb ID to Trakt ID conversion.
-    Falls back to Trakt search by title if TMDb ID is not provided or conversion fails.
+    Prioritizes TMDb ID to Trakt ID conversion. Falls back to Webshare search if Trakt ID cannot be resolved.
     """
     xbmcplugin.setPluginCategory(HANDLE, f"{title} - {ADDON.getLocalizedString(30105)}")
     xbmc.log(f"StreamContinuum: show_tmdb_show_seasons called for title='{title}', year='{year}', tmdb_id='{tmdb_id}'", xbmc.LOGINFO)
@@ -967,61 +966,19 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
             except Exception as e:
                 xbmc.log(f"StreamContinuum: Error fetching localized metadata for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
         else:
-            xbmc.log(f"StreamContinuum: Nelze prelozit TMDb ID '{tmdb_id}' na Trakt ID. Pokousim se vyhledat Trakt.tv podle nazvu '{title}'.", xbmc.LOGWARNING)
-
-    if not trakt_id:
-        xbmc.log(f"StreamContinuum: Falling back to Trakt search by title '{title}'.", xbmc.LOGINFO)
-        results = []
-        try:
-            if trakt and hasattr(trakt, 'search_trakt'): # Explicit safety check for Issue 12
-                results = trakt.search_trakt(title)
-            else:
-                xbmc.log(f"StreamContinuum: Trakt module or search_trakt function not available. Cannot perform Trakt search by title.", xbmc.LOGERROR)
-        except Exception as e:
-            xbmc.log(f"StreamContinuum: Error during trakt.search_trakt for '{title}': {e}", xbmc.LOGERROR)
-
-        if results:
-            for result in results:
-                if result.get('type') == 'show':
-                    show = result.get('show', {})
-                    r_title = show.get('title', '').lower()
-                    # Use a more flexible title comparison for exotic characters
-                    if r_title == title.lower() or title.lower() in r_title or r_title in title.lower():
-                        temp_trakt_id = show.get('ids', {}).get('trakt')
-                        if temp_trakt_id:
-                            trakt_id = temp_trakt_id
-                            xbmc.log(f"StreamContinuum: Trakt ID '{trakt_id}' found by title search for '{title}'", xbmc.LOGINFO)
-                            try:
-                                show_meta = trakt.get_localized_metadata(trakt_id, 'show')
-                                poster = show_meta.get('poster', '')
-                                fanart = show_meta.get('fanart', '')
-                            except Exception as e:
-                                xbmc.log(f"StreamContinuum: Error fetching localized metadata after title search for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
-                            break
-            if not trakt_id: # Fallback to first show result if no exact match (already existing logic, but within the new try/except)
-                for result in results:
-                    if result.get('type') == 'show':
-                        show = result.get('show', {})
-                        temp_trakt_id = show.get('ids', {}).get('trakt')
-                        if temp_trakt_id:
-                            trakt_id = temp_trakt_id
-                            xbmc.log(f"StreamContinuum: Trakt ID '{trakt_id}' found by fallback title search for '{title}'", xbmc.LOGINFO)
-                            try:
-                                show_meta = trakt.get_localized_metadata(trakt_id, 'show')
-                                poster = show_meta.get('poster', '')
-                                fanart = show_meta.get('fanart', '')
-                            except Exception as e:
-                                xbmc.log(f"StreamContinuum: Error fetching localized metadata after fallback title search for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
-                            break
-    
-    if not trakt_id:
-        xbmc.log(f"StreamContinuum: Serial '{title}' nenalezen na Trakt.tv (ani po vyhledani ani pomoci TMDb ID) – presmerovavm na Webshare", xbmc.LOGWARNING)
+            xbmc.log(f"StreamContinuum: Nelze prelozit TMDb ID '{tmdb_id}' na Trakt ID. Presmerovavam na Webshare hledani podle nazvu '{title}'.", xbmc.LOGWARNING)
+            ws_query = f"{title} {year}".strip()
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
+            return
+    else: # tmdb_id was not provided, which shouldn't happen from TMDb menu paths, but as a safeguard.
+        xbmc.log(f"StreamContinuum: TMDb ID not provided for '{title}'. Presmerovavam na Webshare hledani podle nazvu '{title}'.", xbmc.LOGWARNING)
         ws_query = f"{title} {year}".strip()
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
         return
 
-    # Use the metadata fetched via get_localized_metadata for the show
+    # At this point, trakt_id must be set, otherwise the function would have returned to Webshare search.
     final_show_title = show_meta.get('title') or title
     final_year = show_meta.get('year') or year
     final_plot = show_meta.get('overview') or '' # Overview from show_meta
@@ -1469,6 +1426,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 
 def run():
+    xbmc.sleep(200) # Added to mitigate potential Kodi GUI race conditions on startup
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
     
