@@ -133,22 +133,36 @@ def list_categories():
     if trakt_token and enable_trakt_menu:
         items.append((ADDON.getLocalizedString(30119), 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fa-trakt.png'), '#9f42c6'))
 
-    items.append(('TMDb', 'tmdb_menu', 'DefaultAddonVideo.png', main_fanart, '#01b4e4'))
+    # Use localized string for TMDb menu item
+    items.append((ADDON.getLocalizedString(30099), 'tmdb_menu', 'DefaultAddonVideo.png', main_fanart, '#01b4e4'))
     items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
     
+    item_count = 0
     for label, action, icon, fanart, color in items:
         url = f"{sys.argv[0]}?action={action}"
         display_label = f"[COLOR {color}]{label}[/COLOR]" if color else label
         list_item = xbmcgui.ListItem(label=display_label)
+        
+        # Add InfoTag for better Kodi rendering and consistency
+        info_tag = list_item.getVideoInfoTag()
+        info_tag.setTitle(label)
+        info_tag.setMediaType('directory') # Explicitly mark as directory
+        info_tag.setPlot('') # Explicitly set empty plot to prevent 'No information available' if desired
+
         list_item.setArt({
             'icon': icon, 
             'thumb': icon,
             'fanart': fanart
         })
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+        item_count += 1
     
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
+
+    # Set focus to the first item added, if any, to prevent default '..' focus
+    if item_count > 0:
+        xbmcplugin.setFocus(HANDLE, 0)
 
 def trakt_menu():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30119))
