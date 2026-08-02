@@ -160,9 +160,9 @@ def list_categories():
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
-    # Set focus to the first item added, if any, to prevent default '..' focus
-    if item_count > 0:
-        xbmcplugin.setFocus(HANDLE, 0)
+    # Removed: set focus to the first item added, if any, to prevent default '..' focus
+    # if item_count > 0:
+    #     xbmcplugin.setFocus(HANDLE, 0)
 
 def trakt_menu():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30119))
