@@ -61,7 +61,7 @@ def get_trakt_localized(trakt_id, media_type, season_num=None, episode_num=None)
             if season_num is not None and episode_num is not None:
                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}E{episode_num}", xbmc.LOGDEBUG)
             elif season_num is not None:
-                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}", xbmc.LOGDEBUG)
+                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_id} id={trakt_id} S{season_num}", xbmc.LOGDEBUG)
             else:
                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id}", xbmc.LOGDEBUG)
             return result
@@ -114,6 +114,7 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
     return list_item
 
 def list_categories():
+    xbmc.log(f"StreamContinuum: list_categories started.", xbmc.LOGINFO)
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu') # New setting check
     
@@ -132,37 +133,51 @@ def list_categories():
     # Only add Trakt.tv if token exists AND it's enabled in settings
     if trakt_token and enable_trakt_menu:
         items.append((ADDON.getLocalizedString(30119), 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fa-trakt.png'), '#9f42c6'))
+    else: # Log if Trakt menu is skipped
+        xbmc.log(f"StreamContinuum: Trakt menu skipped. Token present: {bool(trakt_token)}, Enabled in settings: {enable_trakt_menu}", xbmc.LOGINFO)
 
     # Use localized string for TMDb menu item
     items.append((ADDON.getLocalizedString(30099), 'tmdb_menu', 'DefaultAddonVideo.png', main_fanart, '#01b4e4'))
     items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
     
     item_count = 0
+    xbmcplugin.setContent(HANDLE, 'addons') # Move this earlier, before adding items.
+
     for label, action, icon, fanart, color in items:
-        url = f"{sys.argv[0]}?action={action}"
-        display_label = f"[COLOR {color}]{label}[/COLOR]" if color else label
-        list_item = xbmcgui.ListItem(label=display_label)
-        
-        # Add InfoTag for better Kodi rendering and consistency
-        info_tag = list_item.getVideoInfoTag()
-        info_tag.setTitle(label)
-        info_tag.setMediaType('directory') # Explicitly mark as directory
-        info_tag.setPlot('') # Explicitly set empty plot to prevent 'No information available' if desired
+        try: # Add try-except block around each item creation to isolate errors
+            url = f"{sys.argv[0]}?action={action}"
+            display_label = f"[COLOR {color}]{label}[/COLOR]" if color else label
+            list_item = xbmcgui.ListItem(label=display_label)
+            
+            # Add InfoTag for better Kodi rendering and consistency
+            info_tag = list_item.getVideoInfoTag()
+            info_tag.setTitle(label)
+            info_tag.setMediaType('directory') # Explicitly mark as directory
+            info_tag.setPlot('') # Explicitly set empty plot to prevent 'No information available' if desired
 
-        list_item.setArt({
-            'icon': icon, 
-            'thumb': icon,
-            'fanart': fanart
-        })
-        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
-        item_count += 1
+            list_item.setArt({
+                'icon': icon, 
+                'thumb': icon,
+                'fanart': fanart
+            })
+            success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+            if success:
+                item_count += 1
+            else:
+                xbmc.log(f"StreamContinuum: Failed to add directory item '{label}' for action '{action}'.", xbmc.LOGERROR)
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Error adding directory item '{label}' (Action: '{action}'): {e}", xbmc.LOGERROR)
     
-    xbmcplugin.setContent(HANDLE, 'addons')
-    xbmcplugin.endOfDirectory(HANDLE)
+    if item_count == 0:
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30129), xbmcgui.NOTIFICATION_WARNING, 5000)
+        xbmc.log(f"StreamContinuum: No items were added to the main menu.", xbmc.LOGWARNING)
 
-    # Removed: set focus to the first item added, if any, to prevent default '..' focus
-    # if item_count > 0:
-    #     xbmcplugin.setFocus(HANDLE, 0)
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
+
+    # Re-enable: set focus to the first item added, if any, to prevent default '..' focus
+    if item_count > 0:
+        xbmcplugin.setFocus(HANDLE, 0)
+    xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
 
 def trakt_menu():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30119))
