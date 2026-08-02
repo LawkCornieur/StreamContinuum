@@ -172,8 +172,9 @@ def list_categories():
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30129), xbmcgui.NOTIFICATION_WARNING, 5000)
         xbmc.log(f"StreamContinuum: No items were added to the main menu.", xbmc.LOGWARNING)
 
-    # Removed explicit setFocus as it can cause issues in an unstable GUI environment.
-    # Kodi should handle initial focus automatically for a new directory.
+    # Re-introduced setFocus as per Issue #15 to potentially mitigate directory item errors
+    # Must be called before endOfDirectory.
+    xbmcplugin.setFocus(HANDLE, 0)
 
     xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
@@ -653,13 +654,18 @@ def show_trakt_watchlist():
         )
         
         cm = []
-        cm.append((ADDON.getLocalizedString(30052), f'RunPlugin({sys.argv[0]}?action=search&query={urllib.parse.quote(query)})'))
-        # Use show_trakt_id for episodes if episode_trakt_id is missing, but prefer episode's ID for marking watched.
-        trakt_id_to_mark = item.get(media_type, {}).get('ids', {}).get('trakt') if media_type != 'episode' else episode.get('ids', {}).get('trakt')
+        # Determine the Trakt ID for the item (movie or episode) to mark watched/unwatched
+        trakt_item_id = None
+        if media_type == 'movie':
+            trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt')
+        elif media_type == 'episode':
+            trakt_item_id = item.get('episode', {}).get('ids', {}).get('trakt')
+        else:
+            trakt_item_id = None
 
-        if trakt_id_to_mark:
-            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id_to_mark}&watched=1)'))
-            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id_to_mark}&watched=0)'))
+        if trakt_item_id:
+            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
         list_item.addContextMenuItems(cm)
         
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
@@ -1428,7 +1434,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 
 def run():
-    xbmc.sleep(2000) # Increased to 2000ms to further mitigate potential Kodi GUI race conditions on startup/after playback
+    xbmc.sleep(500) # Increased to 500ms as per issue #15 to further mitigate potential Kodi GUI race conditions on startup/after playback
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
     
