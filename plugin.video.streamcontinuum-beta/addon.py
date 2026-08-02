@@ -172,11 +172,11 @@ def list_categories():
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30129), xbmcgui.NOTIFICATION_WARNING, 5000)
         xbmc.log(f"StreamContinuum: No items were added to the main menu.", xbmc.LOGWARNING)
 
-    xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
-
     # Re-enable: set focus to the first item added, if any, to prevent default '..' focus
     if item_count > 0:
         xbmcplugin.setFocus(HANDLE, 0)
+
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
 
 def trakt_menu():
@@ -1426,7 +1426,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 
 def run():
-    xbmc.sleep(200) # Added to mitigate potential Kodi GUI race conditions on startup
+    xbmc.sleep(500) # Added to mitigate potential Kodi GUI race conditions on startup, increased from 200ms
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
     
