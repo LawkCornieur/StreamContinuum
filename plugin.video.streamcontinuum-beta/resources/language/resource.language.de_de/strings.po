@@ -402,3 +402,7 @@ msgstr "Fehler beim Identifizieren des Verlaufseintrags mit TMDb."
 msgctxt "#30128"
 msgid "No relevant items found on TMDb. Try a different search."
 msgstr "Keine relevanten Einträge auf TMDb gefunden. Versuchen Sie eine andere Suche."
+
+msgctxt "#30129"
+msgid "No main menu items could be displayed. Please check addon settings."
+msgstr "Keine Hauptmenüpunkte konnten angezeigt werden. Bitte überprüfen Sie die Addon-Einstellungen."
