@@ -983,6 +983,9 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
     final_year = show_meta.get('year') or year
     final_plot = show_meta.get('overview') or '' # Overview from show_meta
 
+    # The line below was causing AttributeError. The correct Trakt ID is already derived from TMDb ID.
+    # results = trakt.search_trakt(title)
+
     show_seasons(final_show_title, str(trakt_id), poster, fanart)
 
 
@@ -1426,7 +1429,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 
 def run():
-    xbmc.sleep(500) # Added to mitigate potential Kodi GUI race conditions on startup, increased from 200ms
+    xbmc.sleep(1000) # Increased to 1000ms to mitigate potential Kodi GUI race conditions on startup
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
     
