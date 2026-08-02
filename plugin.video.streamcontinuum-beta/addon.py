@@ -212,9 +212,9 @@ def search(query=None):
                     ext = parts[1]
                 
                 # Replace dots, commas, underscores, hyphens with spaces
-                name = re.sub(r'[.,_\-]', ' ', name)
+                name = re.sub(r'[.,_\\-]', ' ', name)
                 # Remove multiple spaces
-                name = re.sub(r'\s+', ' ', name).strip()
+                name = re.sub(r'\\s+', ' ', name).strip()
             
             label = name
             list_item = xbmcgui.ListItem(label=label)
@@ -254,10 +254,10 @@ def search(query=None):
                 info['plot'] = f"[COLOR orange][{', '.join(audio_info)}][/COLOR] " + info['plot']
             
             # Add file info to plot
-            info['plot'] += f"\n\n[B]{ADDON.getLocalizedString(30059)}:[/B] {size_str}"
+            info['plot'] += f"\\n\\n[B]{ADDON.getLocalizedString(30059)}:[/B] {size_str}"
             if ext:
-                info['plot'] += f"\n[B]{ADDON.getLocalizedString(30089)}:[/B] {ext.upper()}"
-            info['plot'] += f"\n[B]{ADDON.getLocalizedString(30060)}:[/B] {res}p"
+                info['plot'] += f"\\n[B]{ADDON.getLocalizedString(30089)}:[/B] {ext.upper()}"
+            info['plot'] += f"\\n[B]{ADDON.getLocalizedString(30060)}:[/B] {res}p"
             
             # Set video info using modern InfoTagVideo API (Kodi 20+)
             info_tag = list_item.getVideoInfoTag()
@@ -372,7 +372,7 @@ def show_history():
         runtime = item.get('runtime')
         poster = item.get('poster')
         fanart = item.get('fanart')
-        media_type = item.get('media_type') or ('movie' if 'S00E00' not in query and re.search(r'\b(S\d{2}E\d{2}|\d{1}x\d{2})\b', query, re.IGNORECASE) is None else 'tvshow') # Basic guess based on query pattern
+        media_type = item.get('media_type') or ('movie' if 'S00E00' not in query and re.search(r'\\b(S\\d{2}E\\d{2}|\\d{1}x\\d{2})\\b', query, re.IGNORECASE) is None else 'tvshow') # Basic guess based on query pattern
         
         label = f"{title} ({year})" if year else title
         
@@ -410,7 +410,7 @@ def history_menu(query, title=None):
     ]
     
     # Add episode navigation if it looks like a series
-    series_pattern = re.compile(r'^(.*)\s+S(\d{2})E(\d{2})', re.IGNORECASE)
+    series_pattern = re.compile(r'^(.*)\\s+S(\\d{2})E(\\d{2})', re.IGNORECASE)
     match = series_pattern.match(query)
     if match:
         base_title = match.group(1).strip()
@@ -878,7 +878,7 @@ def show_tmdb_category(category, offset=0):
         # Combine genres/origin info with description
         combined_plot = plot or ''
         if info and info not in combined_plot:
-            combined_plot = f"[B]{info}[/B]\n\n{combined_plot}" if combined_plot else f"[B]{info}[/B]"
+            combined_plot = f"[B]{info}[/B]\\n\\n{combined_plot}" if combined_plot else f"[B]{info}[/B]"
 
         label = f"{display_title} ({year})" if year else display_title
         kodi_type = 'tvshow' if is_show else 'movie'
@@ -915,7 +915,7 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
     Falls back to Trakt search by title if TMDb ID is not provided or conversion fails.
     """
     xbmcplugin.setPluginCategory(HANDLE, f"{title} - {ADDON.getLocalizedString(30105)}")
-    xbmc.log(f"StreamContinuum: Hledam serial '{title}' na Trakt.tv (TMDb ID: {tmdb_id})", xbmc.LOGINFO)
+    xbmc.log(f"StreamContinuum: show_tmdb_show_seasons called for title='{title}', year='{year}', tmdb_id='{tmdb_id}'", xbmc.LOGINFO)
 
     trakt_id = None
     poster = ''
@@ -923,44 +923,68 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
     show_meta = {} # To store TMDb/Trakt metadata for artwork and plot
 
     if tmdb_id:
-        # Try to resolve Trakt ID directly from TMDb ID
-        trakt_id = trakt.get_trakt_id_from_tmdb_id(tmdb_id, 'show')
+        xbmc.log(f"StreamContinuum: Attempting to get Trakt ID from TMDb ID '{tmdb_id}' (media_type='show')", xbmc.LOGINFO)
+        try:
+            trakt_id = trakt.get_trakt_id_from_tmdb_id(tmdb_id, 'show')
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Error getting Trakt ID from TMDb ID '{tmdb_id}': {e}", xbmc.LOGERROR)
+
         if trakt_id:
             xbmc.log(f"StreamContinuum: Trakt ID '{trakt_id}' found for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
-            show_meta = trakt.get_localized_metadata(trakt_id, 'show') # Get full metadata using Trakt ID
-            poster = show_meta.get('poster', '')
-            fanart = show_meta.get('fanart', '')
+            try:
+                show_meta = trakt.get_localized_metadata(trakt_id, 'show') # Get full metadata using Trakt ID
+                poster = show_meta.get('poster', '')
+                fanart = show_meta.get('fanart', '')
+            except Exception as e:
+                xbmc.log(f"StreamContinuum: Error fetching localized metadata for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
         else:
             xbmc.log(f"StreamContinuum: Nelze prelozit TMDb ID '{tmdb_id}' na Trakt ID. Pokousim se vyhledat Trakt.tv podle nazvu '{title}'.", xbmc.LOGWARNING)
 
     if not trakt_id:
-        # Fallback to Trakt search by title if TMDb ID was not provided or conversion failed
-        results = trakt.search_trakt(title)
+        xbmc.log(f"StreamContinuum: Falling back to Trakt search by title '{title}'.", xbmc.LOGINFO)
+        results = []
+        try:
+            if trakt and hasattr(trakt, 'search_trakt'): # Explicit safety check for Issue 12
+                results = trakt.search_trakt(title)
+            else:
+                xbmc.log(f"StreamContinuum: Trakt module or search_trakt function not available. Cannot perform Trakt search by title.", xbmc.LOGERROR)
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Error during trakt.search_trakt for '{title}': {e}", xbmc.LOGERROR)
+
         if results:
-            # Prefer exact title match for shows
             for result in results:
                 if result.get('type') == 'show':
                     show = result.get('show', {})
                     r_title = show.get('title', '').lower()
+                    # Use a more flexible title comparison for exotic characters
                     if r_title == title.lower() or title.lower() in r_title or r_title in title.lower():
-                        trakt_id = show.get('ids', {}).get('trakt')
-                        if trakt_id:
-                            show_meta = trakt.get_localized_metadata(trakt_id, 'show')
-                            poster = show_meta.get('poster', '')
-                            fanart = show_meta.get('fanart', '')
-                        break
-            if not trakt_id:
-                # Fallback to first show result if no exact match
+                        temp_trakt_id = show.get('ids', {}).get('trakt')
+                        if temp_trakt_id:
+                            trakt_id = temp_trakt_id
+                            xbmc.log(f"StreamContinuum: Trakt ID '{trakt_id}' found by title search for '{title}'", xbmc.LOGINFO)
+                            try:
+                                show_meta = trakt.get_localized_metadata(trakt_id, 'show')
+                                poster = show_meta.get('poster', '')
+                                fanart = show_meta.get('fanart', '')
+                            except Exception as e:
+                                xbmc.log(f"StreamContinuum: Error fetching localized metadata after title search for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
+                            break
+            if not trakt_id: # Fallback to first show result if no exact match (already existing logic, but within the new try/except)
                 for result in results:
                     if result.get('type') == 'show':
                         show = result.get('show', {})
-                        trakt_id = show.get('ids', {}).get('trakt')
-                        if trakt_id:
-                            show_meta = trakt.get_localized_metadata(trakt_id, 'show')
-                            poster = show_meta.get('poster', '')
-                            fanart = show_meta.get('fanart', '')
-                        break
-
+                        temp_trakt_id = show.get('ids', {}).get('trakt')
+                        if temp_trakt_id:
+                            trakt_id = temp_trakt_id
+                            xbmc.log(f"StreamContinuum: Trakt ID '{trakt_id}' found by fallback title search for '{title}'", xbmc.LOGINFO)
+                            try:
+                                show_meta = trakt.get_localized_metadata(trakt_id, 'show')
+                                poster = show_meta.get('poster', '')
+                                fanart = show_meta.get('fanart', '')
+                            except Exception as e:
+                                xbmc.log(f"StreamContinuum: Error fetching localized metadata after fallback title search for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
+                            break
+    
     if not trakt_id:
         xbmc.log(f"StreamContinuum: Serial '{title}' nenalezen na Trakt.tv (ani po vyhledani ani pomoci TMDb ID) – presmerovavm na Webshare", xbmc.LOGWARNING)
         ws_query = f"{title} {year}".strip()
@@ -1012,7 +1036,7 @@ def show_tmdb_search(query=None):
 
             combined_plot = plot or ''
             if info and info not in combined_plot:
-                combined_plot = f"[B]{info}[/B]\n\n{combined_plot}" if combined_plot else f"[B]{info}[/B]"
+                combined_plot = f"[B]{info}[/B]\\n\\n{combined_plot}" if combined_plot else f"[B]{info}[/B]"
 
             label = f"{display_title} ({year})" if year else display_title
             kodi_type = 'tvshow' if is_show else 'movie'
@@ -1378,18 +1402,30 @@ def history_tmdb_identify_search(original_query):
     xbmcplugin.setContent(HANDLE, 'movies' if 'movie' in [i.get('media_type') for i in all_items] else 'tvshows') # Dynamic content type
     xbmcplugin.endOfDirectory(HANDLE)
 
+def _safe_int_conversion(value):
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+def _safe_float_conversion(value):
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
 def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year, plot, genres, rating, runtime, poster, fanart):
     """Updates a history item with TMDb metadata."""
     import history
     tmdb_data = {
-        'tmdb_id': int(tmdb_id) if tmdb_id else None,
+        'tmdb_id': _safe_int_conversion(tmdb_id),
         'media_type': media_type if media_type else None,
         'title': title if title else None,
-        'year': int(year) if year else None,
+        'year': _safe_int_conversion(year),
         'plot': plot if plot else None,
         'genres': genres.split('|') if genres else [], # Convert back to list
-        'rating': float(rating) if rating else None,
-        'runtime': int(runtime) if runtime else None,
+        'rating': _safe_float_conversion(rating),
+        'runtime': _safe_int_conversion(runtime),
         'poster': poster if poster else None,
         'fanart': fanart if fanart else None
     }
