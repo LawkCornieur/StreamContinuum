@@ -174,7 +174,10 @@ def list_categories():
 
     # Re-introduced setFocus as per Issue #15 to potentially mitigate directory item errors
     # Must be called before endOfDirectory.
-    # xbmcplugin.setFocus(HANDLE, 0) # Removed due to AttributeError in user's log. It's not supported in all Kodi versions.
+    try:
+        xbmcplugin.setFocus(HANDLE, 0) # Attempting to set focus to mitigate directory item errors
+    except AttributeError:
+        xbmc.log(f"StreamContinuum: xbmcplugin.setFocus is not supported on this Kodi version, skipping.", xbmc.LOGWARNING)
 
     xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
