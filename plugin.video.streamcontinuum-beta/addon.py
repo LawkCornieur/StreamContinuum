@@ -428,7 +428,7 @@ def show_history():
         url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
-    xbmcplugin.endOfDirectory(HANDLE)
+xbmcplugin.endOfDirectory(HANDLE)
 
 def history_menu(query, title=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {query}")
@@ -1437,6 +1437,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 
 def run():
+    xbmc.executebuiltin('Dialog.Close(all)') # Added proactively close all dialogs to prevent GUI focus issues on startup
     xbmc.sleep(500) # Increased to 500ms as per issue #15 to further mitigate potential Kodi GUI race conditions on startup/after playback
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
