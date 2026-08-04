@@ -363,17 +363,16 @@ def play(ident, query=None):
         after = ADDON.getSetting('after_playback')
         safe_query = urllib.parse.quote(query) if query else ""
         
+        # Add a short sleep before container update to allow Kodi UI to stabilize after closing dialogs/player (Issue #15).
+        xbmc.sleep(500)
+
         if after == '0' and query: # Původní hledání (automaticky)
-            # xbmc.sleep(1500) # Removed sleep to prevent race conditions during navigation
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
         elif after == '1': # Prázdné hledání (dialog)
-            # xbmc.sleep(1500) # Removed sleep to prevent race conditions during navigation
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search,replace)')
         elif after == '3': # Historie
-            # xbmc.sleep(1500) # Removed sleep to prevent race conditions during navigation
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
         elif after == '4' and query: # Předvyplněné hledání (dialog s textem)
-            # xbmc.sleep(1500) # Removed sleep to prevent race conditions during navigation
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query},replace)')
         # case 2 is "Last results", which is default behavior in Kodi
 
@@ -1438,7 +1437,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 def run():
     xbmc.executebuiltin('Dialog.Close(all)') # Added proactively close all dialogs to prevent GUI focus issues on startup
-    xbmc.sleep(500) # Increased to 500ms as per issue #15 to further mitigate potential Kodi GUI race conditions on startup/after playback
+    xbmc.sleep(1000) # Increased to 1000ms to further mitigate potential Kodi GUI race conditions on startup/after playback (Issue #15)
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
     
