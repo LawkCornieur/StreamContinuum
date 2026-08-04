@@ -1436,8 +1436,6 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 
 def run():
-    xbmc.executebuiltin('Dialog.Close(all)') # Added proactively close all dialogs to prevent GUI focus issues on startup
-    xbmc.sleep(1000) # Increased to 1000ms to further mitigate potential Kodi GUI race conditions on startup/after playback (Issue #15)
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
     
