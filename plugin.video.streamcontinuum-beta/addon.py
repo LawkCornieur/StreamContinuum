@@ -63,7 +63,7 @@ def get_trakt_localized(trakt_id, media_type, season_num=None, episode_num=None)
             elif season_num is not None:
                  xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}", xbmc.LOGDEBUG)
             else:
-                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id}", xbmc.LOGDEBUG)
+                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_id}", xbmc.LOGDEBUG)
             return result
     except Exception as e:
         xbmc.log(f"StreamContinuum: Trakt localized fetch error (id={trakt_id} S{season_num}E{episode_num}): {e}", xbmc.LOGWARNING)
@@ -171,9 +171,12 @@ def list_categories():
     if item_count == 0:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30129), xbmcgui.NOTIFICATION_WARNING, 5000)
         xbmc.log(f"StreamContinuum: No items were added to the main menu.", xbmc.LOGWARNING)
+    else:
+        # Re-add setFocus as per Issue #15 to potentially stabilize GUI, but only if items were added.
+        # The issue implies it was being called in the wrong place, or its absence caused problems.
+        xbmc.log(f"StreamContinuum: Setting focus on first item (index 0) to ensure UI stability.", xbmc.LOGDEBUG)
+        xbmcplugin.setFocus(HANDLE, 0) # Set focus to the first item (index 0)
 
-    # Removed xbmcplugin.setFocus as it's indicated as unsupported and might not be helping.
-    
     xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
 
@@ -1432,7 +1435,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 def run():
     # Add an initial sleep to allow Kodi UI to stabilize, especially after external actions or startup.
-    xbmc.sleep(500) # Increased to 500ms to allow for better UI stabilization
+    xbmc.sleep(1000) # Increased to 1000ms to allow for better UI stabilization, addressing Issue #15.
 
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
