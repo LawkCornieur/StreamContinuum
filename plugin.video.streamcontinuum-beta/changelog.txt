@@ -1,4 +1,8 @@
 [B]Verze 1.3.11[/B] - 2026-07-25
+- Zapracovány kroky k postupnému ukončení podpory Trakt.tv nově je tato část deaktivována v nastavení (důvodem ukončení je přesun API na placenou verzi).
+- Vylepšení historie (nově zaznamenává datum a čas shlédnutí) a přidání Seznamu ke shlédnutí.
+
+[B]Verze 1.3.11[/B] - 2026-07-25
 - Oprava vydávání beta verze.
 
 [B]Verze 1.3.9[/B] - 2026-07-25
