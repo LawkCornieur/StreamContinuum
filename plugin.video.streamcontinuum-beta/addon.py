@@ -172,13 +172,8 @@ def list_categories():
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30129), xbmcgui.NOTIFICATION_WARNING, 5000)
         xbmc.log(f"StreamContinuum: No items were added to the main menu.", xbmc.LOGWARNING)
 
-    # Re-introduced setFocus as per Issue #15 to potentially mitigate directory item errors
-    # Must be called before endOfDirectory.
-    try:
-        xbmcplugin.setFocus(HANDLE, 0) # Attempting to set focus to mitigate directory item errors
-    except AttributeError:
-        xbmc.log(f"StreamContinuum: xbmcplugin.setFocus is not supported on this Kodi version, skipping.", xbmc.LOGWARNING)
-
+    # Removed xbmcplugin.setFocus as it's indicated as unsupported and might not be helping.
+    
     xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
 
@@ -1436,6 +1431,9 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 
 def run():
+    # Add an initial sleep to allow Kodi UI to stabilize, especially after external actions or startup.
+    xbmc.sleep(500) # Increased to 500ms to allow for better UI stabilization
+
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
     
