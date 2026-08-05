@@ -147,7 +147,13 @@ def list_categories():
     for label, action, icon, fanart, color in items:
         try: # Add try-except block around each item creation to isolate errors
             url = f"{sys.argv[0]}?action={action}"
-            display_label = f"[COLOR {color}]{label}[/COLOR]" if color else label
+            
+            # Handle color tag for display_label, ensuring it's not None
+            if color is not None:
+                display_label = f"[COLOR {color}]{label}[/COLOR]"
+            else:
+                display_label = label
+
             list_item = xbmcgui.ListItem(label=display_label)
             
             # Add InfoTag for better Kodi rendering and consistency
@@ -1434,6 +1440,9 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 def run():
     # Add an initial sleep to allow Kodi UI to stabilize, especially after external actions or startup.
     xbmc.sleep(1000) # Increased to 1000ms to allow for better UI stabilization, addressing Issue #15.
+
+    # Close any lingering dialogs before displaying the main menu, in case Kodi GUI is stuck. (New for Issue #15)
+    xbmc.executebuiltin('Dialog.Close(all)')
 
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
