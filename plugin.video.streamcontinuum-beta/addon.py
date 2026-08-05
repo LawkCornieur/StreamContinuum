@@ -173,9 +173,7 @@ def list_categories():
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30129), xbmcgui.NOTIFICATION_WARNING, 5000)
         xbmc.log(f"StreamContinuum: No items were added to the main menu.", xbmc.LOGWARNING)
     
-    # Unconditional setFocus as per Issue #15 suggestion to ensure UI stability.
-    xbmc.log(f"StreamContinuum: Attempting to set focus on first item (index 0) to ensure UI stability, regardless of item count.", xbmc.LOGDEBUG)
-    xbmcplugin.setFocus(HANDLE, 0) # Set focus to the first item (index 0)
+    # Removed: xbmcplugin.setFocus(HANDLE, 0) caused AttributeError. Kodi handles focus implicitly for directory items.
 
     xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
