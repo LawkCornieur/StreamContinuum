@@ -118,10 +118,10 @@ def list_categories():
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu') # New setting check
     
-    # Set plugin category for breadcrumbs
+    # Set plugin category and content type for breadcrumbs early
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
-    xbmcplugin.setContent(HANDLE, 'addons') # Move this earlier, before adding items.
-    xbmc.sleep(100) # Give Kodi UI a moment to process setPluginCategory and setContent
+    xbmcplugin.setContent(HANDLE, 'addons') # Moved here
+    # No need for xbmc.sleep(100) here, setContent doesn't block and is processed by Kodi UI asynchronously.
 
     # Main Fanart
     main_fanart = get_asset('fa.png')
@@ -171,7 +171,7 @@ def list_categories():
             if success:
                 item_count += 1
             else:
-                xbmc.log(f"StreamContinuum: Failed to add directory item '{label}' for action '{action}'.", xbmc.LOGERROR)
+                xbmc.log(f"StreamContinuum: Failed to add directory item '{label}' for action '{action}'. HANDLE={HANDLE}, URL={url}. addDirectoryItem returned False.", xbmc.LOGERROR)
         except Exception as e:
             xbmc.log(f"StreamContinuum: Error adding directory item '{label}' (Action: '{action}'): {e}", xbmc.LOGERROR)
     
@@ -1439,10 +1439,12 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 def run():
     # Add an initial sleep to allow Kodi UI to stabilize, especially after external actions or startup.
-    xbmc.sleep(1000) # Increased to 1000ms to allow for better UI stabilization, addressing Issue #15.
+    xbmc.sleep(1500) # Increased to 1500ms for better UI stabilization, addressing Issue #15.
 
     # Close any lingering dialogs before displaying the main menu, in case Kodi GUI is stuck. (New for Issue #15)
+    xbmc.log(f"StreamContinuum: Calling Dialog.Close(all) at addon startup.", xbmc.LOGINFO)
     xbmc.executebuiltin('Dialog.Close(all)')
+    xbmc.log(f"StreamContinuum: Dialog.Close(all) called.", xbmc.LOGINFO)
 
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
