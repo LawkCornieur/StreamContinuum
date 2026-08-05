@@ -63,7 +63,7 @@ def get_trakt_localized(trakt_id, media_type, season_num=None, episode_num=None)
             elif season_num is not None:
                  xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}", xbmc.LOGDEBUG)
             else:
-                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_id}", xbmc.LOGDEBUG)
+                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {trakt_id}", xbmc.LOGDEBUG)
             return result
     except Exception as e:
         xbmc.log(f"StreamContinuum: Trakt localized fetch error (id={trakt_id} S{season_num}E{episode_num}): {e}", xbmc.LOGWARNING)
@@ -120,6 +120,8 @@ def list_categories():
     
     # Set plugin category for breadcrumbs
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
+    xbmcplugin.setContent(HANDLE, 'addons') # Move this earlier, before adding items.
+    xbmc.sleep(100) # Give Kodi UI a moment to process setPluginCategory and setContent
 
     # Main Fanart
     main_fanart = get_asset('fa.png')
@@ -141,7 +143,6 @@ def list_categories():
     items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
     
     item_count = 0
-    xbmcplugin.setContent(HANDLE, 'addons') # Move this earlier, before adding items.
 
     for label, action, icon, fanart, color in items:
         try: # Add try-except block around each item creation to isolate errors
@@ -171,11 +172,10 @@ def list_categories():
     if item_count == 0:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30129), xbmcgui.NOTIFICATION_WARNING, 5000)
         xbmc.log(f"StreamContinuum: No items were added to the main menu.", xbmc.LOGWARNING)
-    else:
-        # Re-add setFocus as per Issue #15 to potentially stabilize GUI, but only if items were added.
-        # The issue implies it was being called in the wrong place, or its absence caused problems.
-        xbmc.log(f"StreamContinuum: Setting focus on first item (index 0) to ensure UI stability.", xbmc.LOGDEBUG)
-        xbmcplugin.setFocus(HANDLE, 0) # Set focus to the first item (index 0)
+    
+    # Unconditional setFocus as per Issue #15 suggestion to ensure UI stability.
+    xbmc.log(f"StreamContinuum: Attempting to set focus on first item (index 0) to ensure UI stability, regardless of item count.", xbmc.LOGDEBUG)
+    xbmcplugin.setFocus(HANDLE, 0) # Set focus to the first item (index 0)
 
     xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
