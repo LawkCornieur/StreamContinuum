@@ -118,11 +118,6 @@ def list_categories():
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu') # New setting check
     
-    # Set plugin category and content type for breadcrumbs early
-    xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
-    xbmcplugin.setContent(HANDLE, 'addons') # Moved here
-    # No need for xbmc.sleep(100) here, setContent doesn't block and is processed by Kodi UI asynchronously.
-
     # Main Fanart
     main_fanart = get_asset('fa.png')
 
@@ -142,6 +137,14 @@ def list_categories():
     items.append((ADDON.getLocalizedString(30099), 'tmdb_menu', 'DefaultAddonVideo.png', main_fanart, '#01b4e4'))
     items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
     
+    # --- START OF FIX FOR ISSUE 15 (MAIN MENU NOT DISPLAYING) ---
+    # Set plugin category and content type *just before* adding items, with a small delay
+    # This helps ensure Kodi's UI context is ready to accept directory items.
+    xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
+    xbmcplugin.setContent(HANDLE, 'addons')
+    xbmc.sleep(50) # Small sleep to let Kodi's UI thread process the category/content change.
+    # --- END OF FIX FOR ISSUE 15 ---
+
     item_count = 0
 
     for label, action, icon, fanart, color in items:
@@ -992,11 +995,21 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
     final_year = show_meta.get('year') or year
     final_plot = show_meta.get('overview') or '' # Overview from show_meta
 
+    # --- START OF FIX FOR ISSUE 12 (ATTRIBUTERROR: MODULE 'TRAKT' HAS NO ATTRIBUTE 'SEARCH_TRAKT') ---
     # The line below was causing AttributeError. The correct Trakt ID is already derived from TMDb ID.
-    # results = trakt.search_trakt(title)
+    # results = trakt.search_trakt(title) # This line is removed.
 
-    show_seasons(final_show_title, str(trakt_id), poster, fanart)
-
+    # If trakt_id is successfully resolved, proceed to show seasons.
+    if trakt_id is not None:
+        show_seasons(final_show_title, str(trakt_id), poster, fanart)
+    else:
+        # Defensive fallback: If trakt_id somehow became None (should not happen due to preceding returns), 
+        # redirect to Webshare search.
+        xbmc.log(f"StreamContinuum: Critical error: Trakt ID is None after all checks for '{title}'. Fallback to Webshare search.", xbmc.LOGERROR)
+        ws_query = f"{title} {year}".strip()
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
+    # --- END OF FIX FOR ISSUE 12 ---
 
 def show_tmdb_search(query=None):
     """Prompts user for TMDb search or displays results."""
