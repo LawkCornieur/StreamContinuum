@@ -366,7 +366,7 @@ def play(ident, query=None):
         safe_query = urllib.parse.quote(query) if query else ""
         
         # Add a short sleep before container update to allow Kodi UI to stabilize after closing dialogs/player (Issue #15).
-        xbmc.sleep(500)
+        xbmc.sleep(1500)
 
         if after == '0' and query: # Původní hledání (automaticky)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
