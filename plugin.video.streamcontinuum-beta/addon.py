@@ -115,6 +115,15 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
 
 def list_categories():
     xbmc.log(f"StreamContinuum: list_categories started.", xbmc.LOGINFO)
+    
+    # --- START OF FIX FOR ISSUE 16 (MAIN MENU NOT DISPLAYING) ---
+    # Set plugin category and content type at the very beginning of the function,
+    # with a small delay, to ensure Kodi's UI context is ready.
+    xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
+    xbmcplugin.setContent(HANDLE, 'addons')
+    xbmc.sleep(50) # Small sleep to let Kodi's UI thread process the category/content change.
+    # --- END OF FIX FOR ISSUE 16 ---
+
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu') # New setting check
     
@@ -137,14 +146,6 @@ def list_categories():
     items.append((ADDON.getLocalizedString(30099), 'tmdb_menu', 'DefaultAddonVideo.png', main_fanart, '#01b4e4'))
     items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
     
-    # --- START OF FIX FOR ISSUE 15 (MAIN MENU NOT DISPLAYING) ---
-    # Set plugin category and content type *just before* adding items, with a small delay
-    # This helps ensure Kodi's UI context is ready to accept directory items.
-    xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
-    xbmcplugin.setContent(HANDLE, 'addons')
-    xbmc.sleep(50) # Small sleep to let Kodi's UI thread process the category/content change.
-    # --- END OF FIX FOR ISSUE 15 ---
-
     item_count = 0
 
     for label, action, icon, fanart, color in items:
@@ -1369,7 +1370,7 @@ def history_tmdb_identify_search(original_query):
         final_year = full_tmdb_meta.get('year') or year
         final_plot = full_tmdb_meta.get('overview') or plot
         final_genres = full_tmdb_meta.get('genres', [])
-        final_rating = full_tmdb_meta.get('rating') or item.get('vote_average')
+        final_rating = full_tmdb_meta.get('vote_average') or item.get('vote_average')
         final_runtime = full_tmdb_meta.get('runtime')
         final_poster = full_tmdb_meta.get('poster') or poster_from_search
         final_fanart = full_tmdb_meta.get('fanart') or backdrop_from_search
