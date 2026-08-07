@@ -25,8 +25,15 @@ def get_base_name(query):
     if not query:
         return ""
     # Matches patterns like S01E01, s1e1, 1x01 and everything after it
-    pattern = r'(?i)\s*(s\d+\s*e\d+|\d+x\d+).*$'
-    base = re.sub(pattern, '', query).strip()
+    pattern_episode = r'(?i)\\s*(s\\d+\\s*e\\d+|\\d+x\\d+).*$'
+    base = re.sub(pattern_episode, '', query).strip()
+    
+    # Also remove common year patterns like "(YYYY)" or " YYYY" at the end
+    # This helps get a cleaner title for TMDb search, especially for movies or series
+    # that might have year in the title for disambiguation.
+    pattern_year = r'\\s*(\\(?\\d{4}\\)?|\\s\\d{4})$'
+    base = re.sub(pattern_year, '', base).strip()
+
     return base if base else query
 
 def _save_history(history_list):
