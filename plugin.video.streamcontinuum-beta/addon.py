@@ -121,7 +121,7 @@ def list_categories():
     # with a small delay, to ensure Kodi's UI context is ready.
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
     xbmcplugin.setContent(HANDLE, 'addons')
-    xbmc.sleep(200) # Increased sleep to improve stability for Kodi's UI context (Issue 16).
+    xbmc.sleep(500) # Increased sleep further to improve stability for Kodi's UI context (Issue 16).
     # --- END OF FIX FOR ISSUE 16 ---
 
     trakt_token = ADDON.getSetting('trakt_token')
