@@ -121,7 +121,7 @@ def list_categories():
     # with a small delay, to ensure Kodi's UI context is ready.
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
     xbmcplugin.setContent(HANDLE, 'addons')
-    xbmc.sleep(50) # Small sleep to let Kodi's UI thread process the category/content change.
+    xbmc.sleep(200) # Increased sleep to improve stability for Kodi's UI context (Issue 16).
     # --- END OF FIX FOR ISSUE 16 ---
 
     trakt_token = ADDON.getSetting('trakt_token')
@@ -644,7 +644,7 @@ def show_trakt_watchlist():
             genres_str = ', '.join(show_meta.get('genres', [])) if show_meta.get('genres') else ''
             rating = episode_meta.get('rating') or episode.get('rating') or show_meta.get('rating') or 0
             runtime = episode_meta.get('runtime') or episode.get('runtime') or show_meta.get('runtime') or 0
-            meta_type = 'tvshow' # Kodi type for episodes is 'tvshow'
+            meta_type = 'tvshow' # Kodi type for episodes
         else:
             continue
             
