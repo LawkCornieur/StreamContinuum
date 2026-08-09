@@ -118,7 +118,7 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
     history = get_history()
     updated = False
     for i, item in enumerate(history):
-        if item.get('query') == original_query:
+        if item.get('query', '').strip() == original_query.strip(): # Robust comparison for Issue #13
             item['title'] = tmdb_data.get('title')
             item['year'] = tmdb_data.get('year')
             item['plot'] = tmdb_data.get('plot') # Use 'plot' from TMDb results dict
@@ -132,6 +132,8 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
             item['identified_at'] = int(time.time()) # Timestamp for identification
             updated = True
             break
+    if not updated: # Log if item not found, for Issue #13 debugging
+        xbmc.log(f"StreamContinuum History: Failed to find history item to update for query '{original_query}'", xbmc.LOGWARNING)
     if updated:
         _save_history(history)
     return updated
