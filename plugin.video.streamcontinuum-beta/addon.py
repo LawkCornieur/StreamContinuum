@@ -121,7 +121,7 @@ def list_categories():
     # with a small delay, to ensure Kodi's UI context is ready.
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
     xbmcplugin.setContent(HANDLE, 'addons')
-    xbmc.sleep(500) # Increased sleep further to improve stability for Kodi's UI context (Issue 16).
+    xbmc.sleep(1000) # Increased sleep further to improve stability for Kodi's UI context (Issue 16).
     # --- END OF FIX FOR ISSUE 16 ---
 
     trakt_token = ADDON.getSetting('trakt_token')
@@ -526,7 +526,7 @@ def trakt_search(query=None):
                 plot_parts.append(f"[B]{ADDON.getLocalizedString(30115)}:[/B] {runtime} {unit}")
             if status:
                 plot_parts.append(f"[B]{ADDON.getLocalizedString(30116)}:[/B] {status}")
-            combined_plot = '\n'.join(plot_parts)
+            combined_plot = '\\n'.join(plot_parts)
 
             list_item = _make_media_list_item(label, year, combined_plot, genres_str, rating, runtime, poster, fanart, kodi_media_type)
 
@@ -1285,7 +1285,7 @@ def show_trakt_discover(list_type, media_type, offset=0):
             plot_parts.append(f"[B]{ADDON.getLocalizedString(30115)}:[/B] {runtime} {unit}")
         if status:
             plot_parts.append(f"[B]{ADDON.getLocalizedString(30116)}:[/B] {status}")
-        combined_plot = '\n'.join(plot_parts)
+        combined_plot = '\\n'.join(plot_parts)
 
         li = _make_media_list_item(label, year, combined_plot, genres_str, rating, runtime, poster, fanart, kodi_media_type)
 
