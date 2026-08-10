@@ -121,7 +121,9 @@ def list_categories():
     # with a small delay, to ensure Kodi's UI context is ready.
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
     xbmcplugin.setContent(HANDLE, 'addons')
-    xbmc.sleep(50) # Changed sleep from 1000ms to 50ms (original suggestion for 'short delay') for Kodi's UI context (Issue 16).
+    # Increased sleep to 500ms (from 50ms) to provide more time for Kodi's UI context to stabilize,
+    # especially after playback or addon startup.
+    xbmc.sleep(500) 
     # --- END OF FIX FOR ISSUE 16 ---
 
     trakt_token = ADDON.getSetting('trakt_token')
@@ -185,7 +187,9 @@ def list_categories():
     
     # Removed: xbmcplugin.setFocus(HANDLE, 0) caused AttributeError. Kodi handles focus implicitly for directory items.
 
-    xbmcplugin.endOfDirectory(HANDLE, succeeded=item_count > 0)
+    # Signal success to Kodi even if no items were displayed, as the attempt to build the directory was made.
+    # The notification above will inform the user if no items are shown. (Fix for Issue #16)
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True) 
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
 
 def trakt_menu():
