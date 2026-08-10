@@ -121,7 +121,7 @@ def list_categories():
     # with a small delay, to ensure Kodi's UI context is ready.
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
     xbmcplugin.setContent(HANDLE, 'addons')
-    xbmc.sleep(1000) # Increased sleep further to improve stability for Kodi's UI context (Issue 16).
+    xbmc.sleep(50) # Changed sleep from 1000ms to 50ms (original suggestion for 'short delay') for Kodi's UI context (Issue 16).
     # --- END OF FIX FOR ISSUE 16 ---
 
     trakt_token = ADDON.getSetting('trakt_token')
@@ -370,7 +370,8 @@ def play(ident, query=None):
         safe_query = urllib.parse.quote(query) if query else ""
         
         # Add a short sleep before container update to allow Kodi UI to stabilize after closing dialogs/player (Issue #15).
-        xbmc.sleep(1500)
+        # Increased sleep further to improve stability for Kodi's UI context (Issue 16).
+        xbmc.sleep(2000)
 
         if after == '0' and query: # Původní hledání (automaticky)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
