@@ -116,15 +116,13 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
 def list_categories():
     xbmc.log(f"StreamContinuum: list_categories started.", xbmc.LOGINFO)
     
-    # --- START OF FIX FOR ISSUE 16 (MAIN MENU NOT DISPLAYING) ---
-    # Set plugin category and content type at the very beginning of the function,
-    # with a small delay, to ensure Kodi's UI context is ready.
+    # --- REVISED FIX FOR ISSUE 16 (MAIN MENU NOT DISPLAYING) ---
+    # Set plugin category and content type at the very beginning of the function.
+    # The main stabilization sleep is now handled in run() *after* Dialog.Close(all).
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
     xbmcplugin.setContent(HANDLE, 'addons')
-    # Increased sleep to 500ms (from 50ms) to provide more time for Kodi's UI context to stabilize,
-    # especially after playback or addon startup.
-    xbmc.sleep(500) 
-    # --- END OF FIX FOR ISSUE 16 ---
+    # Removed: xbmc.sleep(500) - this is now handled in run() for better overall UI stability.
+    # --- END OF REVISED FIX FOR ISSUE 16 ---
 
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu') # New setting check
@@ -1458,12 +1456,19 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 def run():
     # Add an initial sleep to allow Kodi UI to stabilize, especially after external actions or startup.
-    xbmc.sleep(2500) # Increased to 2500ms for better UI stabilization, addressing Issue #16 (Main menu display issue).
+    # REVISED FIX FOR ISSUE 16 (MAIN MENU NOT DISPLAYING):
+    # Moved the main stabilization sleep AFTER Dialog.Close(all) to ensure Kodi has time
+    # to process the dialog closing before list_categories attempts to render.
+    xbmc.sleep(2500) 
 
     # Close any lingering dialogs before displaying the main menu, in case Kodi GUI is stuck. (New for Issue #15)
     xbmc.log(f"StreamContinuum: Calling Dialog.Close(all) at addon startup.", xbmc.LOGINFO)
     xbmc.executebuiltin('Dialog.Close(all)')
     xbmc.log(f"StreamContinuum: Dialog.Close(all) called.", xbmc.LOGINFO)
+    
+    # Add a further sleep after closing dialogs to ensure Kodi UI stabilizes before any addon UI is drawn.
+    # This is crucial for fixing the 'addDirectoryItem returned False' errors.
+    xbmc.sleep(500) # Give Kodi's UI context time to fully clear and stabilize.
 
     # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
