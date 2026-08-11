@@ -1458,7 +1458,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 def run():
     # Add an initial sleep to allow Kodi UI to stabilize, especially after external actions or startup.
-    xbmc.sleep(1500) # Increased to 1500ms for better UI stabilization, addressing Issue #15.
+    xbmc.sleep(2500) # Increased to 2500ms for better UI stabilization, addressing Issue #16 (Main menu display issue).
 
     # Close any lingering dialogs before displaying the main menu, in case Kodi GUI is stuck. (New for Issue #15)
     xbmc.log(f"StreamContinuum: Calling Dialog.Close(all) at addon startup.", xbmc.LOGINFO)
@@ -1502,7 +1502,7 @@ def run():
             if success:
                 xbmcgui.Dialog().notification("StreamContinuum", "Nastavení exportováno", xbmcgui.NOTIFICATION_INFO)
             else:
-                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba exportu", xbmcgui.NOTIFICATION_ERROR)
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba exportu", xbmc.NOTIFICATION_ERROR)
     elif action == 'import_settings':
         keyboard = xbmc.Keyboard('', 'Zadejte PIN pro dešifrování')
         keyboard.doModal()
