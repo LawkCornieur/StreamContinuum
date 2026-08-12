@@ -21,61 +21,46 @@ except Exception as _tmdb_e:
     tmdb_module = None
 
 ADDON = xbmcaddon.Addon()
-HANDLE = int(sys.argv[1])
+try:
+    HANDLE = int(sys.argv[1])
+except (IndexError, ValueError):
+    HANDLE = -1
 ADDON_PATH = ADDON.getAddonInfo('path')
-_trakt_cache = {}  # In-memory Trakt artwork cache (resets each Kodi session)
-_trakt_meta_cache = {}  # In-memory Trakt localized metadata cache
+_trakt_cache = {}
+_trakt_meta_cache = {}
 
 def get_asset(name):
-    """Get path to asset."""
     if name in ['icon.png', 'fa.png']:
         return os.path.join(ADDON_PATH, 'resources', name)
     return os.path.join(ADDON_PATH, 'resources', 'media', name)
 
 def get_trakt_localized(trakt_id, media_type, season_num=None, episode_num=None):
-    """Fetch localized metadata and artwork from TMDb via Trakt.
-    Uses in-memory cache within a session.
-    Returns dict with metadata or empty dict.
-    """
     global _trakt_meta_cache
     if not trakt_id:
         return {}
 
-    # Generate a more specific cache key for seasons/episodes
     if media_type == 'season' and season_num is not None:
         cache_key = f"{media_type}_{trakt_id}_S{season_num}"
     elif media_type == 'episode' and season_num is not None and episode_num is not None:
         cache_key = f"{media_type}_{trakt_id}_S{season_num}E{episode_num}"
-    else: # movie or show
+    else:
         cache_key = f"{media_type}_{trakt_id}"
 
     if cache_key in _trakt_meta_cache:
         return _trakt_meta_cache[cache_key]
 
     try:
-        # Pass additional parameters to trakt.get_localized_metadata
         result = trakt.get_localized_metadata(trakt_id, media_type, season_num, episode_num, id_type='trakt')
         if result:
             _trakt_meta_cache[cache_key] = result
-            # Log with episode/season info if available
-            if season_num is not None and episode_num is not None:
-                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}E{episode_num}", xbmc.LOGDEBUG)
-            elif season_num is not None:
-                 xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {media_type} id={trakt_id} S{season_num}", xbmc.LOGDEBUG)
-            else:
-                xbmc.log(f"StreamContinuum: Trakt localized metadata fetched for {trakt_id}", xbmc.LOGDEBUG)
             return result
     except Exception as e:
-        xbmc.log(f"StreamContinuum: Trakt localized fetch error (id={trakt_id} S{season_num}E{episode_num}): {e}", xbmc.LOGWARNING)
+        xbmc.log(f"StreamContinuum: Trakt localized fetch error: {e}", xbmc.LOGWARNING)
 
     _trakt_meta_cache[cache_key] = {}
     return {}
 
-
 def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, poster, fanart, media_type='movie'):
-    """Create a rich Kodi ListItem with full metadata using the modern InfoTagVideo API.
-    Avoids all deprecated setInfo/addStreamInfo calls.
-    """
     list_item = xbmcgui.ListItem(label=label)
     art = {}
     if poster:
@@ -115,104 +100,67 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
 
 def list_categories():
     xbmc.log(f"StreamContinuum: list_categories started.", xbmc.LOGINFO)
-    
-    # --- REVISED FIX FOR ISSUE 16 (MAIN MENU NOT DISPLAYING) ---
-    # Set plugin category and content type at the very beginning of the function.
-    # The main stabilization sleep is now handled in run() *after* Dialog.Close(all).
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
     xbmcplugin.setContent(HANDLE, 'addons')
-    # Removed: xbmc.sleep(500) - this is now handled in run() for better overall UI stability.
-    # --- END OF REVISED FIX FOR ISSUE 16 ---
 
     trakt_token = ADDON.getSetting('trakt_token')
-    enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu') # New setting check
-    
-    # Main Fanart
+    enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
     main_fanart = get_asset('fa.png')
 
     items = [
-        # Label, Action, Icon, Fanart, Color
         (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png', get_asset('fa-ws.png'), '#012a39'),
         (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fa-history.png'), '#cc9900')
     ]
 
-    # Only add Trakt.tv if token exists AND it's enabled in settings
     if trakt_token and enable_trakt_menu:
         items.append((ADDON.getLocalizedString(30119), 'trakt_menu', 'DefaultAddonVideo.png', get_asset('fa-trakt.png'), '#9f42c6'))
-    else: # Log if Trakt menu is skipped
-        xbmc.log(f"StreamContinuum: Trakt menu skipped. Token present: {bool(trakt_token)}, Enabled in settings: {enable_trakt_menu}", xbmc.LOGINFO)
 
-    # Use localized string for TMDb menu item
     items.append((ADDON.getLocalizedString(30099), 'tmdb_menu', 'DefaultAddonVideo.png', main_fanart, '#01b4e4'))
     items.append((ADDON.getLocalizedString(30054), 'settings', 'DefaultAddonSettings.png', main_fanart, None))
     
     item_count = 0
 
     for label, action, icon, fanart, color in items:
-        try: # Add try-except block around each item creation to isolate errors
+        try:
             url = f"{sys.argv[0]}?action={action}"
-            
-            # Handle color tag for display_label, ensuring it's not None
-            if color is not None:
-                display_label = f"[COLOR {color}]{label}[/COLOR]"
-            else:
-                display_label = label
-
+            display_label = f"[COLOR {color}]{label}[/COLOR]" if color else label
             list_item = xbmcgui.ListItem(label=display_label)
             
-            # Add InfoTag for better Kodi rendering and consistency
             info_tag = list_item.getVideoInfoTag()
             info_tag.setTitle(label)
-            info_tag.setMediaType('directory') # Explicitly mark as directory
-            info_tag.setPlot('') # Explicitly set empty plot to prevent 'No information available' if desired
+            info_tag.setMediaType('directory')
+            info_tag.setPlot('')
 
-            list_item.setArt({
-                'icon': icon, 
-                'thumb': icon,
-                'fanart': fanart
-            })
+            list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
             success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
             if success:
                 item_count += 1
             else:
-                xbmc.log(f"StreamContinuum: Failed to add directory item '{label}' for action '{action}'. HANDLE={HANDLE}, URL={url}. addDirectoryItem returned False.", xbmc.LOGERROR)
+                xbmc.log(f"StreamContinuum: Failed to add directory item '{label}' for action '{action}'. HANDLE={HANDLE}", xbmc.LOGERROR)
         except Exception as e:
-            xbmc.log(f"StreamContinuum: Error adding directory item '{label}' (Action: '{action}'): {e}", xbmc.LOGERROR)
+            xbmc.log(f"StreamContinuum: Error adding directory item '{label}': {e}", xbmc.LOGERROR)
     
     if item_count == 0:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30129), xbmcgui.NOTIFICATION_WARNING, 5000)
-        xbmc.log(f"StreamContinuum: No items were added to the main menu.", xbmc.LOGWARNING)
     
-    # Removed: xbmcplugin.setFocus(HANDLE, 0) caused AttributeError. Kodi handles focus implicitly for directory items.
-
-    # Signal success to Kodi even if no items were displayed, as the attempt to build the directory was made.
-    # The notification above will inform the user if no items are shown. (Fix for Issue #16)
     xbmcplugin.endOfDirectory(HANDLE, succeeded=True) 
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
 
 def trakt_menu():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30119))
     fanart = get_asset('fa-trakt.png')
-    
     items = [
-        (ADDON.getLocalizedString(30050), 'trakt_playback&offset=0', 'DefaultRecentlyAddedEpisodes.png'), # Added offset=0 for pagination
+        (ADDON.getLocalizedString(30050), 'trakt_playback&offset=0', 'DefaultRecentlyAddedEpisodes.png'),
         (ADDON.getLocalizedString(30051), 'trakt_watchlist', 'DefaultWatchlist.png'),
         ('Katalog', 'trakt_discover_menu', 'DefaultAddonVideo.png'),
         (ADDON.getLocalizedString(30067), 'trakt_search_menu', 'DefaultAddonsSearch.png'),
     ]
-    
     for label, action, icon in items:
-
         url = f"{sys.argv[0]}?action={action}"
         list_item = xbmcgui.ListItem(label=f"[COLOR #9f42c6]{label}[/COLOR]")
-        list_item.setArt({
-            'icon': icon, 
-            'thumb': icon,
-            'fanart': fanart
-        })
+        list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
-        
-xbmcplugin.endOfDirectory(HANDLE)
+    xbmcplugin.endOfDirectory(HANDLE)
 
 def search(query=None):
     if not query:
@@ -236,12 +184,8 @@ def search(query=None):
         
         for item in results:
             url = f"{sys.argv[0]}?action=play&ident={item['ident']}&query={urllib.parse.quote(query)}&title={urllib.parse.quote(item['name'])}"
-            
             size_mb = item['size'] / (1024 * 1024)
-            if size_mb > 1000:
-                size_str = f"{round(size_mb / 1024, 2)} GB"
-            else:
-                size_str = f"{round(size_mb, 2)} MB"
+            size_str = f"{round(size_mb / 1024, 2)} GB" if size_mb > 1000 else f"{round(size_mb, 2)} MB"
             
             name = item['name']
             ext = ""
@@ -250,24 +194,11 @@ def search(query=None):
                     parts = name.rsplit('.', 1)
                     name = parts[0]
                     ext = parts[1]
-                
-                # Replace dots, commas, underscores, hyphens with spaces
-                name = re.sub(r'[.,_\\-]', ' ', name)
-                # Remove multiple spaces
-                name = re.sub(r'\\s+', ' ', name).strip()
+                name = re.sub(r'[.,_\-]', ' ', name)
+                name = re.sub(r'\s+', ' ', name).strip()
             
-            label = name
-            list_item = xbmcgui.ListItem(label=label)
-            
-            # Set video info
-            info = {
-                'title': name,
-                'plot': item['description'],
-                'size': item['size'],
-                'mediatype': 'video'
-            }
-            
-            # Simple parsing of resolution and quality from name
+            list_item = xbmcgui.ListItem(label=name)
+            info = {'title': name, 'plot': item['description'], 'size': item['size'], 'mediatype': 'video'}
             name_lower = item['name'].lower()
             res = '480'
             if '2160p' in name_lower or '4k' in name_lower:
@@ -279,9 +210,6 @@ def search(query=None):
             elif '480p' in name_lower:
                 res = '480'
             
-            # info['video_resolution'] = res
-            
-            # Parse audio tracks
             audio_info = []
             if 'cz' in name_lower or 'dabing' in name_lower:
                 audio_info.append('CZ')
@@ -293,105 +221,71 @@ def search(query=None):
             if audio_info:
                 info['plot'] = f"[COLOR orange][{', '.join(audio_info)}][/COLOR] " + info['plot']
             
-            # Add file info to plot
-            info['plot'] += f"\\n\\n[B]{ADDON.getLocalizedString(30059)}:[/B] {size_str}"
+            info['plot'] += f"\n\n[B]{ADDON.getLocalizedString(30059)}:[/B] {size_str}"
             if ext:
-                info['plot'] += f"\\n[B]{ADDON.getLocalizedString(30089)}:[/B] {ext.upper()}"
-            info['plot'] += f"\\n[B]{ADDON.getLocalizedString(30060)}:[/B] {res}p"
+                info['plot'] += f"\n[B]{ADDON.getLocalizedString(30089)}:[/B] {ext.upper()}"
+            info['plot'] += f"\n[B]{ADDON.getLocalizedString(30060)}:[/B] {res}p"
             
-            # Set video info using modern InfoTagVideo API (Kodi 20+)
             info_tag = list_item.getVideoInfoTag()
             info_tag.setTitle(name)
             info_tag.setPlot(info['plot'])
             info_tag.setMediaType('video')
             
-            # Set stream info using modern VideoStreamDetail API (Kodi 20+)
             video_stream = xbmc.VideoStreamDetail()
             video_stream.setWidth(int(res) * 16 // 9)
             video_stream.setHeight(int(res))
-            
             if 'h265' in name_lower or 'hevc' in name_lower or 'x265' in name_lower:
                 video_stream.setCodec('hevc')
             elif 'h264' in name_lower or 'x264' in name_lower:
                 video_stream.setCodec('h264')
-                
             info_tag.addVideoStream(video_stream)
             
-            # Set art (thumbnail)
             if item.get('img'):
-                list_item.setArt({
-                    'thumb': item['img'],
-                    'icon': item['img'],
-                    'poster': item['img']
-                })
+                list_item.setArt({'thumb': item['img'], 'icon': item['img'], 'poster': item['img']})
             
             list_item.setProperty('IsPlayable', 'true')
             xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=False)
         
         xbmcplugin.endOfDirectory(HANDLE)
 
-class PlayerMonitor(xbmc.Player):
-    def __init__(self):
-        super(PlayerMonitor, self).__init__()
-        self.ended = False
-    def onPlayBackEnded(self):
-        self.ended = True
-    def onPlayBackStopped(self):
-        self.ended = True
-
 def play(ident, query=None):
     link = webshare.get_link(ident)
     if link:
         list_item = xbmcgui.ListItem(path=link)
         xbmcplugin.setResolvedUrl(HANDLE, True, list_item)
-        
         if query:
             import history
             history.add_to_history(query)
             
-        # Monitor playback
         monitor = xbmc.Monitor()
-        # Wait a bit for the player to initialize
         xbmc.sleep(2000)
         while not monitor.abortRequested() and (xbmc.getCondVisibility('Player.HasMedia') or xbmc.Player().isPlaying()):
             xbmc.sleep(1000)
 
-        # Počkej, dokud se fullscreen okno přehrávače (window 10025) zcela nezavře.
-        # Pokud bychom navigovali dříve, Kodi havaruje při pokusu o nastavení fokusu
-        # na control 55 v dosud aktivním okně.
-        timeout = 50  # max 5 vteřin (50 × 100ms)
+        timeout = 50
         while timeout > 0 and xbmc.getCondVisibility('Window.IsActive(10025)'):
             xbmc.sleep(100)
             timeout -= 1
             
-        # Close any lingering dialogs to prevent unexpected behavior during navigation.
         xbmc.executebuiltin('Dialog.Close(all)')
-        
-        # After playback logic
         after = ADDON.getSetting('after_playback')
         safe_query = urllib.parse.quote(query) if query else ""
-        
-        # Add a short sleep before container update to allow Kodi UI to stabilize after closing dialogs/player (Issue #15).
-        # Increased sleep further to improve stability for Kodi's UI context (Issue 16).
         xbmc.sleep(2000)
 
-        if after == '0' and query: # Původní hledání (automaticky)
+        if after == '0' and query:
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
-        elif after == '1': # Prázdné hledání (dialog)
+        elif after == '1':
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search,replace)')
-        elif after == '3': # Historie
+        elif after == '3':
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
-        elif after == '4' and query: # Předvyplněné hledání (dialog s textem)
+        elif after == '4' and query:
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query},replace)')
-        # case 2 is "Last results", which is default behavior in Kodi
-
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
 
 def show_history():
     import history
     items = history.get_history()
-    
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
     
     if not items:
@@ -401,9 +295,6 @@ def show_history():
         
     for item in items:
         query = item.get('query', '')
-        
-        # Prioritize TMDb identified metadata for display
-        # Fallback to query if TMDb title is missing
         title = item.get('title') or query
         year = item.get('year')
         plot = item.get('plot')
@@ -412,24 +303,15 @@ def show_history():
         runtime = item.get('runtime')
         poster = item.get('poster')
         fanart = item.get('fanart')
-        media_type = item.get('media_type') or ('movie' if 'S00E00' not in query and re.search(r'\\b(S\\d{2}E\\d{2}|\\d{1}x\\d{2})\\b', query, re.IGNORECASE) is None else 'tvshow') # Basic guess based on query pattern
+        media_type = item.get('media_type') or ('movie' if 'S00E00' not in query and re.search(r'\b(S\d{2}E\d{2}|\d{1}x\d{2})\b', query, re.IGNORECASE) is None else 'tvshow')
         
         label = f"{title} ({year})" if year else title
-        
-        # If TMDb data is available (indicated by tmdb_id and poster), create a rich list item
         if item.get('tmdb_id') and poster:
             list_item = _make_media_list_item(
-                label=label,
-                year=year,
-                plot=plot,
-                genres_str=', '.join(genres), # _make_media_list_item expects string
-                rating=rating,
-                runtime_min=runtime,
-                poster=poster,
-                fanart=fanart,
-                media_type=media_type
+                label=label, year=year, plot=plot, genres_str=', '.join(genres),
+                rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type=media_type
             )
-        else: # Fallback to basic list item with default history icon
+        else:
             list_item = xbmcgui.ListItem(label=label)
             list_item.setArt({'icon': 'DefaultHistory.png', 'thumb': 'DefaultHistory.png', 'fanart': get_asset('fa-history.png')})
         
@@ -440,23 +322,20 @@ xbmcplugin.endOfDirectory(HANDLE)
 
 def history_menu(query, title=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {query}")
-    
     items = [
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
-        (ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'), # New item for TMDb identification
+        (ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
         (ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
         (ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'),
         (ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
     ]
     
-    # Add episode navigation if it looks like a series
-    series_pattern = re.compile(r'^(.*)\\s+S(\\d{2})E(\\d{2})', re.IGNORECASE)
+    series_pattern = re.compile(r'^(.*)\s+S(\d{2})E(\d{2})', re.IGNORECASE)
     match = series_pattern.match(query)
     if match:
         base_title = match.group(1).strip()
         season = int(match.group(2))
         episode = int(match.group(3))
-        
         items.extend([
             (f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'),
             (f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png') if episode > 1 else None,
@@ -468,11 +347,7 @@ def history_menu(query, title=None):
         url = f"{sys.argv[0]}?action={action_params}"
         list_item = xbmcgui.ListItem(label=label)
         list_item.setArt({'icon': icon, 'thumb': icon})
-        # Identify with TMDb should not be a folder, it's an action to trigger search/identify
-        is_folder = True if 'search&query=' in action_params or 'trakt_search&query=' in action_params else False
-        if 'history_tmdb_identify_search' in action_params: # This action opens a list of TMDb results, so it's a folder
-            is_folder = True
-
+        is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
         
 xbmcplugin.endOfDirectory(HANDLE)
@@ -496,13 +371,11 @@ def trakt_search(query=None):
             return
 
         for item in results:
-            media_type = item.get('type')  # 'movie' or 'show'
+            media_type = item.get('type')
             data = item.get(media_type, {})
             trakt_id = data.get('ids', {}).get('trakt')
-
             meta = get_trakt_localized(trakt_id, media_type) if trakt_id else {}
             
-            # Use localized meta data, fallback to original Trakt data
             title = meta.get('title') or data.get('title', '')
             year = meta.get('year') or data.get('year', '')
             overview = meta.get('overview') or data.get('overview', '')
@@ -510,15 +383,12 @@ def trakt_search(query=None):
             rating = meta.get('rating') or data.get('rating', 0)
             runtime = meta.get('runtime') or data.get('runtime', 0)
             status = meta.get('status') or data.get('status', '')
-
             poster = meta.get('poster') or ('DefaultMovies.png' if media_type == 'movie' else 'DefaultTVShows.png')
             fanart = meta.get('fanart') or ''
-
             label = f"{title} ({year})" if year else title
             kodi_media_type = 'movie' if media_type == 'movie' else 'tvshow'
             genres_str = ', '.join(genres[:3]) if genres else ''
 
-            # Build enriched plot
             plot_parts = []
             if overview:
                 plot_parts.append(overview)
@@ -529,10 +399,9 @@ def trakt_search(query=None):
                 plot_parts.append(f"[B]{ADDON.getLocalizedString(30115)}:[/B] {runtime} {unit}")
             if status:
                 plot_parts.append(f"[B]{ADDON.getLocalizedString(30116)}:[/B] {status}")
-            combined_plot = '\\n'.join(plot_parts)
+            combined_plot = '\n'.join(plot_parts)
 
             list_item = _make_media_list_item(label, year, combined_plot, genres_str, rating, runtime, poster, fanart, kodi_media_type)
-
             cm = []
             if trakt_id:
                 cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
@@ -543,7 +412,7 @@ def trakt_search(query=None):
                 ws_query = f"{title} {year}".strip()
                 url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
                 xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
-            else:  # show -> seasons
+            else:
                 url = (f"{sys.argv[0]}?action=show_seasons"
                        f"&show_title={urllib.parse.quote(title)}"
                        f"&trakt_id={trakt_id}"
@@ -560,9 +429,7 @@ def show_changelog():
             changelog = f.read()
     except Exception:
         changelog = "Changelog nenalezen."
-    
     xbmcgui.Dialog().textviewer(ADDON.getAddonInfo('name') + ' - Changelog', changelog)
-
 
 def show_trakt_watchlist():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30051))
@@ -582,14 +449,12 @@ def show_trakt_watchlist():
         poster = ''
         fanart = ''
         year = ''
-        label = ''
         query = ''
 
         if media_type == 'movie':
             movie = item.get('movie')
             trakt_id = movie.get('ids', {}).get('trakt')
             meta = get_trakt_localized(trakt_id, 'movie') if trakt_id else {}
-            
             title = meta.get('title') or movie.get('title')
             year = meta.get('year') or movie.get('year')
             query = f"{title} {year}" if year else title
@@ -604,7 +469,6 @@ def show_trakt_watchlist():
             show = item.get('show')
             trakt_id = show.get('ids', {}).get('trakt')
             meta = get_trakt_localized(trakt_id, 'show') if trakt_id else {}
-            
             title = meta.get('title') or show.get('title')
             year = meta.get('year') or show.get('year')
             query = title
@@ -615,110 +479,63 @@ def show_trakt_watchlist():
             genres_str = ', '.join(meta.get('genres', [])) if meta.get('genres') else ''
             rating = meta.get('rating') or 0
             runtime = meta.get('runtime') or 0
-            meta_type = 'tvshow' # Kodi media type for shows
+            meta_type = 'tvshow'
         elif media_type == 'episode':
             show = item.get('show')
             episode = item.get('episode')
             show_trakt_id = show.get('ids', {}).get('trakt')
-            
-            # Fetch show metadata for artwork and fallback details
             show_meta = get_trakt_localized(show_trakt_id, 'show') if show_trakt_id else {}
-            # Fetch episode-specific localized metadata
-            episode_meta = get_trakt_localized(
-                show_trakt_id, # Use show_trakt_id as the primary ID for episode lookup in Trakt.py
-                'episode', 
-                season_num=episode.get('season'), 
-                episode_num=episode.get('number')
-            ) if show_trakt_id and episode.get('season') and episode.get('number') else {}
-
+            episode_meta = get_trakt_localized(show_trakt_id, 'episode', season_num=episode.get('season'), episode_num=episode.get('number')) if show_trakt_id and episode.get('season') and episode.get('number') else {}
             show_title = show_meta.get('title') or show.get('title')
             show_year = show_meta.get('year') or show.get('year', '')
-            
-            # Prioritize episode_meta for title and overview
             ep_title_localized = episode_meta.get('title') or episode.get('title', ADDON.getLocalizedString(30108).format(episode.get('number', 0)))
             ep_overview_localized = episode_meta.get('overview') or episode.get('overview') or show_meta.get('overview') or ''
-
             label = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d} - {ep_title_localized}"
             query = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d}"
-            year = show_year # Use show's year for episodes
+            year = show_year
             poster = show_meta.get('poster') or 'DefaultRecentlyAddedEpisodes.png'
             fanart = show_meta.get('fanart') or ''
             plot = ep_overview_localized
             genres_str = ', '.join(show_meta.get('genres', [])) if show_meta.get('genres') else ''
             rating = episode_meta.get('rating') or episode.get('rating') or show_meta.get('rating') or 0
             runtime = episode_meta.get('runtime') or episode.get('runtime') or show_meta.get('runtime') or 0
-            meta_type = 'tvshow' # Kodi type for episodes
+            meta_type = 'tvshow'
         else:
             continue
             
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
-        list_item = _make_media_list_item(
-            label=label,
-            year=year,
-            plot=plot,
-            genres_str=genres_str,
-            rating=rating,
-            runtime_min=runtime,
-            poster=poster,
-            fanart=fanart,
-            media_type='movie' if meta_type == 'movie' else 'tvshow'
-        )
-        
+        list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
-        # Determine the Trakt ID for the item (movie or episode) to mark watched/unwatched
-        trakt_item_id = None
-        if media_type == 'movie':
-            trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt')
-        elif media_type == 'episode':
-            trakt_item_id = item.get('episode', {}).get('ids', {}).get('trakt')
-        else:
-            trakt_item_id = None
-
+        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
-            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_item_id}&id={trakt_item_id}&watched=0)'))
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
         list_item.addContextMenuItems(cm)
-        
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
 xbmcplugin.endOfDirectory(HANDLE)
 
-
 def show_trakt_playback(offset=0):
-    """Display paginated Trakt.tv 'Continue watching' items."""
     offset = int(offset)
-    PAGE_SIZE = 20 # Number of items to show per page
-
+    PAGE_SIZE = 20
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30050))
-    
     playback_items = trakt.get_playback()
     progress_items = trakt.get_progress()
-    
     combined_items = []
-    seen_ids = set() # To avoid duplicates
+    seen_ids = set()
     
-    # Add playback items (currently paused movies/episodes)
     for item in playback_items:
         media_type = item.get('type')
-        trakt_id = None
-        if media_type == 'movie':
-            trakt_id = item.get('movie', {}).get('ids', {}).get('trakt')
-            id_key = f"movie_{trakt_id}"
-        elif media_type == 'episode':
-            trakt_id = item.get('episode', {}).get('ids', {}).get('trakt')
-            id_key = f"episode_{trakt_id}"
-        
+        trakt_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
+        id_key = f"{media_type}_{trakt_id}"
         if trakt_id and id_key not in seen_ids:
             combined_items.append(item)
             seen_ids.add(id_key)
             
-    # Add progress items (next episodes for watched shows)
     for item in progress_items:
-        # Progress items are always episodes by current implementation of get_progress
         episode = item.get('episode')
         trakt_id = episode.get('ids', {}).get('trakt')
-        id_key = f"episode_{trakt_id}" 
-        
+        id_key = f"episode_{trakt_id}"
         if trakt_id and id_key not in seen_ids:
             combined_items.append(item)
             seen_ids.add(id_key)
@@ -728,12 +545,10 @@ def show_trakt_playback(offset=0):
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
         
-    # Apply pagination
     page_items = combined_items[offset:offset + PAGE_SIZE]
-
     for item in page_items:
         media_type = item.get('type')
-        meta_type = media_type # Used to determine Kodi content type
+        meta_type = media_type
         rating = 0
         runtime = 0
         genres_str = ''
@@ -741,14 +556,12 @@ def show_trakt_playback(offset=0):
         poster = ''
         fanart = ''
         year = ''
-        label = ''
         query = ''
         
         if media_type == 'movie':
             movie = item.get('movie')
             trakt_id = movie.get('ids', {}).get('trakt')
             meta = get_trakt_localized(trakt_id, 'movie') if trakt_id else {}
-            
             title = meta.get('title') or movie.get('title')
             year = meta.get('year') or movie.get('year')
             query = f"{title} {year}" if year else title
@@ -763,68 +576,35 @@ def show_trakt_playback(offset=0):
             show = item.get('show')
             episode = item.get('episode')
             show_trakt_id = show.get('ids', {}).get('trakt')
-            
-            # Fetch show metadata for artwork and fallback details
             show_meta = get_trakt_localized(show_trakt_id, 'show') if show_trakt_id else {}
-            # Fetch episode-specific localized metadata
-            episode_meta = get_trakt_localized(
-                show_trakt_id, # Use show_trakt_id as the primary ID for episode lookup in Trakt.py
-                'episode', 
-                season_num=episode.get('season'), 
-                episode_num=episode.get('number')
-            ) if show_trakt_id and episode.get('season') and episode.get('number') else {}
-            
+            episode_meta = get_trakt_localized(show_trakt_id, 'episode', season_num=episode.get('season'), episode_num=episode.get('number')) if show_trakt_id and episode.get('season') and episode.get('number') else {}
             show_title = show_meta.get('title') or show.get('title')
             show_year = show_meta.get('year') or show.get('year', '')
-            
-            # Prioritize episode_meta for title and overview
             ep_title_localized = episode_meta.get('title') or episode.get('title', ADDON.getLocalizedString(30108).format(episode.get('number', 0)))
             ep_overview_localized = episode_meta.get('overview') or episode.get('overview') or show_meta.get('overview') or ''
-
             label = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d} - {ep_title_localized}"
             query = f"{show_title} S{episode.get('season', 0):02d}E{episode.get('number', 0):02d}"
-            year = show_year # Use show's year for episodes
+            year = show_year
             poster = show_meta.get('poster') or 'DefaultRecentlyAddedEpisodes.png'
             fanart = show_meta.get('fanart') or ''
             plot = ep_overview_localized
             genres_str = ', '.join(show_meta.get('genres', [])) if show_meta.get('genres') else ''
             rating = episode_meta.get('rating') or episode.get('rating') or show_meta.get('rating') or 0
             runtime = episode_meta.get('runtime') or episode.get('runtime') or show_meta.get('runtime') or 0
-            meta_type = 'tvshow' # Kodi type for episodes is 'tvshow'
+            meta_type = 'tvshow'
         else:
             continue
             
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
-        list_item = _make_media_list_item(
-            label=label,
-            year=year,
-            plot=plot,
-            genres_str=genres_str,
-            rating=rating,
-            runtime_min=runtime,
-            poster=poster,
-            fanart=fanart,
-            media_type='movie' if meta_type == 'movie' else 'tvshow' # Kodi type for episodes is 'tvshow'
-        )
-        
+        list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
-        # Determine the Trakt ID for the item (movie or episode) to mark watched/unwatched
-        trakt_item_id = None
-        if media_type == 'movie':
-            trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt')
-        elif media_type == 'episode':
-            trakt_item_id = item.get('episode', {}).get('ids', {}).get('trakt')
-        else:
-            trakt_item_id = None
-
+        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
         list_item.addContextMenuItems(cm)
-        
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
-    # Add next-page button if more items exist
     if len(combined_items) > offset + PAGE_SIZE:
         next_offset = offset + PAGE_SIZE
         next_url = f"{sys.argv[0]}?action=trakt_playback&offset={next_offset}"
@@ -833,9 +613,8 @@ def show_trakt_playback(offset=0):
         li_next.setArt({'icon': 'DefaultFolder.png', 'thumb': 'DefaultFolder.png'})
         xbmcplugin.addDirectoryItem(HANDLE, next_url, li_next, isFolder=True)
 
-    xbmcplugin.setContent(HANDLE, 'videos') # Set content type for better Kodi integration
+    xbmcplugin.setContent(HANDLE, 'videos')
     xbmcplugin.endOfDirectory(HANDLE)
-
 
 def search_prefill(query):
     keyboard = xbmc.Keyboard(query, ADDON.getLocalizedString(30076))
@@ -850,12 +629,7 @@ def search_prefill(query):
     else:
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
-# ---------------------------------------------------------------------------
-# TMDb
-# ---------------------------------------------------------------------------
-
 def show_tmdb_menu():
-    """Display the TMDb main menu with categories and search."""
     xbmcplugin.setPluginCategory(HANDLE, 'TMDb')
     fanart = get_asset('fa.png')
     items = [
@@ -872,9 +646,7 @@ def show_tmdb_menu():
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
-
 def show_tmdb_category(category, offset=0):
-    """Display a TMDb category with 10-item virtual pagination."""
     if tmdb_module is None:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -882,7 +654,6 @@ def show_tmdb_category(category, offset=0):
 
     offset = int(offset)
     PAGE_SIZE = 10
-
     import datetime
     if category == 'tv_tips':
         all_items = tmdb_module.get_tv_tips(0)
@@ -903,46 +674,40 @@ def show_tmdb_category(category, offset=0):
         return
 
     xbmcplugin.setPluginCategory(HANDLE, cat_label)
-
     if not all_items:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30104), xbmcgui.NOTIFICATION_WARNING, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
     page_items = all_items[offset:offset + PAGE_SIZE]
-
     for item in page_items:
         raw_title = item.get('clean_title', item.get('title', ''))
-        display_title = item.get('title', raw_title)  # May include [rating%] prefix
+        display_title = item.get('title', raw_title)
         year = item.get('year', '')
         plot = item.get('plot', '')
         info = item.get('info', '')
         poster = item.get('img', '')
         is_show = item.get('type') == 'show'
-        tmdb_item_id = item.get('id') # Get TMDb ID
+        tmdb_item_id = item.get('id')
 
-        # Combine genres/origin info with description
         combined_plot = plot or ''
         if info and info not in combined_plot:
-            combined_plot = f"[B]{info}[/B]\\n\\n{combined_plot}" if combined_plot else f"[B]{info}[/B]"
+            combined_plot = f"[B]{info}[/B]\n\n{combined_plot}" if combined_plot else f"[B]{info}[/B]"
 
         label = f"{display_title} ({year})" if year else display_title
         kodi_type = 'tvshow' if is_show else 'movie'
         li = _make_media_list_item(label, year, combined_plot, info, None, None, poster, '', kodi_type)
 
         if is_show:
-            # Bridge to Trakt for season/episode navigation, pass TMDb ID
             url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
                    f"&title={urllib.parse.quote(raw_title)}&year={year}"
-                   f"&tmdb_id={tmdb_item_id}") # Pass TMDb ID
+                   f"&tmdb_id={tmdb_item_id}")
         else:
-            # Movie – search Webshare directly
             ws_query = f"{raw_title} {year}".strip()
             url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
 
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
-    # Next-page button
     if len(all_items) > offset + PAGE_SIZE:
         next_offset = offset + PAGE_SIZE
         next_url = f"{sys.argv[0]}?action=tmdb_category&category={category}&offset={next_offset}"
@@ -953,71 +718,48 @@ def show_tmdb_category(category, offset=0):
     xbmcplugin.setContent(HANDLE, content_type)
     xbmcplugin.endOfDirectory(HANDLE)
 
-
 def show_tmdb_show_seasons(title, year='', tmdb_id=None):
-    """
-    Resolve a TMDb show to a Trakt show ID and navigate to seasons.
-    Prioritizes TMDb ID to Trakt ID conversion. Falls back to Webshare search if Trakt ID cannot be resolved.
-    """
     xbmcplugin.setPluginCategory(HANDLE, f"{title} - {ADDON.getLocalizedString(30105)}")
     xbmc.log(f"StreamContinuum: show_tmdb_show_seasons called for title='{title}', year='{year}', tmdb_id='{tmdb_id}'", xbmc.LOGINFO)
 
     trakt_id = None
     poster = ''
     fanart = ''
-    show_meta = {} # To store TMDb/Trakt metadata for artwork and plot
+    show_meta = {}
 
     if tmdb_id:
-        xbmc.log(f"StreamContinuum: Attempting to get Trakt ID from TMDb ID '{tmdb_id}' (media_type='show')", xbmc.LOGINFO)
         try:
             trakt_id = trakt.get_trakt_id_from_tmdb_id(tmdb_id, 'show')
         except Exception as e:
             xbmc.log(f"StreamContinuum: Error getting Trakt ID from TMDb ID '{tmdb_id}': {e}", xbmc.LOGERROR)
 
         if trakt_id:
-            xbmc.log(f"StreamContinuum: Trakt ID '{trakt_id}' found for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
             try:
-                show_meta = trakt.get_localized_metadata(trakt_id, 'show') # Get full metadata using Trakt ID
+                show_meta = trakt.get_localized_metadata(trakt_id, 'show')
                 poster = show_meta.get('poster', '')
                 fanart = show_meta.get('fanart', '')
             except Exception as e:
                 xbmc.log(f"StreamContinuum: Error fetching localized metadata for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
         else:
-            xbmc.log(f"StreamContinuum: Nelze prelozit TMDb ID '{tmdb_id}' na Trakt ID. Presmerovavam na Webshare hledani podle nazvu '{title}'.", xbmc.LOGWARNING)
             ws_query = f"{title} {year}".strip()
             xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
             return
-    else: # tmdb_id was not provided, which shouldn't happen from TMDb menu paths, but as a safeguard.
-        xbmc.log(f"StreamContinuum: TMDb ID not provided for '{title}'. Presmerovavam na Webshare hledani podle nazvu '{title}'.", xbmc.LOGWARNING)
+    else:
         ws_query = f"{title} {year}".strip()
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
         return
 
-    # At this point, trakt_id must be set, otherwise the function would have returned to Webshare search.
     final_show_title = show_meta.get('title') or title
-    final_year = show_meta.get('year') or year
-    final_plot = show_meta.get('overview') or '' # Overview from show_meta
-
-    # --- START OF FIX FOR ISSUE 12 (ATTRIBUTERROR: MODULE 'TRAKT' HAS NO ATTRIBUTE 'SEARCH_TRAKT') ---
-    # The line below was causing AttributeError. The correct Trakt ID is already derived from TMDb ID.
-    # results = trakt.search_trakt(title) # This line is removed.
-
-    # If trakt_id is successfully resolved, proceed to show seasons.
     if trakt_id is not None:
         show_seasons(final_show_title, str(trakt_id), poster, fanart)
     else:
-        # Defensive fallback: If trakt_id somehow became None (should not happen due to preceding returns), 
-        # redirect to Webshare search.
-        xbmc.log(f"StreamContinuum: Critical error: Trakt ID is None after all checks for '{title}'. Fallback to Webshare search.", xbmc.LOGERROR)
         ws_query = f"{title} {year}".strip()
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
-    # --- END OF FIX FOR ISSUE 12 ---
 
 def show_tmdb_search(query=None):
-    """Prompts user for TMDb search or displays results."""
     if tmdb_module is None:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -1048,11 +790,11 @@ def show_tmdb_search(query=None):
             info = item.get('info', '')
             poster = item.get('img', '')
             is_show = item.get('type') == 'show'
-            tmdb_item_id = item.get('id') # Get TMDb ID
+            tmdb_item_id = item.get('id')
 
             combined_plot = plot or ''
             if info and info not in combined_plot:
-                combined_plot = f"[B]{info}[/B]\\n\\n{combined_plot}" if combined_plot else f"[B]{info}[/B]"
+                combined_plot = f"[B]{info}[/B]\n\n{combined_plot}" if combined_plot else f"[B]{info}[/B]"
 
             label = f"{display_title} ({year})" if year else display_title
             kodi_type = 'tvshow' if is_show else 'movie'
@@ -1062,7 +804,7 @@ def show_tmdb_search(query=None):
                 url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
                        f"&title={urllib.parse.quote(raw_title)}"
                        f"&year={year}"
-                       f"&tmdb_id={tmdb_item_id}") # Pass TMDb ID
+                       f"&tmdb_id={tmdb_item_id}")
             else:
                 ws_query = f"{raw_title} {year}".strip()
                 url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
@@ -1072,14 +814,8 @@ def show_tmdb_search(query=None):
         xbmcplugin.setContent(HANDLE, 'movies')
         xbmcplugin.endOfDirectory(HANDLE)
 
-# ---------------------------------------------------------------------------
-# Seasons / Episodes navigation
-# ---------------------------------------------------------------------------
-
 def show_seasons(show_title, trakt_id, poster='', fanart=''):
-    """Display all seasons for a Trakt show (skips season 0 / specials)."""
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)}")
-
     seasons = trakt.get_seasons(trakt_id)
     if not seasons:
         xbmcgui.Dialog().notification('StreamContinuum', ADDON.getLocalizedString(30106), xbmcgui.NOTIFICATION_ERROR, 3000)
@@ -1089,23 +825,18 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
     for season in seasons:
         season_num = season.get('number', 0)
         if season_num == 0:
-            continue  # Skip specials/season 0
+            continue
         
-        # Fetch localized season metadata
-        season_meta = get_trakt_localized(trakt_id, 'season', season_num=season_num) # trakt_id is show's trakt_id
-
+        season_meta = get_trakt_localized(trakt_id, 'season', season_num=season_num)
         ep_count = season_meta.get('episode_count') or season.get('episode_count', 0)
         rating = season_meta.get('rating') or season.get('rating', 0)
         overview = season_meta.get('overview') or season.get('overview', '')
         season_title = season_meta.get('title') or f"{ADDON.getLocalizedString(30105)} {season_num}"
 
-        label = season_title
-        if ep_count:
-            label += f"  ({ep_count})"
-
+        label = season_title if not ep_count else f"{season_title}  ({ep_count})"
         li = xbmcgui.ListItem(label=label)
         art = {}
-        if poster: # Use show's poster for seasons
+        if poster:
             art['poster'] = poster
             art['thumb'] = poster
             art['icon'] = poster
@@ -1113,18 +844,18 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
         li.setArt(art)
 
         info_tag = li.getVideoInfoTag()
-        info_tag.setTitle(season_title) # Use localized season title
+        info_tag.setTitle(season_title)
         info_tag.setMediaType('season')
         info_tag.setSeason(season_num)
         if overview:
-            info_tag.setPlot(overview) # Use localized season overview
+            info_tag.setPlot(overview)
         if rating:
             try:
                 info_tag.setRating(float(rating))
             except (ValueError, TypeError):
                 pass
         if ep_count:
-            info_tag.setEpisodeCount(ep_count) # Corrected from setEpisode to setEpisodeCount
+            info_tag.setEpisodeCount(ep_count)
 
         url = (f"{sys.argv[0]}?action=show_episodes"
                f"&show_title={urllib.parse.quote(show_title)}"
@@ -1137,12 +868,9 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
     xbmcplugin.setContent(HANDLE, 'seasons')
     xbmcplugin.endOfDirectory(HANDLE)
 
-
 def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
-    """Display all episodes of a season. Each episode triggers a Webshare search."""
     season_num = int(season_num)
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)} {season_num}")
-
     episodes = trakt.get_episodes(trakt_id, season_num)
     if not episodes:
         xbmcgui.Dialog().notification('StreamContinuum', ADDON.getLocalizedString(30107), xbmcgui.NOTIFICATION_ERROR, 3000)
@@ -1151,11 +879,7 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
 
     for episode in episodes:
         ep_num = episode.get('number', 0)
-        
-        # Fetch localized episode metadata
-        episode_meta = get_trakt_localized(trakt_id, 'episode', season_num=season_num, episode_num=ep_num) # trakt_id is show's trakt_id
-
-        # Prioritize localized data, fallback to original Trakt data
+        episode_meta = get_trakt_localized(trakt_id, 'episode', season_num=season_num, episode_num=ep_num)
         ep_title = episode_meta.get('title') or episode.get('title', ADDON.getLocalizedString(30108).format(ep_num))
         overview = episode_meta.get('overview') or episode.get('overview', '')
         rating = episode_meta.get('rating') or episode.get('rating', 0)
@@ -1166,7 +890,7 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
 
         li = xbmcgui.ListItem(label=label)
         art = {}
-        if poster: # Use show's poster for episodes
+        if poster:
             art['poster'] = poster
             art['thumb'] = poster
             art['icon'] = poster
@@ -1174,12 +898,12 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
         li.setArt(art)
 
         info_tag = li.getVideoInfoTag()
-        info_tag.setTitle(ep_title) # Use localized episode title
+        info_tag.setTitle(ep_title)
         info_tag.setMediaType('episode')
         info_tag.setSeason(season_num)
         info_tag.setEpisode(ep_num)
         if overview:
-            info_tag.setPlot(overview) # Use localized episode overview
+            info_tag.setPlot(overview)
         if rating:
             try:
                 info_tag.setRating(float(rating))
@@ -1197,12 +921,7 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
     xbmcplugin.setContent(HANDLE, 'episodes')
     xbmcplugin.endOfDirectory(HANDLE)
 
-# ---------------------------------------------------------------------------
-# Trakt.tv Discover (Trending / Popular / Recommended)
-# ---------------------------------------------------------------------------
-
 def show_trakt_discover_menu():
-    """Display the Trakt.tv Discover main menu."""
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30109))
     fanart = get_asset('fa-trakt.png')
     items = [
@@ -1221,12 +940,9 @@ def show_trakt_discover_menu():
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
-
 def show_trakt_discover(list_type, media_type, offset=0):
-    """Display a paginated Trakt discover list (trending / popular / recommended)."""
     offset = int(offset)
     PAGE_SIZE = 10
-
     discover_titles = {
         ('trending', 'movies'): 30055,
         ('popular', 'movies'): 30110,
@@ -1238,7 +954,6 @@ def show_trakt_discover(list_type, media_type, offset=0):
     list_label = ADDON.getLocalizedString(discover_titles.get((list_type, media_type), 30055))
     xbmcplugin.setPluginCategory(HANDLE, f"Trakt.tv - {list_label}")
 
-    # Fetch items from Trakt
     if list_type == 'trending':
         raw = trakt.get_trending(media_type)
         item_key = 'movie' if media_type == 'movies' else 'show'
@@ -1263,19 +978,15 @@ def show_trakt_discover(list_type, media_type, offset=0):
     for item in page_items:
         trakt_id = item.get('ids', {}).get('trakt')
         meta = get_trakt_localized(trakt_id, item_type_single) if trakt_id else {}
-        
-        # Use localized meta data, fallback to original Trakt data
         title = meta.get('title') or item.get('title', '')
         year = meta.get('year') or item.get('year', '')
         overview = meta.get('overview') or item.get('overview', '')
         genres = meta.get('genres', []) or item.get('genres', [])
         rating = meta.get('rating') or item.get('rating', 0)
         runtime = meta.get('runtime') or item.get('runtime', 0)
-        status = meta.get('status') or item.get('status', '') # Only for shows
-        
+        status = meta.get('status') or item.get('status', '')
         poster = meta.get('poster') or ('DefaultMovies.png' if item_type_single == 'movie' else 'DefaultTVShows.png')
         fanart = meta.get('fanart') or ''
-
         label = f"{title} ({year})" if year else title
         genres_str = ', '.join(genres[:3]) if genres else ''
 
@@ -1289,11 +1000,9 @@ def show_trakt_discover(list_type, media_type, offset=0):
             plot_parts.append(f"[B]{ADDON.getLocalizedString(30115)}:[/B] {runtime} {unit}")
         if status:
             plot_parts.append(f"[B]{ADDON.getLocalizedString(30116)}:[/B] {status}")
-        combined_plot = '\\n'.join(plot_parts)
+        combined_plot = '\n'.join(plot_parts)
 
         li = _make_media_list_item(label, year, combined_plot, genres_str, rating, runtime, poster, fanart, kodi_media_type)
-
-
         cm = []
         if trakt_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={item_type_single}&id={trakt_id}&watched=1)'))
@@ -1312,7 +1021,6 @@ def show_trakt_discover(list_type, media_type, offset=0):
                    f"&fanart={urllib.parse.quote(fanart)}")
             xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
-    # Next-page button
     if len(items) > offset + PAGE_SIZE:
         next_offset = offset + PAGE_SIZE
         next_url = (f"{sys.argv[0]}?action=trakt_discover"
@@ -1325,22 +1033,15 @@ def show_trakt_discover(list_type, media_type, offset=0):
     xbmcplugin.setContent(HANDLE, kodi_content)
     xbmcplugin.endOfDirectory(HANDLE)
 
-# ---------------------------------------------------------------------------
-# History TMDb Identification
-# ---------------------------------------------------------------------------
-
 def history_tmdb_identify_search(original_query):
-    """Performs a TMDb search based on history query and displays results for identification."""
     if tmdb_module is None:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
     import history
-    cleaned_query = history.get_base_name(original_query) # Use cleaned query for TMDb search
-    
+    cleaned_query = history.get_base_name(original_query)
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30120)}: {original_query}")
-    
     xbmc.log(f"StreamContinuum: Searching TMDb for '{original_query}', cleaned to '{cleaned_query}'", xbmc.LOGINFO)
     all_items = tmdb_module.search_tmdb(cleaned_query)
     if not all_items:
@@ -1353,33 +1054,29 @@ def history_tmdb_identify_search(original_query):
         display_title = item.get('title', raw_title)
         year = item.get('year', '')
         plot = item.get('plot', '')
-        info_type = item.get('info', '') # e.g., 'Film', 'Seriál'
-        poster_from_search = item.get('img', '') # poster from initial search
-        backdrop_from_search = item.get('backdrop_path', '') # backdrop from initial search
+        poster_from_search = item.get('img', '')
+        backdrop_from_search = item.get('backdrop_path', '')
         is_show = item.get('type') == 'show'
         kodi_type = 'tvshow' if is_show else 'movie'
 
-        # Fetch full localized metadata using trakt.get_localized_metadata (which uses TMDb internally)
         full_tmdb_meta = {}
-        if item.get('id'): # item.get('id') is TMDb ID from tmdb_module.search_tmdb
-            trakt_media_type_param = item.get('media_type').replace('tv', 'show')
+        if item.get('id'):
+            trakt_media_type_param = item.get('media_type', 'movie').replace('tv', 'show')
             full_tmdb_meta = trakt.get_localized_metadata(
                 item_id=item.get('id'), 
                 media_type=trakt_media_type_param, 
                 id_type='tmdb'
             )
         
-        # Combine data: prefer full_tmdb_meta, then initial search result item
         final_title = full_tmdb_meta.get('title') or raw_title
         final_year = full_tmdb_meta.get('year') or year
         final_plot = full_tmdb_meta.get('overview') or plot
         final_genres = full_tmdb_meta.get('genres', [])
-        final_rating = full_tmdb_meta.get('rating') or item.get('vote_average') # FIX: Prioritize 'rating' key from full_tmdb_meta
+        final_rating = full_tmdb_meta.get('rating') or item.get('vote_average')
         final_runtime = full_tmdb_meta.get('runtime')
         final_poster = full_tmdb_meta.get('poster') or poster_from_search
         final_fanart = full_tmdb_meta.get('fanart') or backdrop_from_search
 
-        # Create list item for display
         li = _make_media_list_item(
             label=f"{final_title} ({final_year})" if final_year else final_title,
             year=final_year,
@@ -1392,30 +1089,26 @@ def history_tmdb_identify_search(original_query):
             media_type=kodi_type
         )
 
-        # Parameters for the identification action
         assign_params = {
             'action': 'assign_tmdb_data_to_history',
             'original_query': original_query,
-            'tmdb_id': item.get('id'), # Store TMDb ID
+            'tmdb_id': item.get('id'),
             'media_type': kodi_type,
             'title': final_title,
             'year': final_year,
             'plot': final_plot,
-            'genres': '|'.join(final_genres), # Pass as pipe-separated string
+            'genres': '|'.join(final_genres),
             'rating': final_rating,
             'runtime': final_runtime,
             'poster': final_poster,
             'fanart': final_fanart
         }
         
-        # URL encode all values in assign_params, ensuring None becomes empty string
         encoded_params = '&'.join(f"{key}={urllib.parse.quote_plus(str(value) if value is not None else '')}" for key, value in assign_params.items())
         url = f"{sys.argv[0]}?{encoded_params}"
-        
-        # Clicking the item directly performs the identification
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=False)
 
-    xbmcplugin.setContent(HANDLE, 'movies' if 'movie' in [i.get('media_type') for i in all_items] else 'tvshows') # Dynamic content type
+    xbmcplugin.setContent(HANDLE, 'movies' if 'movie' in [i.get('media_type') for i in all_items] else 'tvshows')
     xbmcplugin.endOfDirectory(HANDLE)
 
 def _safe_int_conversion(value):
@@ -1431,7 +1124,6 @@ def _safe_float_conversion(value):
         return None
 
 def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year, plot, genres, rating, runtime, poster, fanart):
-    """Updates a history item with TMDb metadata."""
     import history
     tmdb_data = {
         'tmdb_id': _safe_int_conversion(tmdb_id),
@@ -1439,7 +1131,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
         'title': title if title else None,
         'year': _safe_int_conversion(year),
         'plot': plot if plot else None,
-        'genres': genres.split('|') if genres else [], # Convert back to list
+        'genres': genres.split('|') if genres else [],
         'rating': _safe_float_conversion(rating),
         'runtime': _safe_int_conversion(runtime),
         'poster': poster if poster else None,
@@ -1449,34 +1141,21 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
     success = history.update_history_with_tmdb_data(original_query, tmdb_data)
     if success:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30126), xbmcgui.NOTIFICATION_INFO, 2000)
-        # Refresh history container to show updated metadata
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30127), xbmcgui.NOTIFICATION_ERROR, 3000)
 
-
 def run():
-    # REVISED FIX FOR MAIN MENU ISSUE:
-    # Initial long sleep moved to service.py before RunAddon to prevent UI conflicts
-    # caused by Kodi's startup or welcome melody playback.
-    # xbmc.sleep(2500) # Removed as per new strategy
-
-    # Close any lingering dialogs before displaying the main menu, in case Kodi GUI is stuck. (New for Issue #15)
-    xbmc.log(f"StreamContinuum: Calling Dialog.Close(all) at addon startup.", xbmc.LOGINFO)
-    xbmc.executebuiltin('Dialog.Close(all)')
-    xbmc.log(f"StreamContinuum: Dialog.Close(all) called. Status after close: {xbmc.getCondVisibility('Window.IsActive(10025)')}", xbmc.LOGINFO)
-    
-    # Add a further sleep after closing dialogs to ensure Kodi UI stabilizes before any addon UI is drawn.
-    # This is crucial for fixing the 'addDirectoryItem returned False' errors.
-    xbmc.sleep(500) # Give Kodi's UI context time to fully clear and stabilize.
-
-    # Force updating the visible version setting since Kodi caches the default from first install
     ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
     
-    params = dict(urllib.parse.parse_qsl(sys.argv[2][1:]))
+    if HANDLE < 0:
+        xbmc.log("StreamContinuum: Invalid handle (< 0). Redirecting to ActivateWindow.", xbmc.LOGWARNING)
+        xbmc.executebuiltin('ActivateWindow(Videos, plugin://plugin.video.streamcontinuum/, return)')
+        return
+
+    params = dict(urllib.parse.parse_qsl(sys.argv[2][1:])) if len(sys.argv) > 2 else {}
     action = params.get('action')
 
-    # Update Trakt status if token exists but username is not set
     trakt_token = ADDON.getSetting('trakt_token')
     trakt_user = ADDON.getSetting('trakt_username')
     if trakt_token and (not trakt_user or trakt_user == ADDON.getLocalizedString(30048)):
@@ -1533,7 +1212,6 @@ def run():
     elif action == 'paste_from_clipboard':
         target = params.get('target')
         try:
-            # Kodi 20+ has xbmc.getClipboard()
             clipboard = xbmc.getClipboard()
             if clipboard:
                 ADDON.setSetting(target, clipboard)
@@ -1541,7 +1219,6 @@ def run():
             else:
                 xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30083))
         except AttributeError:
-            # Fallback for older Kodi versions or platforms where getClipboard fails
             xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30084))
     elif action == 'settings':
         ADDON.openSettings()
@@ -1561,7 +1238,7 @@ def run():
     elif action == 'trakt_watchlist':
         show_trakt_watchlist()
     elif action == 'trakt_playback':
-        show_trakt_playback(params.get('offset', 0)) # Pass offset parameter
+        show_trakt_playback(params.get('offset', 0))
     elif action == 'trakt_search':
         trakt_search(params.get('query', ''))
     elif action == 'trakt_mark':
@@ -1592,7 +1269,7 @@ def run():
             new_query = keyboard.getText()
             if new_query:
                 import history
-                history.update_history_item(old_query, new_query) # Simple update
+                history.update_history_item(old_query, new_query)
                 xbmc.executebuiltin('Container.Refresh')
     elif action == 'history_tmdb_identify_search':
         history_tmdb_identify_search(params.get('original_query', ''))
@@ -1615,7 +1292,7 @@ def run():
     elif action == 'tmdb_category':
         show_tmdb_category(params.get('category'), params.get('offset', 0))
     elif action == 'tmdb_show_seasons':
-        show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''), params.get('tmdb_id')) # Add tmdb_id parameter
+        show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''), params.get('tmdb_id'))
     elif action == 'tmdb_search':
         show_tmdb_search(params.get('query'))
     elif action == 'show_seasons':
