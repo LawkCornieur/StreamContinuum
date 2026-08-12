@@ -846,6 +846,7 @@ def search_prefill(query):
             search(new_query)
         else:
             xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            return
     else:
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
@@ -1373,7 +1374,7 @@ def history_tmdb_identify_search(original_query):
         final_year = full_tmdb_meta.get('year') or year
         final_plot = full_tmdb_meta.get('overview') or plot
         final_genres = full_tmdb_meta.get('genres', [])
-        final_rating = full_tmdb_meta.get('vote_average') or item.get('vote_average')
+        final_rating = full_tmdb_meta.get('rating') or item.get('vote_average') # FIX: Prioritize 'rating' key from full_tmdb_meta
         final_runtime = full_tmdb_meta.get('runtime')
         final_poster = full_tmdb_meta.get('poster') or poster_from_search
         final_fanart = full_tmdb_meta.get('fanart') or backdrop_from_search
@@ -1517,7 +1518,7 @@ def run():
             if success:
                 xbmcgui.Dialog().notification("StreamContinuum", "Nastavení importováno", xbmcgui.NOTIFICATION_INFO)
             else:
-                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba importu", xbmcgui.NOTIFICATION_ERROR)
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba importu", xbmc.NOTIFICATION_ERROR)
     elif action == 'trakt_refresh':
         user_info = trakt.get_user_info()
         if user_info:
