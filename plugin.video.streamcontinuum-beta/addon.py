@@ -676,7 +676,7 @@ def show_trakt_watchlist():
 
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
-            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_item_id}&id={trakt_item_id}&watched=0)'))
         list_item.addContextMenuItems(cm)
         
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
@@ -1456,16 +1456,15 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
 
 
 def run():
-    # Add an initial sleep to allow Kodi UI to stabilize, especially after external actions or startup.
-    # REVISED FIX FOR ISSUE 16 (MAIN MENU NOT DISPLAYING):
-    # Moved the main stabilization sleep AFTER Dialog.Close(all) to ensure Kodi has time
-    # to process the dialog closing before list_categories attempts to render.
-    xbmc.sleep(2500) 
+    # REVISED FIX FOR MAIN MENU ISSUE:
+    # Initial long sleep moved to service.py before RunAddon to prevent UI conflicts
+    # caused by Kodi's startup or welcome melody playback.
+    # xbmc.sleep(2500) # Removed as per new strategy
 
     # Close any lingering dialogs before displaying the main menu, in case Kodi GUI is stuck. (New for Issue #15)
     xbmc.log(f"StreamContinuum: Calling Dialog.Close(all) at addon startup.", xbmc.LOGINFO)
     xbmc.executebuiltin('Dialog.Close(all)')
-    xbmc.log(f"StreamContinuum: Dialog.Close(all) called.", xbmc.LOGINFO)
+    xbmc.log(f"StreamContinuum: Dialog.Close(all) called. Status after close: {xbmc.getCondVisibility('Window.IsActive(10025)')}", xbmc.LOGINFO)
     
     # Add a further sleep after closing dialogs to ensure Kodi UI stabilizes before any addon UI is drawn.
     # This is crucial for fixing the 'addDirectoryItem returned False' errors.
