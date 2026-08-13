@@ -21,7 +21,7 @@ if __name__ == '__main__':
                 try:
                     xbmcvfs.copy(melody_path, profile_melody)
                     xbmc.log("StreamContinuum: Playing welcome melody.", xbmc.LOGINFO)
-                    xbmc.executebuiltin('PlayMedia(\"{}\")'.format(profile_melody))
+                    xbmc.executebuiltin('PlayMedia("{}")'.format(profile_melody))
                     melody_played_or_auto_start_enabled = True
 
                     xbmc.sleep(1000)
@@ -42,4 +42,5 @@ if __name__ == '__main__':
             xbmc.sleep(2000)
             
         if ADDON.getSettingBool('auto_start'):
-            xbmc.executebuiltin('ActivateWindow(Videos, plugin://plugin.video.streamcontinuum/, return)')
+            addon_id = ADDON.getAddonInfo('id')
+            xbmc.executebuiltin(f'ActivateWindow(Videos, plugin://{addon_id}/, return)')
