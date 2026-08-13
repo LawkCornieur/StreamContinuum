@@ -101,7 +101,7 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
 def list_categories():
     xbmc.log(f"StreamContinuum: list_categories started.", xbmc.LOGINFO)
     xbmcplugin.setPluginCategory(HANDLE, 'StreamContinuum')
-    xbmcplugin.setContent(HANDLE, 'addons')
+    xbmcplugin.setContent(HANDLE, 'files')
 
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
@@ -125,13 +125,8 @@ def list_categories():
             url = f"{sys.argv[0]}?action={action}"
             display_label = f"[COLOR {color}]{label}[/COLOR]" if color else label
             list_item = xbmcgui.ListItem(label=display_label)
-            
-            info_tag = list_item.getVideoInfoTag()
-            info_tag.setTitle(label)
-            info_tag.setMediaType('directory')
-            info_tag.setPlot('')
-
             list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
+            
             success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
             if success:
                 item_count += 1
@@ -143,7 +138,7 @@ def list_categories():
     if item_count == 0:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30129), xbmcgui.NOTIFICATION_WARNING, 5000)
     
-    xbmcplugin.endOfDirectory(HANDLE, succeeded=True) 
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True if item_count > 0 else False)
     xbmc.log(f"StreamContinuum: list_categories finished with {item_count} items.", xbmc.LOGINFO)
 
 def trakt_menu():
