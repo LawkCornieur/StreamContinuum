@@ -313,7 +313,7 @@ def show_history():
         url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
-xbmcplugin.endOfDirectory(HANDLE)
+    xbmcplugin.endOfDirectory(HANDLE)
 
 def history_menu(query, title=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {query}")
@@ -345,7 +345,7 @@ def history_menu(query, title=None):
         is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
         
-xbmcplugin.endOfDirectory(HANDLE)
+    xbmcplugin.endOfDirectory(HANDLE)
 
 def trakt_search(query=None):
     if not query:
@@ -509,7 +509,7 @@ def show_trakt_watchlist():
         list_item.addContextMenuItems(cm)
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
-xbmcplugin.endOfDirectory(HANDLE)
+    xbmcplugin.endOfDirectory(HANDLE)
 
 def show_trakt_playback(offset=0):
     offset = int(offset)
@@ -1142,15 +1142,125 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30127), xbmcgui.NOTIFICATION_ERROR, 3000)
 
 def run():
-    ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
-    
-    if HANDLE < 0:
-        xbmc.log("StreamContinuum: Invalid handle (< 0). Redirecting to ActivateWindow.", xbmc.LOGWARNING)
-        xbmc.executebuiltin('ActivateWindow(Videos, plugin://plugin.video.streamcontinuum/, return)')
-        return
-
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:])) if len(sys.argv) > 2 else {}
     action = params.get('action')
+
+    # Actions that do not require an active directory handle
+    if action == 'show_changelog':
+        show_changelog()
+        return
+    elif action == 'trakt_auth':
+        trakt.authenticate()
+        return
+    elif action == 'trakt_refresh':
+        user_info = trakt.get_user_info()
+        if user_info:
+            username = user_info.get('username', ADDON.getLocalizedString(30077))
+            ADDON.setSetting('trakt_username', username)
+            xbmcgui.Dialog().notification("Trakt.tv", f"{ADDON.getLocalizedString(30078)}: {username}", xbmcgui.NOTIFICATION_INFO)
+        else:
+            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30079), xbmcgui.NOTIFICATION_ERROR)
+        return
+    elif action == 'trakt_logout':
+        ADDON.setSetting('trakt_token', '')
+        ADDON.setSetting('trakt_username', ADDON.getLocalizedString(30048))
+        xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30080), xbmcgui.NOTIFICATION_INFO)
+        return
+    elif action == 'paste_from_clipboard':
+        target = params.get('target')
+        try:
+            clipboard = xbmc.getClipboard()
+            if clipboard:
+                ADDON.setSetting(target, clipboard)
+                xbmcgui.Dialog().notification("StreamContinuum", f"{ADDON.getLocalizedString(30081)} {target}", xbmcgui.NOTIFICATION_INFO)
+            else:
+                xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30083))
+        except AttributeError:
+            xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30084))
+        return
+    elif action == 'sync_history':
+        import sync
+        if sync.sync_history():
+            xbmcgui.Dialog().notification("StreamContinuum", "Historie synchronizována", xbmcgui.NOTIFICATION_INFO)
+        else:
+            xbmcgui.Dialog().notification("StreamContinuum", "Chyba synchronizace", xbmcgui.NOTIFICATION_ERROR)
+        return
+    elif action == 'export_settings':
+        keyboard = xbmc.Keyboard('', 'Zadejte PIN pro šifrování')
+        keyboard.doModal()
+        if keyboard.isConfirmed() and keyboard.getText():
+            import sync
+            success, msg = sync.export_settings(keyboard.getText())
+            if success:
+                xbmcgui.Dialog().notification("StreamContinuum", "Nastavení exportováno", xbmcgui.NOTIFICATION_INFO)
+            else:
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba exportu", xbmc.NOTIFICATION_ERROR)
+        return
+    elif action == 'import_settings':
+        keyboard = xbmc.Keyboard('', 'Zadejte PIN pro dešifrování')
+        keyboard.doModal()
+        if keyboard.isConfirmed() and keyboard.getText():
+            import sync
+            success, msg = sync.import_settings(keyboard.getText())
+            if success:
+                xbmcgui.Dialog().notification("StreamContinuum", "Nastavení importováno", xbmcgui.NOTIFICATION_INFO)
+            else:
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba importu", xbmc.NOTIFICATION_ERROR)
+        return
+    elif action == 'trakt_mark':
+        media_type = params.get('type')
+        trakt_id = params.get('id')
+        watched = params.get('watched') == '1'
+        if watched:
+            success = trakt.mark_watched(media_type, trakt_id)
+        else:
+            success = trakt.mark_unwatched(media_type, trakt_id)
+        if success:
+            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
+        else:
+            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30086), xbmcgui.NOTIFICATION_ERROR, 2000)
+        return
+    elif action == 'history_delete':
+        import history
+        history.delete_from_history(params.get('query'))
+        xbmc.executebuiltin('Container.Refresh')
+        return
+    elif action == 'history_edit':
+        old_query = params.get('query')
+        keyboard = xbmc.Keyboard(old_query, ADDON.getLocalizedString(30087))
+        keyboard.doModal()
+        if keyboard.isConfirmed():
+            new_query = keyboard.getText()
+            if new_query:
+                import history
+                history.update_history_item(old_query, new_query)
+                xbmc.executebuiltin('Container.Refresh')
+        return
+    elif action == 'assign_tmdb_data_to_history':
+        assign_tmdb_data_to_history(
+            original_query=params.get('original_query'),
+            tmdb_id=params.get('tmdb_id'),
+            media_type=params.get('media_type'),
+            title=params.get('title'),
+            year=params.get('year'),
+            plot=params.get('plot'),
+            genres=params.get('genres'),
+            rating=params.get('rating'),
+            runtime=params.get('runtime'),
+            poster=params.get('poster'),
+            fanart=params.get('fanart')
+        )
+        return
+
+    # If the action requires directory handle but handle is invalid, redirect to window
+    if HANDLE < 0:
+        addon_id = ADDON.getAddonInfo('id')
+        target_url = f"plugin://{addon_id}/"
+        if len(sys.argv) > 2 and sys.argv[2]:
+            target_url += sys.argv[2]
+        xbmc.log(f"StreamContinuum: Invalid handle (< 0) for action '{action}'. Redirecting to ActivateWindow.", xbmc.LOGWARNING)
+        xbmc.executebuiltin(f'ActivateWindow(Videos, {target_url}, return)')
+        return
 
     if action:
         trakt_token = ADDON.getSetting('trakt_token')
@@ -1166,60 +1276,8 @@ def run():
         trakt_menu()
     elif action == 'trakt_search_menu':
         trakt_search()
-    elif action == 'trakt_auth':
-        trakt.authenticate()
-    elif action == 'sync_history':
-        import sync
-        if sync.sync_history():
-            xbmcgui.Dialog().notification("StreamContinuum", "Historie synchronizována", xbmcgui.NOTIFICATION_INFO)
-        else:
-            xbmcgui.Dialog().notification("StreamContinuum", "Chyba synchronizace", xbmcgui.NOTIFICATION_ERROR)
-    elif action == 'export_settings':
-        keyboard = xbmc.Keyboard('', 'Zadejte PIN pro šifrování')
-        keyboard.doModal()
-        if keyboard.isConfirmed() and keyboard.getText():
-            import sync
-            success, msg = sync.export_settings(keyboard.getText())
-            if success:
-                xbmcgui.Dialog().notification("StreamContinuum", "Nastavení exportováno", xbmcgui.NOTIFICATION_INFO)
-            else:
-                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba exportu", xbmc.NOTIFICATION_ERROR)
-    elif action == 'import_settings':
-        keyboard = xbmc.Keyboard('', 'Zadejte PIN pro dešifrování')
-        keyboard.doModal()
-        if keyboard.isConfirmed() and keyboard.getText():
-            import sync
-            success, msg = sync.import_settings(keyboard.getText())
-            if success:
-                xbmcgui.Dialog().notification("StreamContinuum", "Nastavení importováno", xbmcgui.NOTIFICATION_INFO)
-            else:
-                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba importu", xbmc.NOTIFICATION_ERROR)
-    elif action == 'trakt_refresh':
-        user_info = trakt.get_user_info()
-        if user_info:
-            username = user_info.get('username', ADDON.getLocalizedString(30077))
-            ADDON.setSetting('trakt_username', username)
-            xbmcgui.Dialog().notification("Trakt.tv", f"{ADDON.getLocalizedString(30078)}: {username}", xbmcgui.NOTIFICATION_INFO)
-        else:
-            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30079), xbmcgui.NOTIFICATION_ERROR)
-    elif action == 'trakt_logout':
-        ADDON.setSetting('trakt_token', '')
-        ADDON.setSetting('trakt_username', ADDON.getLocalizedString(30048))
-        xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30080), xbmcgui.NOTIFICATION_INFO)
-    elif action == 'paste_from_clipboard':
-        target = params.get('target')
-        try:
-            clipboard = xbmc.getClipboard()
-            if clipboard:
-                ADDON.setSetting(target, clipboard)
-                xbmcgui.Dialog().notification("StreamContinuum", f"{ADDON.getLocalizedString(30081)} {target}", xbmcgui.NOTIFICATION_INFO)
-            else:
-                xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30083))
-        except AttributeError:
-            xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30084))
     elif action == 'settings':
         ADDON.openSettings()
-        xbmc.executebuiltin(f'Container.Update({sys.argv[0]},replace)')
     elif action == 'search':
         search(params.get('query'))
     elif action == 'search_prefill':
@@ -1238,52 +1296,12 @@ def run():
         show_trakt_playback(params.get('offset', 0))
     elif action == 'trakt_search':
         trakt_search(params.get('query', ''))
-    elif action == 'trakt_mark':
-        media_type = params.get('type')
-        trakt_id = params.get('id')
-        watched = params.get('watched') == '1'
-        if watched:
-            success = trakt.mark_watched(media_type, trakt_id)
-        else:
-            success = trakt.mark_unwatched(media_type, trakt_id)
-        if success:
-            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
-        else:
-            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30086), xbmcgui.NOTIFICATION_ERROR, 2000)
     elif action == 'history':
         show_history()
     elif action == 'history_menu':
         history_menu(params.get('query'))
-    elif action == 'history_delete':
-        import history
-        history.delete_from_history(params.get('query'))
-        xbmc.executebuiltin('Container.Refresh')
-    elif action == 'history_edit':
-        old_query = params.get('query')
-        keyboard = xbmc.Keyboard(old_query, ADDON.getLocalizedString(30087))
-        keyboard.doModal()
-        if keyboard.isConfirmed():
-            new_query = keyboard.getText()
-            if new_query:
-                import history
-                history.update_history_item(old_query, new_query)
-                xbmc.executebuiltin('Container.Refresh')
     elif action == 'history_tmdb_identify_search':
         history_tmdb_identify_search(params.get('original_query', ''))
-    elif action == 'assign_tmdb_data_to_history':
-        assign_tmdb_data_to_history(
-            original_query=params.get('original_query'),
-            tmdb_id=params.get('tmdb_id'),
-            media_type=params.get('media_type'),
-            title=params.get('title'),
-            year=params.get('year'),
-            plot=params.get('plot'),
-            genres=params.get('genres'),
-            rating=params.get('rating'),
-            runtime=params.get('runtime'),
-            poster=params.get('poster'),
-            fanart=params.get('fanart')
-        )
     elif action == 'tmdb_menu':
         show_tmdb_menu()
     elif action == 'tmdb_category':
@@ -1300,8 +1318,6 @@ def run():
         show_trakt_discover_menu()
     elif action == 'trakt_discover':
         show_trakt_discover(params.get('list_type', 'trending'), params.get('media_type', 'movies'), params.get('offset', 0))
-    elif action == 'show_changelog':
-        show_changelog()
     else:
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
