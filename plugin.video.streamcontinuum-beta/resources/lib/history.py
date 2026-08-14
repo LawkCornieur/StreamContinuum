@@ -4,6 +4,7 @@ import xbmcaddon
 import xbmcvfs
 import re
 import time
+import xbmc
 
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
@@ -25,14 +26,10 @@ def get_base_name(query):
     if not query:
         return ""
     # Matches patterns like S01E01, s1e1, 1x01 and everything after it
-    pattern_episode = r'(?i)\\s*(s\\d+\\s*e\\d+|\\d+x\\d+).*$'
-    base = re.sub(pattern_episode, '', query).strip()
+    base = re.sub(r'\s*(?:s\d+\s*e\d+|\d+x\d+).*$', '', query, flags=re.IGNORECASE).strip()
     
-    # Also remove common year patterns like "(YYYY)" or " YYYY" at the end
-    # This helps get a cleaner title for TMDb search, especially for movies or series
-    # that might have year in the title for disambiguation.
-    pattern_year = r'\\s*(\\(?\\d{4}\\)?|\\s\\d{4})$'
-    base = re.sub(pattern_year, '', base).strip()
+    # Also remove common year patterns like "(YYYY)" or "YYYY" at the end
+    base = re.sub(r'\s*\(?\d{4}\)?$', '', base).strip()
 
     return base if base else query
 
