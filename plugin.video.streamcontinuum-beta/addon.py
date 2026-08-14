@@ -422,8 +422,9 @@ def show_changelog():
     try:
         with open(changelog_path, 'r', encoding='utf-8') as f:
             changelog = f.read()
-    except Exception:
-        changelog = "Changelog nenalezen."
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error reading changelog: {e}", xbmc.LOGWARNING)
+        changelog = "Changelog momentálně není k dispozici."
     xbmcgui.Dialog().textviewer(ADDON.getAddonInfo('name') + ' - Changelog', changelog)
 
 def show_trakt_watchlist():
@@ -1151,12 +1152,13 @@ def run():
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:])) if len(sys.argv) > 2 else {}
     action = params.get('action')
 
-    trakt_token = ADDON.getSetting('trakt_token')
-    trakt_user = ADDON.getSetting('trakt_username')
-    if trakt_token and (not trakt_user or trakt_user == ADDON.getLocalizedString(30048)):
-        user_info = trakt.get_user_info()
-        if user_info:
-            ADDON.setSetting('trakt_username', user_info.get('username', ADDON.getLocalizedString(30077)))
+    if action:
+        trakt_token = ADDON.getSetting('trakt_token')
+        trakt_user = ADDON.getSetting('trakt_username')
+        if trakt_token and (not trakt_user or trakt_user == ADDON.getLocalizedString(30048)):
+            user_info = trakt.get_user_info()
+            if user_info:
+                ADDON.setSetting('trakt_username', user_info.get('username', ADDON.getLocalizedString(30077)))
 
     if not action:
         list_categories()
