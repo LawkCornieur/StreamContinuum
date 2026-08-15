@@ -120,7 +120,9 @@ def get_tv_tips(day_offset=0):
                 raw_title = title
                 overview = str(item.get('overview') or '')
                 poster_path = item.get('poster_path')
+                backdrop_path = item.get('backdrop_path')
                 img = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                backdrop_img = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
                 
                 date_key = 'release_date' if media_type == 'movie' else 'first_air_date'
                 year = _extract_year(item, date_key)
@@ -132,11 +134,13 @@ def get_tv_tips(day_offset=0):
                 info_type = 'Televizní tip (Film)' if media_type == 'movie' else 'Televizní tip (Seriál)'
                 
                 items.append({
+                    'id': item.get('id'),
                     'title': display_title,
                     'clean_title': raw_title,
                     'year': year,
                     'url': '',
                     'img': img,
+                    'backdrop_path': backdrop_img,
                     'info': info_type,
                     'plot': overview,
                     'type': 'show' if media_type == 'tv' else 'movie'
@@ -173,7 +177,9 @@ def get_vod_premieres(page=1):
                 raw_title = title
                 overview = str(item.get('overview') or '')
                 poster_path = item.get('poster_path')
+                backdrop_path = item.get('backdrop_path')
                 img = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                backdrop_img = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
                 year = _extract_year(item, 'release_date')
                 
                 rating_raw = item.get('vote_average', 0)
@@ -181,11 +187,13 @@ def get_vod_premieres(page=1):
                 display_title = f"[{rating_percent}%] {title}" if rating_percent else title
                 
                 items.append({
+                    'id': item.get('id'),
                     'title': display_title,
                     'clean_title': raw_title,
                     'year': year,
                     'url': '',
                     'img': img,
+                    'backdrop_path': backdrop_img,
                     'info': 'Kino / VOD Premiéra',
                     'plot': overview,
                     'type': 'movie'
@@ -222,7 +230,9 @@ def get_disk_premieres(month, year):
                 raw_title = title
                 overview = str(item.get('overview') or '')
                 poster_path = item.get('poster_path')
+                backdrop_path = item.get('backdrop_path')
                 img = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                backdrop_img = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
                 rel_year = _extract_year(item, 'release_date')
                 
                 rating_raw = item.get('vote_average', 0)
@@ -230,11 +240,13 @@ def get_disk_premieres(month, year):
                 display_title = f"[{rating_percent}%] {title}" if rating_percent else title
                 
                 items.append({
+                    'id': item.get('id'),
                     'title': display_title,
                     'clean_title': raw_title,
                     'year': rel_year,
                     'url': '',
                     'img': img,
+                    'backdrop_path': backdrop_img,
                     'info': 'Novinka / Disk',
                     'plot': overview,
                     'type': 'movie'
@@ -276,7 +288,9 @@ def search_tmdb(query):
                 raw_title = title
                 overview = str(item.get('overview') or '')
                 poster_path = item.get('poster_path')
+                backdrop_path = item.get('backdrop_path')
                 img = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                backdrop_img = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
                 
                 date_key = 'release_date' if media_type == 'movie' else 'first_air_date'
                 year = _extract_year(item, date_key)
@@ -288,11 +302,13 @@ def search_tmdb(query):
                 info_type = 'Film' if media_type == 'movie' else 'Seriál'
                 
                 items.append({
+                    'id': item.get('id'),
                     'title': display_title,
                     'clean_title': raw_title,
                     'year': year,
                     'url': '',
                     'img': img,
+                    'backdrop_path': backdrop_img,
                     'info': info_type,
                     'plot': overview,
                     'type': 'show' if media_type == 'tv' else 'movie'
@@ -305,4 +321,3 @@ def search_tmdb(query):
         xbmc.log(f"StreamContinuum: Error searching TMDb: {e}", xbmc.LOGERROR)
     
     return []
-
