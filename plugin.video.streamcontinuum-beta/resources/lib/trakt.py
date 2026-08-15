@@ -100,7 +100,7 @@ def get_trakt_id_from_tmdb_id(tmdb_id, media_type):
     media_type: 'movie' nebo 'show'
     Vrací Trakt ID (int) nebo None.
     """
-    if not tmdb_id or media_type not in ('movie', 'show'):
+    if not tmdb_id or str(tmdb_id).strip().lower() in ('none', '', '0') or media_type not in ('movie', 'show'):
         return None
 
     trakt_search_type = 'movie' if media_type == 'movie' else 'show'
