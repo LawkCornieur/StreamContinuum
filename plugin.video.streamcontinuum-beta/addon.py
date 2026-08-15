@@ -317,13 +317,17 @@ def show_history():
 
 def history_menu(query, title=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {query}")
+    trakt_token = ADDON.getSetting('trakt_token')
+    enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
+    
     items = [
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
         (ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
         (ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
         (ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'),
-        (ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
     ]
+    if trakt_token and enable_trakt_menu:
+        items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'))
     
     series_pattern = re.compile(r'^(.*)\s+S(\d{2})E(\d{2})', re.IGNORECASE)
     match = series_pattern.match(query)
@@ -718,20 +722,78 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{title} - {ADDON.getLocalizedString(30105)}")
     xbmc.log(f"StreamContinuum: show_tmdb_show_seasons called for title='{title}', year='{year}', tmdb_id='{tmdb_id}'", xbmc.LOGINFO)
 
-    trakt_id = None
-    poster = ''
-    fanart = ''
-    show_meta = {}
-
     clean_tmdb_id = tmdb_id if (tmdb_id and str(tmdb_id).strip().lower() != 'none') else None
 
+    if not clean_tmdb_id and tmdb_module and title:
+        try:
+            search_res = tmdb_module.search_tmdb(title)
+            for s_item in search_res:
+                if s_item.get('type') == 'show' and s_item.get('id'):
+                    clean_tmdb_id = s_item.get('id')
+                    break
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Error searching TMDb ID for '{title}': {e}", xbmc.LOGWARNING)
+
+    if clean_tmdb_id and tmdb_module:
+        seasons_data = tmdb_module.get_show_seasons(clean_tmdb_id)
+        if seasons_data:
+            show_name = seasons_data.get('title') or title
+            poster = seasons_data.get('poster') or ''
+            fanart = seasons_data.get('fanart') or ''
+            seasons = seasons_data.get('seasons', [])
+            
+            for season in seasons:
+                season_num = season.get('season_number', 0)
+                if season_num == 0:
+                    continue
+                ep_count = season.get('episode_count', 0)
+                rating = season.get('rating', 0)
+                overview = season.get('overview', '')
+                season_name = season.get('name') or f"{ADDON.getLocalizedString(30105)} {season_num}"
+                season_poster = season.get('poster') or poster
+                
+                label = season_name if not ep_count else f"{season_name} ({ep_count})"
+                li = xbmcgui.ListItem(label=label)
+                art = {'icon': 'DefaultTVShows.png', 'thumb': season_poster or 'DefaultTVShows.png'}
+                if season_poster:
+                    art['poster'] = season_poster
+                art['fanart'] = fanart if fanart else get_asset('fa.png')
+                li.setArt(art)
+                
+                info_tag = li.getVideoInfoTag()
+                info_tag.setTitle(season_name)
+                info_tag.setMediaType('season')
+                info_tag.setSeason(season_num)
+                if overview:
+                    info_tag.setPlot(overview)
+                if rating:
+                    try:
+                        info_tag.setRating(float(rating))
+                    except (ValueError, TypeError):
+                        pass
+                if ep_count:
+                    info_tag.setEpisodeCount(ep_count)
+                    
+                url = (f"{sys.argv[0]}?action=tmdb_show_episodes"
+                       f"&show_title={urllib.parse.quote(show_name)}"
+                       f"&tmdb_id={clean_tmdb_id}"
+                       f"&season={season_num}"
+                       f"&poster={urllib.parse.quote(season_poster)}"
+                       f"&fanart={urllib.parse.quote(fanart)}")
+                xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
+                
+            xbmcplugin.setContent(HANDLE, 'seasons')
+            xbmcplugin.endOfDirectory(HANDLE)
+            return
+
+    # Fallback to Trakt if TMDb direct retrieval fails
+    trakt_id = None
     if clean_tmdb_id:
         try:
             trakt_id = trakt.get_trakt_id_from_tmdb_id(clean_tmdb_id, 'show')
         except Exception as e:
             xbmc.log(f"StreamContinuum: Error getting Trakt ID from TMDb ID '{clean_tmdb_id}': {e}", xbmc.LOGERROR)
 
-    # Fallback to search_trakt by title if TMDb ID lookup failed or wasn't available
     if not trakt_id and title:
         try:
             search_results = trakt.search_trakt(title)
@@ -741,7 +803,6 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
                     candidate_id = found_show.get('ids', {}).get('trakt')
                     if candidate_id:
                         trakt_id = candidate_id
-                        xbmc.log(f"StreamContinuum: Fallback match found for show '{title}' -> Trakt ID {trakt_id}", xbmc.LOGINFO)
                         break
         except Exception as e:
             xbmc.log(f"StreamContinuum: Error searching Trakt by show title '{title}': {e}", xbmc.LOGERROR)
@@ -752,13 +813,76 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
             poster = show_meta.get('poster', '')
             fanart = show_meta.get('fanart', '')
         except Exception as e:
-            xbmc.log(f"StreamContinuum: Error fetching localized metadata for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
+            poster = ''
+            fanart = ''
         final_show_title = show_meta.get('title') or title
         show_seasons(final_show_title, str(trakt_id), poster, fanart)
     else:
         ws_query = f"{title} {year}".strip()
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
+
+def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart=''):
+    season_num = int(season_num)
+    xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)} {season_num}")
+    
+    if not tmdb_module:
+        xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+        
+    episodes = tmdb_module.get_season_episodes(tmdb_id, season_num)
+    if not episodes:
+        xbmcgui.Dialog().notification('StreamContinuum', ADDON.getLocalizedString(30107), xbmcgui.NOTIFICATION_ERROR, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+        
+    for ep in episodes:
+        ep_num = ep.get('episode_number', 0)
+        ep_title = ep.get('name') or ADDON.getLocalizedString(30108).format(ep_num)
+        overview = ep.get('overview', '')
+        rating = ep.get('rating', 0)
+        runtime = ep.get('runtime', 0)
+        still = ep.get('still') or poster
+
+        ws_query = f"{show_title} S{season_num:02d}E{ep_num:02d}"
+        label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}"
+
+        li = xbmcgui.ListItem(label=label)
+        art = {}
+        if still:
+            art['poster'] = still
+            art['thumb'] = still
+            art['icon'] = still
+        else:
+            art['icon'] = 'DefaultTVShows.png'
+            art['thumb'] = 'DefaultTVShows.png'
+        art['fanart'] = fanart if fanart else get_asset('fa.png')
+        li.setArt(art)
+
+        info_tag = li.getVideoInfoTag()
+        info_tag.setTitle(ep_title)
+        info_tag.setMediaType('episode')
+        info_tag.setSeason(season_num)
+        info_tag.setEpisode(ep_num)
+        if overview:
+            info_tag.setPlot(overview)
+        if rating:
+            try:
+                info_tag.setRating(float(rating))
+            except (ValueError, TypeError):
+                pass
+        if runtime:
+            try:
+                info_tag.setDuration(int(runtime) * 60)
+            except (ValueError, TypeError):
+                pass
+
+        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
+
+    xbmcplugin.setContent(HANDLE, 'episodes')
+    xbmcplugin.endOfDirectory(HANDLE)
 
 def show_tmdb_search(query=None):
     if tmdb_module is None:
@@ -1313,6 +1437,8 @@ def run():
         show_tmdb_category(params.get('category'), params.get('offset', 0))
     elif action == 'tmdb_show_seasons':
         show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''), params.get('tmdb_id'))
+    elif action == 'tmdb_show_episodes':
+        show_tmdb_show_episodes(params.get('show_title', ''), params.get('tmdb_id'), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
     elif action == 'tmdb_search':
         show_tmdb_search(params.get('query'))
     elif action == 'show_seasons':
