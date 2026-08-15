@@ -1169,6 +1169,10 @@ def history_tmdb_identify_search(original_query):
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30120)}: {original_query}")
     xbmc.log(f"StreamContinuum: Searching TMDb for '{original_query}', cleaned to '{cleaned_query}'", xbmc.LOGINFO)
     all_items = tmdb_module.search_tmdb(cleaned_query)
+    if not all_items and cleaned_query != original_query:
+        xbmc.log(f"StreamContinuum: Searching TMDb fallback with raw query '{original_query}'", xbmc.LOGINFO)
+        all_items = tmdb_module.search_tmdb(original_query)
+
     if not all_items:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30128), xbmcgui.NOTIFICATION_WARNING, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -1214,23 +1218,7 @@ def history_tmdb_identify_search(original_query):
             media_type=kodi_type
         )
 
-        assign_params = {
-            'action': 'assign_tmdb_data_to_history',
-            'original_query': original_query,
-            'tmdb_id': item.get('id'),
-            'media_type': kodi_type,
-            'title': final_title,
-            'year': final_year,
-            'plot': final_plot,
-            'genres': '|'.join(final_genres),
-            'rating': final_rating,
-            'runtime': final_runtime,
-            'poster': final_poster,
-            'fanart': final_fanart
-        }
-        
-        encoded_params = '&'.join(f"{key}={urllib.parse.quote_plus(str(value) if value is not None else '')}" for key, value in assign_params.items())
-        url = f"{sys.argv[0]}?{encoded_params}"
+        url = f"{sys.argv[0]}?action=assign_tmdb_data_to_history&original_query={urllib.parse.quote_plus(original_query)}&tmdb_id={item.get('id')}&media_type={kodi_type}"
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=False)
 
     xbmcplugin.setContent(HANDLE, 'movies' if 'movie' in [i.get('media_type') for i in all_items] else 'tvshows')
@@ -1248,19 +1236,44 @@ def _safe_float_conversion(value):
     except (ValueError, TypeError):
         return None
 
-def assign_tmdb_data_to_history(original_query, tmdb_id, media_type, title, year, plot, genres, rating, runtime, poster, fanart):
+def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
     import history
+    if not original_query or not tmdb_id:
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30127), xbmcgui.NOTIFICATION_ERROR, 3000)
+        return
+
+    trakt_media_type = 'show' if media_type == 'tvshow' or media_type == 'tv' else 'movie'
+    meta = trakt.get_localized_metadata(item_id=tmdb_id, media_type=trakt_media_type, id_type='tmdb')
+    
+    if not meta.get('title') and tmdb_module:
+        if trakt_media_type == 'show':
+            show_data = tmdb_module.get_show_seasons(tmdb_id)
+            if show_data:
+                meta['title'] = show_data.get('title')
+                meta['overview'] = show_data.get('overview')
+                meta['poster'] = show_data.get('poster')
+                meta['fanart'] = show_data.get('fanart')
+
+    title = meta.get('title')
+    year = meta.get('year')
+    plot = meta.get('overview')
+    genres = meta.get('genres', [])
+    rating = meta.get('rating')
+    runtime = meta.get('runtime')
+    poster = meta.get('poster')
+    fanart = meta.get('fanart')
+
     tmdb_data = {
         'tmdb_id': _safe_int_conversion(tmdb_id),
-        'media_type': media_type if media_type else None,
-        'title': title if title else None,
+        'media_type': 'tvshow' if trakt_media_type == 'show' else 'movie',
+        'title': title,
         'year': _safe_int_conversion(year),
-        'plot': plot if plot else None,
-        'genres': genres.split('|') if genres else [],
+        'plot': plot,
+        'genres': genres if isinstance(genres, list) else [],
         'rating': _safe_float_conversion(rating),
         'runtime': _safe_int_conversion(runtime),
-        'poster': poster if poster else None,
-        'fanart': fanart if fanart else None
+        'poster': poster,
+        'fanart': fanart
     }
     
     success = history.update_history_with_tmdb_data(original_query, tmdb_data)
@@ -1369,15 +1382,7 @@ def run():
         assign_tmdb_data_to_history(
             original_query=params.get('original_query'),
             tmdb_id=params.get('tmdb_id'),
-            media_type=params.get('media_type'),
-            title=params.get('title'),
-            year=params.get('year'),
-            plot=params.get('plot'),
-            genres=params.get('genres'),
-            rating=params.get('rating'),
-            runtime=params.get('runtime'),
-            poster=params.get('poster'),
-            fanart=params.get('fanart')
+            media_type=params.get('media_type')
         )
         return
 
