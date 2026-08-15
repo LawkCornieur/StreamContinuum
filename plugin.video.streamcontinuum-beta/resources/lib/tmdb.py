@@ -321,3 +321,79 @@ def search_tmdb(query):
         xbmc.log(f"StreamContinuum: Error searching TMDb: {e}", xbmc.LOGERROR)
     
     return []
+
+def get_show_seasons(tmdb_id):
+    """
+    Načte detaily seriálu a seznam jeho sezón z TMDb v češtině.
+    """
+    xbmc.log(f"StreamContinuum: Fetching show details and seasons for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
+    url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
+    try:
+        res = make_tmdb_request(url_template)
+        if res and res.status_code == 200:
+            data = res.json()
+            title = data.get('name') or data.get('original_name', '')
+            overview = data.get('overview', '')
+            poster_path = data.get('poster_path')
+            backdrop_path = data.get('backdrop_path')
+            poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+            fanart = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
+            
+            raw_seasons = data.get('seasons', [])
+            seasons = []
+            for s in raw_seasons:
+                s_poster = f"https://image.tmdb.org/t/p/w500{s.get('poster_path')}" if s.get('poster_path') else poster
+                seasons.append({
+                    'season_number': s.get('season_number', 0),
+                    'name': s.get('name', ''),
+                    'overview': s.get('overview', ''),
+                    'episode_count': s.get('episode_count', 0),
+                    'poster': s_poster,
+                    'air_date': s.get('air_date', ''),
+                    'rating': s.get('vote_average', 0)
+                })
+            return {
+                'id': data.get('id'),
+                'title': title,
+                'overview': overview,
+                'poster': poster,
+                'fanart': fanart,
+                'seasons': seasons
+            }
+        else:
+            xbmc.log(f"StreamContinuum: TMDb show details failed: status {res.status_code if res else 'None'}", xbmc.LOGWARNING)
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error fetching TMDb show details for ID {tmdb_id}: {e}", xbmc.LOGERROR)
+    return None
+
+def get_season_episodes(tmdb_id, season_number):
+    """
+    Načte seznam epizod dané série seriálu z TMDb v češtině.
+    """
+    xbmc.log(f"StreamContinuum: Fetching episodes for TMDb ID '{tmdb_id}', season {season_number}", xbmc.LOGINFO)
+    url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_number}?api_key={{api_key}}&language=cs-CZ"
+    try:
+        res = make_tmdb_request(url_template)
+        if res and res.status_code == 200:
+            data = res.json()
+            raw_episodes = data.get('episodes', [])
+            episodes = []
+            for ep in raw_episodes:
+                still_path = ep.get('still_path')
+                still = f"https://image.tmdb.org/t/p/w500{still_path}" if still_path else ''
+                episodes.append({
+                    'episode_number': ep.get('episode_number', 0),
+                    'season_number': ep.get('season_number', season_number),
+                    'name': ep.get('name', ''),
+                    'overview': ep.get('overview', ''),
+                    'runtime': ep.get('runtime', 0),
+                    'still': still,
+                    'rating': ep.get('vote_average', 0),
+                    'air_date': ep.get('air_date', '')
+                })
+            return episodes
+        else:
+            xbmc.log(f"StreamContinuum: TMDb season episodes failed: status {res.status_code if res else 'None'}", xbmc.LOGWARNING)
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error fetching TMDb season episodes for ID {tmdb_id}, S{season_number}: {e}", xbmc.LOGERROR)
+    return []
