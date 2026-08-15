@@ -697,7 +697,7 @@ def show_tmdb_category(category, offset=0):
         if is_show:
             url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
                    f"&title={urllib.parse.quote(raw_title)}&year={year}"
-                   f"&tmdb_id={tmdb_item_id}")
+                   f"&tmdb_id={tmdb_item_id if tmdb_item_id is not None else ''}")
         else:
             ws_query = f"{raw_title} {year}".strip()
             url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
@@ -723,32 +723,37 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
     fanart = ''
     show_meta = {}
 
-    if tmdb_id:
+    clean_tmdb_id = tmdb_id if (tmdb_id and str(tmdb_id).strip().lower() != 'none') else None
+
+    if clean_tmdb_id:
         try:
-            trakt_id = trakt.get_trakt_id_from_tmdb_id(tmdb_id, 'show')
+            trakt_id = trakt.get_trakt_id_from_tmdb_id(clean_tmdb_id, 'show')
         except Exception as e:
-            xbmc.log(f"StreamContinuum: Error getting Trakt ID from TMDb ID '{tmdb_id}': {e}", xbmc.LOGERROR)
+            xbmc.log(f"StreamContinuum: Error getting Trakt ID from TMDb ID '{clean_tmdb_id}': {e}", xbmc.LOGERROR)
 
-        if trakt_id:
-            try:
-                show_meta = trakt.get_localized_metadata(trakt_id, 'show')
-                poster = show_meta.get('poster', '')
-                fanart = show_meta.get('fanart', '')
-            except Exception as e:
-                xbmc.log(f"StreamContinuum: Error fetching localized metadata for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
-        else:
-            ws_query = f"{title} {year}".strip()
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
-            return
-    else:
-        ws_query = f"{title} {year}".strip()
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
-        return
+    # Fallback to search_trakt by title if TMDb ID lookup failed or wasn't available
+    if not trakt_id and title:
+        try:
+            search_results = trakt.search_trakt(title)
+            for res_item in search_results:
+                if res_item.get('type') == 'show':
+                    found_show = res_item.get('show', {})
+                    candidate_id = found_show.get('ids', {}).get('trakt')
+                    if candidate_id:
+                        trakt_id = candidate_id
+                        xbmc.log(f"StreamContinuum: Fallback match found for show '{title}' -> Trakt ID {trakt_id}", xbmc.LOGINFO)
+                        break
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Error searching Trakt by show title '{title}': {e}", xbmc.LOGERROR)
 
-    final_show_title = show_meta.get('title') or title
-    if trakt_id is not None:
+    if trakt_id:
+        try:
+            show_meta = trakt.get_localized_metadata(trakt_id, 'show')
+            poster = show_meta.get('poster', '')
+            fanart = show_meta.get('fanart', '')
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Error fetching localized metadata for Trakt ID '{trakt_id}': {e}", xbmc.LOGERROR)
+        final_show_title = show_meta.get('title') or title
         show_seasons(final_show_title, str(trakt_id), poster, fanart)
     else:
         ws_query = f"{title} {year}".strip()
@@ -800,7 +805,7 @@ def show_tmdb_search(query=None):
                 url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
                        f"&title={urllib.parse.quote(raw_title)}"
                        f"&year={year}"
-                       f"&tmdb_id={tmdb_item_id}")
+                       f"&tmdb_id={tmdb_item_id if tmdb_item_id is not None else ''}")
             else:
                 ws_query = f"{raw_title} {year}".strip()
                 url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
