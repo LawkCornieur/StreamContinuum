@@ -25,13 +25,23 @@ def get_history():
 def get_base_name(query):
     if not query:
         return ""
-    # Matches patterns like S01E01, s1e1, 1x01 and everything after it
-    base = re.sub(r'\s*(?:s\d+\s*e\d+|\d+x\d+).*$', '', query, flags=re.IGNORECASE).strip()
-    
-    # Also remove common year patterns like "(YYYY)" or "YYYY" at the end
-    base = re.sub(r'\s*\(?\d{4}\)?$', '', base).strip()
-
-    return base if base else query
+    q = query
+    # Odstranění běžných video přípon
+    q = re.sub(r'\.(mkv|avi|mp4|m4v|mov|wmv|ts|flv)$', '', q, flags=re.IGNORECASE)
+    # Nahrazení teček, podtržítek a pomlček mezerami
+    q = re.sub(r'[._]', ' ', q)
+    # Odstranění označení sezón a epizod (S01E01, s1e1, 1x01, Season, Serie apod.)
+    q = re.sub(r'\s*(?:s\d+\s*e\d+|\bseason\s*\d+|\bsérie\s*\d+|\bserie\s*\d+|\bs\d+\b|\be\d+\b|\d+x\d+).*$', '', q, flags=re.IGNORECASE).strip()
+    # Odstranění kvality a formátů videa/audia
+    q = re.sub(r'\b(2160p|1080p|720p|480p|4k|uhd|hd|hdtv|web-?dl|bluray|bdrip|dvdrip|dvd|x264|x265|h264|hevc|aac|ac3|dts)\b.*$', '', q, flags=re.IGNORECASE).strip()
+    # Odstranění jazykových tagů a vydání
+    q = re.sub(r'\b(cz|sk|en|dabing|dab|czdab|skdab|titulky|tit|cztit|sktit|repack|proper|extended|unrated)\b.*$', '', q, flags=re.IGNORECASE).strip()
+    # Odstranění roku (YYYY) na konci
+    q = re.sub(r'\s*\(?\d{4}\)?$', '', q).strip()
+    # Odstranění přebytečných znaků na konci a vícenásobných mezer
+    q = re.sub(r'[\-\–\—\s]+$', '', q).strip()
+    q = re.sub(r'\s+', ' ', q).strip()
+    return q if q else query
 
 def _save_history(history_list):
     try:
@@ -114,22 +124,24 @@ def update_history_item(old_query, new_query):
 def update_history_with_tmdb_data(original_query, tmdb_data):
     history = get_history()
     updated = False
+    norm_orig = original_query.strip().lower() if original_query else ""
     for i, item in enumerate(history):
-        if item.get('query', '').strip() == original_query.strip(): # Robust comparison for Issue #13
+        item_query = item.get('query', '').strip().lower()
+        if item_query == norm_orig or item.get('query', '').strip() == original_query.strip():
             item['title'] = tmdb_data.get('title')
             item['year'] = tmdb_data.get('year')
-            item['plot'] = tmdb_data.get('plot') # Use 'plot' from TMDb results dict
-            item['genres'] = tmdb_data.get('genres', []) # Assume this is a list of strings
-            item['rating'] = tmdb_data.get('rating') # Float
-            item['runtime'] = tmdb_data.get('runtime') # Integer (minutes)
+            item['plot'] = tmdb_data.get('plot')
+            item['genres'] = tmdb_data.get('genres', [])
+            item['rating'] = tmdb_data.get('rating')
+            item['runtime'] = tmdb_data.get('runtime')
             item['poster'] = tmdb_data.get('poster')
             item['fanart'] = tmdb_data.get('fanart')
             item['tmdb_id'] = tmdb_data.get('tmdb_id')
             item['media_type'] = tmdb_data.get('media_type')
-            item['identified_at'] = int(time.time()) # Timestamp for identification
+            item['identified_at'] = int(time.time())
             updated = True
             break
-    if not updated: # Log if item not found, for Issue #13 debugging
+    if not updated:
         xbmc.log(f"StreamContinuum History: Failed to find history item to update for query '{original_query}'", xbmc.LOGWARNING)
     if updated:
         _save_history(history)
