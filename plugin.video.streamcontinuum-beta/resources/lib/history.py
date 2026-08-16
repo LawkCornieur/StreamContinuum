@@ -25,10 +25,10 @@ def get_base_name(query):
     q = re.sub(r'[._]', ' ', q)
     # Odstranění označení sezón a epizod (S01E01, s1e1, 1x01, Season, Serie apod.)
     q = re.sub(r'\s*(?:s\d+\s*e\d+|\bseason\s*\d+|\bsérie\s*\d+|\bserie\s*\d+|\bs\d+\b|\be\d+\b|\d+x\d+).*$', '', q, flags=re.IGNORECASE).strip()
-    # Odstranění kvality a formátů videa/audia
-    q = re.sub(r'\b(2160p|1080p|720p|480p|4k|uhd|hd|hdtv|web-?dl|bluray|bdrip|dvdrip|dvd|x264|x265|h264|hevc|aac|ac3|dts)\b.*$', '', q, flags=re.IGNORECASE).strip()
+    # Odstranění kvality a formátů videa/audia/médií
+    q = re.sub(r'\b(2160p|1080p|720p|480p|4k|uhd|hd|hdtv|web-?dl|bluray|blu-?ray|bdrip|brrip|dvdrip|dvd|laserdisk|laserdisc|cd|vhs|remux|x264|x265|h264|hevc|aac|ac3|dts)\b.*$', '', q, flags=re.IGNORECASE).strip()
     # Odstranění jazykových tagů a vydání
-    q = re.sub(r'\b(cz|sk|en|dabing|dab|czdab|skdab|titulky|tit|cztit|sktit|repack|proper|extended|unrated)\b.*$', '', q, flags=re.IGNORECASE).strip()
+    q = re.sub(r'\b(cz|sk|en|de|czech|czdab|skdab|dabing|dab|czsub|sksub|sub|titulky|tit|cztit|sktit|repack|proper|extended|unrated)\b.*$', '', q, flags=re.IGNORECASE).strip()
     # Odstranění roku (YYYY) na konci
     q = re.sub(r'\s*\(?\d{4}\)?$', '', q).strip()
     # Odstranění přebytečných znaků na konci a vícenásobných mezer
@@ -63,6 +63,13 @@ def get_history():
     except Exception as e:
         xbmc.log(f"StreamContinuum History: Error loading history.json: {e}", xbmc.LOGERROR)
         return []
+
+def get_history_item(query):
+    items = get_history()
+    for item in items:
+        if item.get('query') == query:
+            return item
+    return None
 
 def _save_history(history_list):
     try:
