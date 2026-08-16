@@ -10,17 +10,10 @@ ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
 HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
 
-def get_history():
-    if not os.path.exists(PROFILE_DIR):
-        os.makedirs(PROFILE_DIR)
-    if not os.path.exists(HISTORY_FILE):
-        return []
-    try:
-        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        xbmc.log(f"StreamContinuum History: Error loading history.json: {e}", xbmc.LOGERROR)
-        return []
+def is_series(query):
+    if not query:
+        return False
+    return bool(re.search(r'\b(s\d+\s*e\d+|season\s*\d+|série\s*\d+|serie\s*\d+|s\d+\b|e\d+\b|\d+x\d+)\b', query, re.IGNORECASE))
 
 def get_base_name(query):
     if not query:
@@ -42,6 +35,34 @@ def get_base_name(query):
     q = re.sub(r'[\-\–\—\s]+$', '', q).strip()
     q = re.sub(r'\s+', ' ', q).strip()
     return q if q else query
+
+def get_history():
+    if not os.path.exists(PROFILE_DIR):
+        os.makedirs(PROFILE_DIR)
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            items = json.load(f)
+            if not isinstance(items, list):
+                return []
+            
+            # Deduplicate series keeping only the latest watched episode
+            seen_series = set()
+            unique_items = []
+            for item in items:
+                q = item.get('query', '')
+                if is_series(q) or item.get('media_type') in ('tvshow', 'tv'):
+                    base = get_base_name(q).lower().strip()
+                    if base:
+                        if base in seen_series:
+                            continue
+                        seen_series.add(base)
+                unique_items.append(item)
+            return unique_items
+    except Exception as e:
+        xbmc.log(f"StreamContinuum History: Error loading history.json: {e}", xbmc.LOGERROR)
+        return []
 
 def _save_history(history_list):
     try:
@@ -69,22 +90,33 @@ def add_to_history(query):
         'identified_at': None # Timestamp for when it was identified with TMDb
     }
 
-    # Check for existing item with the exact same query
+    query_is_series = is_series(query)
+    query_base = get_base_name(query).lower().strip()
+
+    # Find existing item (either exact query match, or same TV series)
     existing_item = None
-    for i, item in enumerate(history):
-        if item.get('query') == query:
-            existing_item = item
-            # Remove it temporarily to re-add it at the top
-            del history[i]
-            break
+    remaining_history = []
+    for item in history:
+        item_q = item.get('query', '')
+        item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv')
+        item_base = get_base_name(item_q).lower().strip()
+        
+        is_same_exact = (item_q == query)
+        is_same_series = (query_is_series or item.get('media_type') in ('tvshow', 'tv')) and item_is_series and (query_base and item_base and query_base == item_base)
+        
+        if is_same_exact or is_same_series:
+            if not existing_item:
+                existing_item = item
+        else:
+            remaining_history.append(item)
+    
+    history = remaining_history
     
     # If an existing item was found, use its data (to preserve TMDb info if already identified)
     if existing_item:
-        # Update query in case of slight changes (e.g. case) and bring to top
         existing_item['query'] = query
         item_to_add = existing_item
     else:
-        # If not found, create a new item with template values
         item_to_add = new_item_template
         
     # Add to top
@@ -105,8 +137,6 @@ def update_history_item(old_query, new_query):
     for item in history:
         if item.get('query') == old_query:
             item['query'] = new_query
-            # If it was identified, the identification is now potentially invalid
-            # or at least the query has changed, so clear identification status
             item['title'] = None
             item['year'] = None
             item['plot'] = None
@@ -125,9 +155,12 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
     history = get_history()
     updated = False
     norm_orig = original_query.strip().lower() if original_query else ""
+    orig_base = get_base_name(original_query).strip().lower() if original_query else ""
+    
     for i, item in enumerate(history):
         item_query = item.get('query', '').strip().lower()
-        if item_query == norm_orig or item.get('query', '').strip() == original_query.strip():
+        item_base = get_base_name(item.get('query', '')).strip().lower()
+        if item_query == norm_orig or item.get('query', '').strip() == original_query.strip() or (orig_base and item_base == orig_base):
             item['title'] = tmdb_data.get('title')
             item['year'] = tmdb_data.get('year')
             item['plot'] = tmdb_data.get('plot')
