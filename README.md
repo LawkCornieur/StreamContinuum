@@ -56,6 +56,17 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.3.13** - 2026-08-16
+- - Zapracovány kroky k postupnému ukončení podpory Trakt.tv nově je tato část deaktivována v nastavení (důvodem ukončení je přesun API na placenou verzi). - Řešení kritického problému zobrazování hlavního menu. Opraveno 2026-08-14. - Opravena ztotožnění, již proběhne a zobrazuje název grafiku a popis, či překlady názvů s nestandardními znaky. Ale stále nezobrazuje exotické abecedy 2026-08-15. - Oprava u seriálů a jejich procházení v katalogu. - Přidání hledání pro ztotožnění v historii.
+
+**Verze 1.3.12** - 2026-08-15
+- Zapracovány kroky k postupnému ukončení podpory Trakt.tv nově je tato část deaktivována v nastavení (důvodem ukončení je přesun API na placenou verzi).
+- Řešení kritického problému zobrazování hlavního menu. Opraveno 2026-08-14.
+- Opravena ztotožnění, již proběhne a zobrazuje název grafiku a popis, či překlady názvů s nestandardními znaky. Ale stále nezobrazuje exotické abecedy 2026-08-15.
+- Oprava u seriálů a jejich procházení v katalogu.
+- Zkrácená a tišší úvodní melodie.
+- Přidání hledání pro ztotožnění v historii.
+
 **Verze 1.3.11** - 2026-07-25
 - Oprava vydávání beta verze.
 
