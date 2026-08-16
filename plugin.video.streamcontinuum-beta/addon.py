@@ -324,6 +324,11 @@ def history_menu(query, title=None):
     hist_item = history.get_history_item(query)
     fanart = hist_item.get('fanart') if hist_item and hist_item.get('fanart') else get_asset('fa-history.png')
     poster = hist_item.get('poster') if hist_item and hist_item.get('poster') else None
+    plot = hist_item.get('plot') if hist_item else ''
+    year = hist_item.get('year') if hist_item else None
+    genres = hist_item.get('genres', []) if hist_item else []
+    rating = hist_item.get('rating') if hist_item else None
+    media_type = hist_item.get('media_type') if hist_item and hist_item.get('media_type') else ('movie' if 'S00E00' not in query and re.search(r'\b(S\d{2}E\d{2}|\d{1}x\d{2})\b', query, re.IGNORECASE) is None else 'tvshow')
 
     items = [
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
@@ -354,9 +359,29 @@ def history_menu(query, title=None):
         if poster:
             art['poster'] = poster
         list_item.setArt(art)
+        
+        info_tag = list_item.getVideoInfoTag()
+        info_tag.setTitle(label)
+        info_tag.setMediaType('movie' if media_type == 'movie' else 'tvshow')
+        if plot:
+            info_tag.setPlot(str(plot))
+        if year:
+            try:
+                info_tag.setYear(int(str(year)[:4]))
+            except (ValueError, TypeError):
+                pass
+        if rating:
+            try:
+                info_tag.setRating(float(rating))
+            except (ValueError, TypeError):
+                pass
+        if genres:
+            info_tag.setGenres(genres if isinstance(genres, list) else [genres])
+            
         is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
         
+    xbmcplugin.setContent(HANDLE, 'movies' if media_type == 'movie' else 'tvshows')
     xbmcplugin.endOfDirectory(HANDLE)
 
 def trakt_search(query=None):
@@ -1215,7 +1240,7 @@ def history_tmdb_identify_search(original_query, custom_query=None):
 
         full_tmdb_meta = {}
         if item.get('id'):
-            trakt_media_type_param = item.get('media_type', 'movie').replace('tv', 'show')
+            trakt_media_type_param = 'show' if is_show else 'movie'
             full_tmdb_meta = trakt.get_localized_metadata(
                 item_id=item.get('id'), 
                 media_type=trakt_media_type_param, 
@@ -1246,7 +1271,7 @@ def history_tmdb_identify_search(original_query, custom_query=None):
         url = f"{sys.argv[0]}?action=assign_tmdb_data_to_history&original_query={urllib.parse.quote_plus(original_query)}&tmdb_id={item.get('id')}&media_type={kodi_type}"
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=False)
 
-    xbmcplugin.setContent(HANDLE, 'movies' if 'movie' in [i.get('media_type') for i in all_items] else 'tvshows')
+    xbmcplugin.setContent(HANDLE, 'movies' if any(i.get('type') == 'movie' for i in all_items) else 'tvshows')
     xbmcplugin.endOfDirectory(HANDLE)
 
 def _safe_int_conversion(value):
@@ -1267,7 +1292,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30127), xbmcgui.NOTIFICATION_ERROR, 3000)
         return
 
-    trakt_media_type = 'show' if media_type == 'tvshow' or media_type == 'tv' else 'movie'
+    trakt_media_type = 'show' if media_type in ('tvshow', 'tv', 'show') else 'movie'
     meta = trakt.get_localized_metadata(item_id=tmdb_id, media_type=trakt_media_type, id_type='tmdb')
     
     if not meta.get('title') and tmdb_module:
