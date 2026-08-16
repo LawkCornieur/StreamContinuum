@@ -956,7 +956,7 @@ def show_tmdb_search(query=None):
         return
 
     if not query:
-        keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30057))
+        keyboard = xbmc.Keyboard('', f"{ADDON.getLocalizedString(30052)} - {ADDON.getLocalizedString(30099)}")
         keyboard.doModal()
         if keyboard.isConfirmed():
             query = keyboard.getText()
@@ -1048,6 +1048,7 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
             try:
                 if hasattr(info_tag, 'setEpisodeCount'):
                     info_tag.setEpisodeCount(ep_count)
+                    pass
             except Exception:
                 pass
             li.setProperty('TotalEpisodes', str(ep_count))
