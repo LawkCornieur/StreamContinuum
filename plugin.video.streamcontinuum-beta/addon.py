@@ -6,6 +6,7 @@ import xbmcplugin
 import xbmcaddon
 import urllib.parse
 import re
+import datetime
 
 # Add addon root and resources/lib to sys.path
 ADDON_ROOT = os.path.dirname(__file__)
@@ -687,7 +688,6 @@ def show_tmdb_category(category, offset=0):
 
     offset = int(offset)
     PAGE_SIZE = 10
-    import datetime
     if category == 'tv_tips':
         all_items = tmdb_module.get_tv_tips(0)
         cat_label = ADDON.getLocalizedString(30100)
@@ -875,6 +875,8 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
         
+    today = datetime.date.today()
+
     for ep in episodes:
         ep_num = ep.get('episode_number', 0)
         ep_title = ep.get('name') or ADDON.getLocalizedString(30108).format(ep_num)
@@ -882,9 +884,26 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         rating = ep.get('rating', 0)
         runtime = ep.get('runtime', 0)
         still = ep.get('still') or poster
+        air_date = ep.get('air_date', '')
+
+        formatted_date = ""
+        is_future = False
+        if air_date:
+            try:
+                dt = datetime.datetime.strptime(str(air_date)[:10], '%Y-%m-%d').date()
+                formatted_date = dt.strftime('%d.%m.%Y')
+                if dt > today:
+                    is_future = True
+            except Exception:
+                formatted_date = str(air_date)[:10]
+
+        if formatted_date:
+            date_label = f" [COLOR red]({formatted_date})[/COLOR]" if is_future else f" [COLOR gray]({formatted_date})[/COLOR]"
+        else:
+            date_label = ""
 
         ws_query = f"{show_title} S{season_num:02d}E{ep_num:02d}"
-        label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}"
+        label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
 
         li = xbmcgui.ListItem(label=label)
         art = {}
@@ -914,6 +933,14 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
             try:
                 info_tag.setDuration(int(runtime) * 60)
             except (ValueError, TypeError):
+                pass
+        if air_date:
+            try:
+                if hasattr(info_tag, 'setFirstAired'):
+                    info_tag.setFirstAired(str(air_date)[:10])
+                elif hasattr(info_tag, 'setPremiered'):
+                    info_tag.setPremiered(str(air_date)[:10])
+            except Exception:
                 pass
 
         url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
@@ -1045,6 +1072,8 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
+    today = datetime.date.today()
+
     for episode in episodes:
         ep_num = episode.get('number', 0)
         episode_meta = get_trakt_localized(trakt_id, 'episode', season_num=season_num, episode_num=ep_num)
@@ -1052,9 +1081,26 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
         overview = episode_meta.get('overview') or episode.get('overview', '')
         rating = episode_meta.get('rating') or episode.get('rating', 0)
         runtime = episode_meta.get('runtime') or episode.get('runtime', 0)
+        air_date = episode_meta.get('air_date') or episode.get('first_aired', '')
+
+        formatted_date = ""
+        is_future = False
+        if air_date:
+            try:
+                dt = datetime.datetime.strptime(str(air_date)[:10], '%Y-%m-%d').date()
+                formatted_date = dt.strftime('%d.%m.%Y')
+                if dt > today:
+                    is_future = True
+            except Exception:
+                formatted_date = str(air_date)[:10]
+
+        if formatted_date:
+            date_label = f" [COLOR red]({formatted_date})[/COLOR]" if is_future else f" [COLOR gray]({formatted_date})[/COLOR]"
+        else:
+            date_label = ""
 
         ws_query = f"{show_title} S{season_num:02d}E{ep_num:02d}"
-        label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}"
+        label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
 
         li = xbmcgui.ListItem(label=label)
         art = {}
@@ -1081,6 +1127,14 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
             try:
                 info_tag.setDuration(int(runtime) * 60)
             except (ValueError, TypeError):
+                pass
+        if air_date:
+            try:
+                if hasattr(info_tag, 'setFirstAired'):
+                    info_tag.setFirstAired(str(air_date)[:10])
+                elif hasattr(info_tag, 'setPremiered'):
+                    info_tag.setPremiered(str(air_date)[:10])
+            except Exception:
                 pass
 
         url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
