@@ -320,6 +320,11 @@ def history_menu(query, title=None):
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
     
+    import history
+    hist_item = history.get_history_item(query)
+    fanart = hist_item.get('fanart') if hist_item and hist_item.get('fanart') else get_asset('fa-history.png')
+    poster = hist_item.get('poster') if hist_item and hist_item.get('poster') else None
+
     items = [
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
         (ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
@@ -345,7 +350,10 @@ def history_menu(query, title=None):
     for label, action_params, icon in [i for i in items if i]:
         url = f"{sys.argv[0]}?action={action_params}"
         list_item = xbmcgui.ListItem(label=label)
-        list_item.setArt({'icon': icon, 'thumb': icon})
+        art = {'icon': icon, 'thumb': poster or icon, 'fanart': fanart}
+        if poster:
+            art['poster'] = poster
+        list_item.setArt(art)
         is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
         
@@ -772,7 +780,12 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
                     except (ValueError, TypeError):
                         pass
                 if ep_count:
-                    info_tag.setEpisodeCount(ep_count)
+                    try:
+                        if hasattr(info_tag, 'setEpisodeCount'):
+                            info_tag.setEpisodeCount(ep_count)
+                    except Exception:
+                        pass
+                    li.setProperty('TotalEpisodes', str(ep_count))
                     
                 url = (f"{sys.argv[0]}?action=tmdb_show_episodes"
                        f"&show_title={urllib.parse.quote(show_name)}"
@@ -980,7 +993,12 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
             except (ValueError, TypeError):
                 pass
         if ep_count:
-            info_tag.setEpisodeCount(ep_count)
+            try:
+                if hasattr(info_tag, 'setEpisodeCount'):
+                    info_tag.setEpisodeCount(ep_count)
+            except Exception:
+                pass
+            li.setProperty('TotalEpisodes', str(ep_count))
 
         url = (f"{sys.argv[0]}?action=show_episodes"
                f"&show_title={urllib.parse.quote(show_title)}"
@@ -1158,24 +1176,31 @@ def show_trakt_discover(list_type, media_type, offset=0):
     xbmcplugin.setContent(HANDLE, kodi_content)
     xbmcplugin.endOfDirectory(HANDLE)
 
-def history_tmdb_identify_search(original_query):
+def history_tmdb_identify_search(original_query, custom_query=None):
     if tmdb_module is None:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
     import history
-    cleaned_query = history.get_base_name(original_query)
-    xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30120)}: {original_query}")
-    xbmc.log(f"StreamContinuum: Searching TMDb for '{original_query}', cleaned to '{cleaned_query}'", xbmc.LOGINFO)
-    all_items = tmdb_module.search_tmdb(cleaned_query)
-    if not all_items and cleaned_query != original_query:
+    search_term = custom_query.strip() if (custom_query and custom_query.strip()) else history.get_base_name(original_query)
+    xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30120)}: {search_term}")
+    xbmc.log(f"StreamContinuum: Searching TMDb for '{original_query}', search_term='{search_term}'", xbmc.LOGINFO)
+    all_items = tmdb_module.search_tmdb(search_term)
+    if not all_items and search_term != original_query and not custom_query:
         xbmc.log(f"StreamContinuum: Searching TMDb fallback with raw query '{original_query}'", xbmc.LOGINFO)
         all_items = tmdb_module.search_tmdb(original_query)
 
+    # Add item at top to allow manual search term customization
+    edit_label = f"[COLOR #01b4e4]✎ {ADDON.getLocalizedString(30087)} TMDb ({search_term})...[/COLOR]"
+    edit_url = f"{sys.argv[0]}?action=history_tmdb_custom_search&original_query={urllib.parse.quote_plus(original_query)}&prefill={urllib.parse.quote_plus(search_term)}"
+    edit_item = xbmcgui.ListItem(label=edit_label)
+    edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa.png')})
+    xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=False)
+
     if not all_items:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30128), xbmcgui.NOTIFICATION_WARNING, 3000)
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
         return
 
     for item in all_items:
@@ -1378,6 +1403,16 @@ def run():
                 history.update_history_item(old_query, new_query)
                 xbmc.executebuiltin('Container.Refresh')
         return
+    elif action == 'history_tmdb_custom_search':
+        orig_q = params.get('original_query', '')
+        prefill = params.get('prefill', '')
+        keyboard = xbmc.Keyboard(prefill, "Hledat na TMDb pro ztotožnění")
+        keyboard.doModal()
+        if keyboard.isConfirmed():
+            new_search_term = keyboard.getText()
+            if new_search_term:
+                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote_plus(orig_q)}&custom_query={urllib.parse.quote_plus(new_search_term)},replace)')
+        return
     elif action == 'assign_tmdb_data_to_history':
         assign_tmdb_data_to_history(
             original_query=params.get('original_query'),
@@ -1435,7 +1470,7 @@ def run():
     elif action == 'history_menu':
         history_menu(params.get('query'))
     elif action == 'history_tmdb_identify_search':
-        history_tmdb_identify_search(params.get('original_query', ''))
+        history_tmdb_identify_search(params.get('original_query', ''), params.get('custom_query'))
     elif action == 'tmdb_menu':
         show_tmdb_menu()
     elif action == 'tmdb_category':
