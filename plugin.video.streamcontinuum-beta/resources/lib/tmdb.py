@@ -143,6 +143,7 @@ def get_tv_tips(day_offset=0):
                     'backdrop_path': backdrop_img,
                     'info': info_type,
                     'plot': overview,
+                    'media_type': media_type,
                     'type': 'show' if media_type == 'tv' else 'movie'
                 })
             xbmc.log(f"StreamContinuum: Safely loaded {len(items)} TV tips items", xbmc.LOGINFO)
@@ -196,6 +197,7 @@ def get_vod_premieres(page=1):
                     'backdrop_path': backdrop_img,
                     'info': 'Kino / VOD Premiéra',
                     'plot': overview,
+                    'media_type': 'movie',
                     'type': 'movie'
                 })
             xbmc.log(f"StreamContinuum: Safely loaded {len(items)} VOD items", xbmc.LOGINFO)
@@ -249,6 +251,7 @@ def get_disk_premieres(month, year):
                     'backdrop_path': backdrop_img,
                     'info': 'Novinka / Disk',
                     'plot': overview,
+                    'media_type': 'movie',
                     'type': 'movie'
                 })
             xbmc.log(f"StreamContinuum: Safely loaded {len(items)} upcoming items", xbmc.LOGINFO)
@@ -311,6 +314,7 @@ def search_tmdb(query):
                     'backdrop_path': backdrop_img,
                     'info': info_type,
                     'plot': overview,
+                    'media_type': media_type,
                     'type': 'show' if media_type == 'tv' else 'movie'
                 })
             xbmc.log(f"StreamContinuum: Safely loaded {len(items)} search items from TMDb", xbmc.LOGINFO)
