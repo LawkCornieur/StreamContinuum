@@ -216,7 +216,8 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
             'genres': trakt_item_data.get('genres', []),
             'rating': trakt_item_data.get('rating', 0),
             'runtime': trakt_item_data.get('runtime', 0),
-            'status': trakt_item_data.get('status', '')
+            'status': trakt_item_data.get('status', ''),
+            'air_date': trakt_item_data.get('first_aired', '')
         }
 
     try:
@@ -323,6 +324,7 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
             result['runtime'] = tmdb_data_cs.get('runtime', 0) or tmdb_data_en.get('runtime', 0) # Episode runtime from TMDb
             result['year'] = _get_best_year('air_date', 'air_date', None, log_context=f'Episode Year S{season_num}E{episode_num}') # Episode air date
             result['rating'] = tmdb_data_cs.get('vote_average', 0) or tmdb_data_en.get('vote_average', 0)
+            result['air_date'] = tmdb_data_cs.get('air_date') or tmdb_data_en.get('air_date') or trakt_item_data.get('first_aired', '')
 
         # Common fields (artwork, genres)
         # Artwork paths are universal, use the first available one (CS or EN response has them)
@@ -359,5 +361,6 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
             'genres': trakt_item_data.get('genres', []),
             'rating': trakt_item_data.get('rating', 0),
             'runtime': trakt_item_data.get('runtime', 0),
-            'status': trakt_item_data.get('status', '')
+            'status': trakt_item_data.get('status', ''),
+            'air_date': trakt_item_data.get('first_aired', '')
         }
