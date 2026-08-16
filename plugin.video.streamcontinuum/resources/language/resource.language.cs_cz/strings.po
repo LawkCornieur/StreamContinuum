@@ -382,3 +382,27 @@ msgstr "Další stránka"
 msgctxt "#30118"
 msgid "Failed to load items. Check the connection."
 msgstr "Nepodařilo se načíst položky. Zkontrolujte připojení."
+
+msgctxt "#30119"
+msgid "Trakt.tv"
+msgstr "Trakt.tv"
+
+msgctxt "#30120"
+msgid "Identify with TMDb"
+msgstr "Ztotožnit s TMDb"
+
+msgctxt "#30126"
+msgid "History item identified with TMDb."
+msgstr "Položka historie ztotožněna s TMDb."
+
+msgctxt "#30127"
+msgid "Failed to identify history item with TMDb."
+msgstr "Chyba při ztotožnění položky historie s TMDb."
+
+msgctxt "#30128"
+msgid "No relevant items found on TMDb. Try a different search."
+msgstr "Na TMDb nebyly nalezeny žádné relevantní položky. Zkuste jiné hledání."
+
+msgctxt "#30129"
+msgid "No main menu items could be displayed. Please check addon settings."
+msgstr "Hlavní menu se nepodařilo zobrazit. Zkontrolujte nastavení doplňku."

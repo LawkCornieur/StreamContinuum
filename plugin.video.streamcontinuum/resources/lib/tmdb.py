@@ -120,7 +120,9 @@ def get_tv_tips(day_offset=0):
                 raw_title = title
                 overview = str(item.get('overview') or '')
                 poster_path = item.get('poster_path')
+                backdrop_path = item.get('backdrop_path')
                 img = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                backdrop_img = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
                 
                 date_key = 'release_date' if media_type == 'movie' else 'first_air_date'
                 year = _extract_year(item, date_key)
@@ -132,13 +134,16 @@ def get_tv_tips(day_offset=0):
                 info_type = 'Televizní tip (Film)' if media_type == 'movie' else 'Televizní tip (Seriál)'
                 
                 items.append({
+                    'id': item.get('id'),
                     'title': display_title,
                     'clean_title': raw_title,
                     'year': year,
                     'url': '',
                     'img': img,
+                    'backdrop_path': backdrop_img,
                     'info': info_type,
                     'plot': overview,
+                    'media_type': media_type,
                     'type': 'show' if media_type == 'tv' else 'movie'
                 })
             xbmc.log(f"StreamContinuum: Safely loaded {len(items)} TV tips items", xbmc.LOGINFO)
@@ -173,7 +178,9 @@ def get_vod_premieres(page=1):
                 raw_title = title
                 overview = str(item.get('overview') or '')
                 poster_path = item.get('poster_path')
+                backdrop_path = item.get('backdrop_path')
                 img = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                backdrop_img = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
                 year = _extract_year(item, 'release_date')
                 
                 rating_raw = item.get('vote_average', 0)
@@ -181,13 +188,16 @@ def get_vod_premieres(page=1):
                 display_title = f"[{rating_percent}%] {title}" if rating_percent else title
                 
                 items.append({
+                    'id': item.get('id'),
                     'title': display_title,
                     'clean_title': raw_title,
                     'year': year,
                     'url': '',
                     'img': img,
+                    'backdrop_path': backdrop_img,
                     'info': 'Kino / VOD Premiéra',
                     'plot': overview,
+                    'media_type': 'movie',
                     'type': 'movie'
                 })
             xbmc.log(f"StreamContinuum: Safely loaded {len(items)} VOD items", xbmc.LOGINFO)
@@ -222,7 +232,9 @@ def get_disk_premieres(month, year):
                 raw_title = title
                 overview = str(item.get('overview') or '')
                 poster_path = item.get('poster_path')
+                backdrop_path = item.get('backdrop_path')
                 img = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                backdrop_img = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
                 rel_year = _extract_year(item, 'release_date')
                 
                 rating_raw = item.get('vote_average', 0)
@@ -230,13 +242,16 @@ def get_disk_premieres(month, year):
                 display_title = f"[{rating_percent}%] {title}" if rating_percent else title
                 
                 items.append({
+                    'id': item.get('id'),
                     'title': display_title,
                     'clean_title': raw_title,
                     'year': rel_year,
                     'url': '',
                     'img': img,
+                    'backdrop_path': backdrop_img,
                     'info': 'Novinka / Disk',
                     'plot': overview,
+                    'media_type': 'movie',
                     'type': 'movie'
                 })
             xbmc.log(f"StreamContinuum: Safely loaded {len(items)} upcoming items", xbmc.LOGINFO)
@@ -276,7 +291,9 @@ def search_tmdb(query):
                 raw_title = title
                 overview = str(item.get('overview') or '')
                 poster_path = item.get('poster_path')
+                backdrop_path = item.get('backdrop_path')
                 img = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+                backdrop_img = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
                 
                 date_key = 'release_date' if media_type == 'movie' else 'first_air_date'
                 year = _extract_year(item, date_key)
@@ -288,13 +305,16 @@ def search_tmdb(query):
                 info_type = 'Film' if media_type == 'movie' else 'Seriál'
                 
                 items.append({
+                    'id': item.get('id'),
                     'title': display_title,
                     'clean_title': raw_title,
                     'year': year,
                     'url': '',
                     'img': img,
+                    'backdrop_path': backdrop_img,
                     'info': info_type,
                     'plot': overview,
+                    'media_type': media_type,
                     'type': 'show' if media_type == 'tv' else 'movie'
                 })
             xbmc.log(f"StreamContinuum: Safely loaded {len(items)} search items from TMDb", xbmc.LOGINFO)
@@ -306,3 +326,78 @@ def search_tmdb(query):
     
     return []
 
+def get_show_seasons(tmdb_id):
+    """
+    Načte detaily seriálu a seznam jeho sezón z TMDb v češtině.
+    """
+    xbmc.log(f"StreamContinuum: Fetching show details and seasons for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
+    url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
+    try:
+        res = make_tmdb_request(url_template)
+        if res and res.status_code == 200:
+            data = res.json()
+            title = data.get('name') or data.get('original_name', '')
+            overview = data.get('overview', '')
+            poster_path = data.get('poster_path')
+            backdrop_path = data.get('backdrop_path')
+            poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+            fanart = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
+            
+            raw_seasons = data.get('seasons', [])
+            seasons = []
+            for s in raw_seasons:
+                s_poster = f"https://image.tmdb.org/t/p/w500{s.get('poster_path')}" if s.get('poster_path') else poster
+                seasons.append({
+                    'season_number': s.get('season_number', 0),
+                    'name': s.get('name', ''),
+                    'overview': s.get('overview', ''),
+                    'episode_count': s.get('episode_count', 0),
+                    'poster': s_poster,
+                    'air_date': s.get('air_date', ''),
+                    'rating': s.get('vote_average', 0)
+                })
+            return {
+                'id': data.get('id'),
+                'title': title,
+                'overview': overview,
+                'poster': poster,
+                'fanart': fanart,
+                'seasons': seasons
+            }
+        else:
+            xbmc.log(f"StreamContinuum: TMDb show details failed: status {res.status_code if res else 'None'}", xbmc.LOGWARNING)
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error fetching TMDb show details for ID {tmdb_id}: {e}", xbmc.LOGERROR)
+    return None
+
+def get_season_episodes(tmdb_id, season_number):
+    """
+    Načte seznam epizod dané série seriálu z TMDb v češtině.
+    """
+    xbmc.log(f"StreamContinuum: Fetching episodes for TMDb ID '{tmdb_id}', season {season_number}", xbmc.LOGINFO)
+    url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_number}?api_key={{api_key}}&language=cs-CZ"
+    try:
+        res = make_tmdb_request(url_template)
+        if res and res.status_code == 200:
+            data = res.json()
+            raw_episodes = data.get('episodes', [])
+            episodes = []
+            for ep in raw_episodes:
+                still_path = ep.get('still_path')
+                still = f"https://image.tmdb.org/t/p/w500{still_path}" if still_path else ''
+                episodes.append({
+                    'episode_number': ep.get('episode_number', 0),
+                    'season_number': ep.get('season_number', season_number),
+                    'name': ep.get('name', ''),
+                    'overview': ep.get('overview', ''),
+                    'runtime': ep.get('runtime', 0),
+                    'still': still,
+                    'rating': ep.get('vote_average', 0),
+                    'air_date': ep.get('air_date', '')
+                })
+            return episodes
+        else:
+            xbmc.log(f"StreamContinuum: TMDb season episodes failed: status {res.status_code if res else 'None'}", xbmc.LOGWARNING)
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error fetching TMDb season episodes for ID {tmdb_id}, S{season_number}: {e}", xbmc.LOGERROR)
+    return []

@@ -382,3 +382,27 @@ msgstr "Next page"
 msgctxt "#30118"
 msgid "Failed to load items. Check the connection."
 msgstr "Failed to load items. Check the connection."
+
+msgctxt "#30119"
+msgid "Trakt.tv"
+msgstr "Trakt.tv"
+
+msgctxt "#30120"
+msgid "Identify with TMDb"
+msgstr "Identify with TMDb"
+
+msgctxt "#30126"
+msgid "History item identified with TMDb."
+msgstr "History item identified with TMDb."
+
+msgctxt "#30127"
+msgid "Failed to identify history item with TMDb."
+msgstr "Failed to identify history item with TMDb."
+
+msgctxt "#30128"
+msgid "No relevant items found on TMDb. Try a different search."
+msgstr "No relevant items found on TMDb. Try a different search."
+
+msgctxt "#30129"
+msgid "No main menu items could be displayed. Please check addon settings."
+msgstr "No main menu items could be displayed. Please check addon settings."
