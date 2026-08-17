@@ -328,7 +328,7 @@ def search_tmdb(query):
 
 def get_show_seasons(tmdb_id):
     """
-    Načte detaily seriálu a seznam jeho sezón z TMDb v češtině.
+    Načte detaily seriálu a seznam jeho sezón z TMDb v češtině (s případným anglickým fallbackem pro popis).
     """
     xbmc.log(f"StreamContinuum: Fetching show details and seasons for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
     url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
@@ -338,6 +338,13 @@ def get_show_seasons(tmdb_id):
             data = res.json()
             title = data.get('name') or data.get('original_name', '')
             overview = data.get('overview', '')
+            if not overview:
+                try:
+                    res_en = make_tmdb_request(f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={{api_key}}&language=en-US")
+                    if res_en and res_en.status_code == 200:
+                        overview = res_en.json().get('overview', '')
+                except Exception:
+                    pass
             poster_path = data.get('poster_path')
             backdrop_path = data.get('backdrop_path')
             poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
