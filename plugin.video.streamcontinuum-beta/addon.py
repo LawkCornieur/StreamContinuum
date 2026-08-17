@@ -408,7 +408,7 @@ def history_menu(query, title=None):
 
 def trakt_search(query=None):
     if not query:
-        keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30057))
+        keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30067))
         keyboard.doModal()
         if keyboard.isConfirmed():
             query = keyboard.getText()
@@ -691,7 +691,7 @@ def show_tmdb_menu():
         (ADDON.getLocalizedString(30096), 'tmdb_category&category=tv_tips&offset=0', 'DefaultTVShows.png'),
         (ADDON.getLocalizedString(30097), 'tmdb_category&category=vod&offset=0', 'DefaultMovies.png'),
         (ADDON.getLocalizedString(30098), 'tmdb_category&category=disks&offset=0', 'DefaultMovies.png'),
-        (f"{ADDON.getLocalizedString(30052)} ({ADDON.getLocalizedString(30099)})", 'tmdb_search', 'DefaultAddonsSearch.png'),
+        (ADDON.getLocalizedString(30130), 'tmdb_search', 'DefaultAddonsSearch.png'),
     ]
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
@@ -977,7 +977,7 @@ def show_tmdb_search(query=None):
         return
 
     if not query:
-        keyboard = xbmc.Keyboard('', f"{ADDON.getLocalizedString(30052)} - {ADDON.getLocalizedString(30099)}")
+        keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30130))
         keyboard.doModal()
         if keyboard.isConfirmed():
             query = keyboard.getText()
