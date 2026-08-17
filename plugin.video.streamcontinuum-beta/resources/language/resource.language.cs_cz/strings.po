@@ -406,3 +406,7 @@ msgstr "Na TMDb nebyly nalezeny žádné relevantní položky. Zkuste jiné hled
 msgctxt "#30129"
 msgid "No main menu items could be displayed. Please check addon settings."
 msgstr "Hlavní menu se nepodařilo zobrazit. Zkontrolujte nastavení doplňku."
+
+msgctxt "#30130"
+msgid "Search catalog"
+msgstr "Hledat v katalogu"
