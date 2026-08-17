@@ -281,8 +281,9 @@ def play(ident, query=None):
 
 def show_history():
     import history
-    items = history.get_history()
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
+    xbmcplugin.setContent(HANDLE, 'videos')
+    items = history.get_history()
     
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
@@ -293,7 +294,7 @@ def show_history():
         query = item.get('query', '')
         raw_title = item.get('title')
         year = item.get('year')
-        plot = item.get('plot')
+        plot = item.get('plot') or ''
         genres = item.get('genres', [])
         rating = item.get('rating')
         runtime = item.get('runtime')
@@ -330,7 +331,6 @@ def show_history():
         url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
-    xbmcplugin.setContent(HANDLE, 'videos')
     xbmcplugin.endOfDirectory(HANDLE)
 
 def history_menu(query, title=None):
@@ -338,7 +338,7 @@ def history_menu(query, title=None):
     hist_item = history.get_history_item(query)
     raw_title = (hist_item.get('title') if hist_item else None) or title
     year = hist_item.get('year') if hist_item else None
-    plot = hist_item.get('plot') if hist_item else ''
+    plot = (hist_item.get('plot') if hist_item else '') or ''
     genres = hist_item.get('genres', []) if hist_item else []
     rating = hist_item.get('rating') if hist_item else None
     poster = hist_item.get('poster') if hist_item and hist_item.get('poster') else None
@@ -348,6 +348,7 @@ def history_menu(query, title=None):
 
     display_title = raw_title or history.get_base_name(query) or query
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {display_title}")
+    xbmcplugin.setContent(HANDLE, 'movies' if media_type == 'movie' else 'tvshows')
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
 
@@ -403,7 +404,6 @@ def history_menu(query, title=None):
         is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
         
-    xbmcplugin.setContent(HANDLE, 'movies' if media_type == 'movie' else 'tvshows')
     xbmcplugin.endOfDirectory(HANDLE)
 
 def trakt_search(query=None):
@@ -1371,14 +1371,18 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
     trakt_media_type = 'show' if media_type in ('tvshow', 'tv', 'show') else 'movie'
     meta = trakt.get_localized_metadata(item_id=tmdb_id, media_type=trakt_media_type, id_type='tmdb')
     
-    if not meta.get('title') and tmdb_module:
+    if tmdb_module:
         if trakt_media_type == 'show':
             show_data = tmdb_module.get_show_seasons(tmdb_id)
             if show_data:
-                meta['title'] = show_data.get('title')
-                meta['overview'] = show_data.get('overview')
-                meta['poster'] = show_data.get('poster')
-                meta['fanart'] = show_data.get('fanart')
+                if not meta.get('title'):
+                    meta['title'] = show_data.get('title')
+                if not meta.get('overview'):
+                    meta['overview'] = show_data.get('overview')
+                if not meta.get('poster'):
+                    meta['poster'] = show_data.get('poster')
+                if not meta.get('fanart'):
+                    meta['fanart'] = show_data.get('fanart')
 
     title = meta.get('title')
     year = meta.get('year')
@@ -1394,12 +1398,12 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
         'media_type': 'tvshow' if trakt_media_type == 'show' else 'movie',
         'title': title,
         'year': _safe_int_conversion(year),
-        'plot': plot,
+        'plot': plot or '',
         'genres': genres if isinstance(genres, list) else [],
         'rating': _safe_float_conversion(rating),
         'runtime': _safe_int_conversion(runtime),
-        'poster': poster,
-        'fanart': fanart
+        'poster': poster or '',
+        'fanart': fanart or ''
     }
     
     success = history.update_history_with_tmdb_data(original_query, tmdb_data)
