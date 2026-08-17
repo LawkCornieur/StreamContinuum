@@ -404,5 +404,9 @@ msgid "No relevant items found on TMDb. Try a different search."
 msgstr "Keine relevanten Einträge auf TMDb gefunden. Versuchen Sie eine andere Suche."
 
 msgctxt "#30129"
-msgid "No main menu items could be displayed. Please check addon settings."
+msgid "No main menu items could be displayed. Bitte überprüfen Sie die Addon-Einstellungen."
 msgstr "Keine Hauptmenüpunkte konnten angezeigt werden. Bitte überprüfen Sie die Addon-Einstellungen."
+
+msgctxt "#30130"
+msgid "Search catalog"
+msgstr "Im Katalog suchen"
