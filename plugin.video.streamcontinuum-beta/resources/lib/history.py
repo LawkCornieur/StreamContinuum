@@ -52,7 +52,7 @@ def get_history():
             unique_items = []
             for item in items:
                 q = item.get('query', '')
-                if is_series(q) or item.get('media_type') in ('tvshow', 'tv'):
+                if is_series(q) or item.get('media_type') in ('tvshow', 'tv', 'show'):
                     base = get_base_name(q).lower().strip()
                     if base:
                         if base in seen_series:
@@ -65,10 +65,19 @@ def get_history():
         return []
 
 def get_history_item(query):
+    if not query:
+        return None
     items = get_history()
+    norm_q = query.strip().lower()
     for item in items:
-        if item.get('query') == query:
+        if item.get('query') == query or item.get('query', '').strip().lower() == norm_q:
             return item
+    q_base = get_base_name(query).strip().lower()
+    if q_base:
+        for item in items:
+            item_q = item.get('query', '')
+            if (is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')) and get_base_name(item_q).strip().lower() == q_base:
+                return item
     return None
 
 def _save_history(history_list):
@@ -105,11 +114,11 @@ def add_to_history(query):
     remaining_history = []
     for item in history:
         item_q = item.get('query', '')
-        item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv')
+        item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')
         item_base = get_base_name(item_q).lower().strip()
         
         is_same_exact = (item_q == query)
-        is_same_series = (query_is_series or item.get('media_type') in ('tvshow', 'tv')) and item_is_series and (query_base and item_base and query_base == item_base)
+        is_same_series = (query_is_series or item.get('media_type') in ('tvshow', 'tv', 'show')) and item_is_series and (query_base and item_base and query_base == item_base)
         
         if is_same_exact or is_same_series:
             if not existing_item:
@@ -181,8 +190,24 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
             item['identified_at'] = int(time.time())
             updated = True
             break
-    if not updated:
-        xbmc.log(f"StreamContinuum History: Failed to find history item to update for query '{original_query}'", xbmc.LOGWARNING)
+    if not updated and original_query:
+        new_item = {
+            'query': original_query,
+            'title': tmdb_data.get('title'),
+            'year': tmdb_data.get('year'),
+            'plot': tmdb_data.get('plot'),
+            'genres': tmdb_data.get('genres', []),
+            'rating': tmdb_data.get('rating'),
+            'runtime': tmdb_data.get('runtime'),
+            'poster': tmdb_data.get('poster'),
+            'fanart': tmdb_data.get('fanart'),
+            'tmdb_id': tmdb_data.get('tmdb_id'),
+            'media_type': tmdb_data.get('media_type'),
+            'identified_at': int(time.time())
+        }
+        history.insert(0, new_item)
+        history = history[:50]
+        updated = True
     if updated:
         _save_history(history)
     return updated
