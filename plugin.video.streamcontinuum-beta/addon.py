@@ -291,7 +291,7 @@ def show_history():
         
     for item in items:
         query = item.get('query', '')
-        title = item.get('title') or query
+        raw_title = item.get('title')
         year = item.get('year')
         plot = item.get('plot')
         genres = item.get('genres', [])
@@ -299,37 +299,57 @@ def show_history():
         runtime = item.get('runtime')
         poster = item.get('poster')
         fanart = item.get('fanart')
-        media_type = item.get('media_type') or ('movie' if 'S00E00' not in query and re.search(r'\b(S\d{2}E\d{2}|\d{1}x\d{2})\b', query, re.IGNORECASE) is None else 'tvshow')
+        is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
+        media_type = 'tvshow' if is_tv else 'movie'
         
-        label = f"{title} ({year})" if year else title
-        if item.get('tmdb_id') and poster:
-            list_item = _make_media_list_item(
-                label=label, year=year, plot=plot, genres_str=', '.join(genres),
-                rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type=media_type
-            )
+        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+        ep_suffix = ""
+        if ep_match:
+            s_num = int(ep_match.group(1) or ep_match.group(3))
+            e_num = int(ep_match.group(2) or ep_match.group(4))
+            ep_suffix = f" S{s_num:02d}E{e_num:02d}"
+
+        if raw_title:
+            base_display = raw_title
+            if year:
+                label = f"{base_display} ({year}){ep_suffix}"
+            else:
+                label = f"{base_display}{ep_suffix}"
         else:
-            list_item = xbmcgui.ListItem(label=label)
-            list_item.setArt({'icon': 'DefaultHistory.png', 'thumb': 'DefaultHistory.png', 'fanart': get_asset('fa-history.png')})
+            base_name = history.get_base_name(query)
+            if ep_suffix:
+                label = f"{base_name}{ep_suffix}"
+            else:
+                label = base_name or query
+
+        list_item = _make_media_list_item(
+            label=label, year=year, plot=plot, genres_str=', '.join(genres) if genres else '',
+            rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type=media_type
+        )
         
         url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
+    xbmcplugin.setContent(HANDLE, 'videos')
     xbmcplugin.endOfDirectory(HANDLE)
 
 def history_menu(query, title=None):
-    xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {query}")
-    trakt_token = ADDON.getSetting('trakt_token')
-    enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
-    
     import history
     hist_item = history.get_history_item(query)
-    fanart = hist_item.get('fanart') if hist_item and hist_item.get('fanart') else get_asset('fa-history.png')
-    poster = hist_item.get('poster') if hist_item and hist_item.get('poster') else None
-    plot = hist_item.get('plot') if hist_item else ''
+    raw_title = (hist_item.get('title') if hist_item else None) or title
     year = hist_item.get('year') if hist_item else None
+    plot = hist_item.get('plot') if hist_item else ''
     genres = hist_item.get('genres', []) if hist_item else []
     rating = hist_item.get('rating') if hist_item else None
-    media_type = hist_item.get('media_type') if hist_item and hist_item.get('media_type') else ('movie' if 'S00E00' not in query and re.search(r'\b(S\d{2}E\d{2}|\d{1}x\d{2})\b', query, re.IGNORECASE) is None else 'tvshow')
+    poster = hist_item.get('poster') if hist_item and hist_item.get('poster') else None
+    fanart = hist_item.get('fanart') if hist_item and hist_item.get('fanart') else get_asset('fa-history.png')
+    is_tv = (hist_item.get('media_type') in ('tvshow', 'tv', 'show') if hist_item else False) or history.is_series(query)
+    media_type = 'tvshow' if is_tv else 'movie'
+
+    display_title = raw_title or history.get_base_name(query) or query
+    xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {display_title}")
+    trakt_token = ADDON.getSetting('trakt_token')
+    enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
 
     items = [
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
@@ -338,19 +358,20 @@ def history_menu(query, title=None):
         (ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'),
     ]
     if trakt_token and enable_trakt_menu:
-        items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'))
+        items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(raw_title or query)}', 'DefaultAddonVideo.png'))
     
-    series_pattern = re.compile(r'^(.*)\s+S(\d{2})E(\d{2})', re.IGNORECASE)
-    match = series_pattern.match(query)
+    series_pattern = re.compile(r'^(.*?)(?:\s+|_|\.)S(\d{2})E(\d{2})', re.IGNORECASE)
+    match = series_pattern.search(query)
     if match:
         base_title = match.group(1).strip()
         season = int(match.group(2))
         episode = int(match.group(3))
+        ws_base = raw_title or base_title
         items.extend([
-            (f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'),
-            (f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{base_title} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png') if episode > 1 else None,
-            (f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{base_title} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'),
-            (f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{base_title} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png') if season > 1 else None,
+            (f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'),
+            (f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png') if episode > 1 else None,
+            (f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'),
+            (f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png') if season > 1 else None,
         ])
     
     for label, action_params, icon in [i for i in items if i]:
@@ -670,7 +691,7 @@ def show_tmdb_menu():
         (ADDON.getLocalizedString(30096), 'tmdb_category&category=tv_tips&offset=0', 'DefaultTVShows.png'),
         (ADDON.getLocalizedString(30097), 'tmdb_category&category=vod&offset=0', 'DefaultMovies.png'),
         (ADDON.getLocalizedString(30098), 'tmdb_category&category=disks&offset=0', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30052), 'tmdb_search', 'DefaultAddonsSearch.png'),
+        (f"{ADDON.getLocalizedString(30052)} ({ADDON.getLocalizedString(30099)})", 'tmdb_search', 'DefaultAddonsSearch.png'),
     ]
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
