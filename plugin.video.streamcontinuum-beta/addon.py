@@ -1310,7 +1310,7 @@ def history_tmdb_identify_search(original_query, custom_query=None):
         year = item.get('year', '')
         plot = item.get('plot', '')
         poster_from_search = item.get('img', '')
-        backdrop_from_search = item.get('backdrop_path', '')
+        backdrop_path = item.get('backdrop_path', '')
         is_show = item.get('type') == 'show'
         kodi_type = 'tvshow' if is_show else 'movie'
 
@@ -1330,7 +1330,7 @@ def history_tmdb_identify_search(original_query, custom_query=None):
         final_rating = full_tmdb_meta.get('rating') or item.get('vote_average')
         final_runtime = full_tmdb_meta.get('runtime')
         final_poster = full_tmdb_meta.get('poster') or poster_from_search
-        final_fanart = full_tmdb_meta.get('fanart') or backdrop_from_search
+        final_fanart = full_tmdb_meta.get('fanart') or backdrop_path
 
         li = _make_media_list_item(
             label=f"{final_title} ({final_year})" if final_year else final_title,
