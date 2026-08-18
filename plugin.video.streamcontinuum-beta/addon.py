@@ -685,7 +685,7 @@ def search_prefill(query):
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
 def show_tmdb_menu():
-    xbmcplugin.setPluginCategory(HANDLE, 'TMDb')
+    xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30099))
     fanart = get_asset('fa.png')
     items = [
         (ADDON.getLocalizedString(30096), 'tmdb_category&category=tv_tips&offset=0', 'DefaultTVShows.png'),
@@ -697,7 +697,7 @@ def show_tmdb_menu():
         url = f"{sys.argv[0]}?action={action}"
         li = xbmcgui.ListItem(label=f"[COLOR #01b4e4]{label}[/COLOR]")
         li.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
-        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True if action != 'tmdb_search' else False)
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
@@ -986,7 +986,7 @@ def show_tmdb_search(query=None):
             return
 
     if query:
-        xbmcplugin.setPluginCategory(HANDLE, f"TMDb: {query}")
+        xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30099)}: {query}")
         all_items = tmdb_module.search_tmdb(query)
         if not all_items:
             xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_WARNING, 3000)
@@ -1055,7 +1055,7 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
         li.setArt(art)
 
         info_tag = li.getVideoInfoTag()
-        info_tag.setTitle(season_title)
+        info_tag.setTitle(season_name if 'season_name' in locals() else season_title)
         info_tag.setMediaType('season')
         info_tag.setSeason(season_num)
         if overview:
