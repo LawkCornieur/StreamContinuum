@@ -89,8 +89,9 @@ def _save_history(history_list):
 
 def add_to_history(query):
     history = get_history()
+    now = int(time.time())
     
-    # New item template with default None/empty values for TMDb data
+    # New item template with default values and timestamps
     new_item_template = {
         'query': query,
         'title': None,
@@ -103,7 +104,10 @@ def add_to_history(query):
         'fanart': None,
         'tmdb_id': None,
         'media_type': None,
-        'identified_at': None # Timestamp for when it was identified with TMDb
+        'identified_at': None,
+        'is_watched': True,
+        'last_played_at': now,
+        'added_at': now
     }
 
     query_is_series = is_series(query)
@@ -131,6 +135,8 @@ def add_to_history(query):
     # If an existing item was found, use its data (to preserve TMDb info if already identified)
     if existing_item:
         existing_item['query'] = query
+        existing_item['is_watched'] = True
+        existing_item['last_played_at'] = now
         item_to_add = existing_item
     else:
         item_to_add = new_item_template
@@ -142,6 +148,22 @@ def add_to_history(query):
     history = history[:50]
     
     _save_history(history)
+
+def set_watched_status(query, is_watched):
+    history = get_history()
+    norm_q = query.strip().lower() if query else ""
+    q_base = get_base_name(query).strip().lower() if query else ""
+    updated = False
+    for item in history:
+        item_query = item.get('query', '').strip().lower()
+        item_base = get_base_name(item.get('query', '')).strip().lower()
+        if item_query == norm_q or (q_base and item_base == q_base):
+            item['is_watched'] = bool(is_watched)
+            updated = True
+            break
+    if updated:
+        _save_history(history)
+    return updated
 
 def delete_from_history(query):
     history = get_history()
@@ -170,6 +192,7 @@ def update_history_item(old_query, new_query):
 def update_history_with_tmdb_data(original_query, tmdb_data):
     history = get_history()
     updated = False
+    now = int(time.time())
     norm_orig = original_query.strip().lower() if original_query else ""
     orig_base = get_base_name(original_query).strip().lower() if original_query else ""
     
@@ -187,7 +210,7 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
             item['fanart'] = tmdb_data.get('fanart')
             item['tmdb_id'] = tmdb_data.get('tmdb_id')
             item['media_type'] = tmdb_data.get('media_type')
-            item['identified_at'] = int(time.time())
+            item['identified_at'] = now
             updated = True
             break
     if not updated and original_query:
@@ -203,7 +226,10 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
             'fanart': tmdb_data.get('fanart'),
             'tmdb_id': tmdb_data.get('tmdb_id'),
             'media_type': tmdb_data.get('media_type'),
-            'identified_at': int(time.time())
+            'identified_at': now,
+            'is_watched': True,
+            'last_played_at': now,
+            'added_at': now
         }
         history.insert(0, new_item)
         history = history[:50]
