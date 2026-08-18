@@ -61,7 +61,7 @@ def get_trakt_localized(trakt_id, media_type, season_num=None, episode_num=None)
     _trakt_meta_cache[cache_key] = {}
     return {}
 
-def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, poster, fanart, media_type='movie'):
+def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, poster, fanart, media_type='movie', is_watched=False):
     list_item = xbmcgui.ListItem(label=label)
     art = {}
     if poster:
@@ -76,6 +76,10 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
     info_tag = list_item.getVideoInfoTag()
     info_tag.setTitle(label)
     info_tag.setMediaType(media_type)
+    if is_watched:
+        info_tag.setPlaycount(1)
+    else:
+        info_tag.setPlaycount(0)
     if plot:
         info_tag.setPlot(str(plot))
     if year:
@@ -300,6 +304,7 @@ def show_history():
         runtime = item.get('runtime')
         poster = item.get('poster')
         fanart = item.get('fanart')
+        is_watched = bool(item.get('is_watched', True))
         is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
         media_type = 'tvshow' if is_tv else 'movie'
         
@@ -325,8 +330,18 @@ def show_history():
 
         list_item = _make_media_list_item(
             label=label, year=year, plot=plot, genres_str=', '.join(genres) if genres else '',
-            rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type=media_type
+            rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type=media_type,
+            is_watched=is_watched
         )
+        
+        # Context menu for history items
+        cm = [
+            (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=1)'),
+            (ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=0)'),
+            (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote(query)})'),
+            (ADDON.getLocalizedString(30066), f'RunPlugin({sys.argv[0]}?action=history_delete&query={urllib.parse.quote(query)})'),
+        ]
+        list_item.addContextMenuItems(cm)
         
         url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
@@ -343,6 +358,7 @@ def history_menu(query, title=None):
     rating = hist_item.get('rating') if hist_item else None
     poster = hist_item.get('poster') if hist_item and hist_item.get('poster') else None
     fanart = hist_item.get('fanart') if hist_item and hist_item.get('fanart') else get_asset('fa-history.png')
+    is_watched = bool(hist_item.get('is_watched', True)) if hist_item else True
     is_tv = (hist_item.get('media_type') in ('tvshow', 'tv', 'show') if hist_item else False) or history.is_series(query)
     media_type = 'tvshow' if is_tv else 'movie'
 
@@ -354,6 +370,7 @@ def history_menu(query, title=None):
 
     items = [
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
+        (ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073), f'history_mark&query={urllib.parse.quote(query)}&watched={0 if is_watched else 1}', 'DefaultAddonVideo.png'),
         (ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
         (ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
         (ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'),
@@ -1413,6 +1430,31 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30127), xbmcgui.NOTIFICATION_ERROR, 3000)
 
+def history_mark_watched(query, watched):
+    import history
+    if not query:
+        return
+    is_watched = bool(watched)
+    history.set_watched_status(query, is_watched)
+    
+    # Sync with Trakt if item is identified and Trakt is connected
+    trakt_token = ADDON.getSetting('trakt_token')
+    if trakt_token:
+        hist_item = history.get_history_item(query)
+        if hist_item and hist_item.get('tmdb_id'):
+            tmdb_id = hist_item.get('tmdb_id')
+            is_show = hist_item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
+            media_type = 'show' if is_show else 'movie'
+            trakt_id = trakt.get_trakt_id_from_tmdb_id(tmdb_id, media_type)
+            if trakt_id:
+                if is_watched:
+                    trakt.mark_watched(media_type, trakt_id)
+                else:
+                    trakt.mark_unwatched(media_type, trakt_id)
+                    
+    xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 1500)
+    xbmc.executebuiltin('Container.Refresh')
+
 def run():
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:])) if len(sys.argv) > 2 else {}
     action = params.get('action')
@@ -1491,6 +1533,9 @@ def run():
             xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
         else:
             xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30086), xbmcgui.NOTIFICATION_ERROR, 2000)
+        return
+    elif action == 'history_mark':
+        history_mark_watched(params.get('query'), params.get('watched') == '1')
         return
     elif action == 'history_delete':
         import history
