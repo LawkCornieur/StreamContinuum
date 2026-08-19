@@ -410,3 +410,11 @@ msgstr "Keine Hauptmenüpunkte konnten angezeigt werden. Bitte überprüfen Sie 
 msgctxt "#30130"
 msgid "Search catalog"
 msgstr "Im Katalog suchen"
+
+msgctxt "#30131"
+msgid "Show full history"
+msgstr "Vollständigen Verlauf anzeigen"
+
+msgctxt "#30132"
+msgid "Open last played item on history entry"
+msgstr "Beim Öffnen des Verlaufs das zuletzt abgespielte Element öffnen"
