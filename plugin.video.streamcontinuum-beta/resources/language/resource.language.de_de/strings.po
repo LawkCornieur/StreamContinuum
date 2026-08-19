@@ -320,7 +320,7 @@ msgid "TMDb - DVD and Blu-ray premieres"
 msgstr "TMDb - DVD- und Blu-ray-Premieren"
 
 msgctxt "#30103"
-msgid "TMDb module is not available."
+msgid "TMDb-Modul ist nicht verfügbar."
 msgstr "TMDb-Modul ist nicht verfügbar."
 
 msgctxt "#30104"
@@ -418,3 +418,15 @@ msgstr "Vollständigen Verlauf anzeigen"
 msgctxt "#30132"
 msgid "Open last played item on history entry"
 msgstr "Beim Öffnen des Verlaufs das zuletzt abgespielte Element öffnen"
+
+msgctxt "#30133"
+msgid "Add to Watchlist"
+msgstr "Zur Merkliste hinzufügen"
+
+msgctxt "#30134"
+msgid "Remove from Watchlist"
+msgstr "Von Merkliste entfernen"
+
+msgctxt "#30135"
+msgid "Browse seasons and episodes"
+msgstr "Staffeln und Episoden durchsuchen"
