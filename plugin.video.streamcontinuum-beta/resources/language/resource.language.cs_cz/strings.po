@@ -410,3 +410,11 @@ msgstr "Hlavní menu se nepodařilo zobrazit. Zkontrolujte nastavení doplňku."
 msgctxt "#30130"
 msgid "Search catalog"
 msgstr "Hledat v katalogu"
+
+msgctxt "#30131"
+msgid "Show full history"
+msgstr "Zobrazit celou historii"
+
+msgctxt "#30132"
+msgid "Open last played item on history entry"
+msgstr "Při otevření historie otevřít detail posledního záznamu"
