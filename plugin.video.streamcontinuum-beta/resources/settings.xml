@@ -24,6 +24,7 @@
         <setting id="autoplay_next" type="bool" label="30022" default="true" />
         <setting id="optimize_results" type="bool" label="30088" default="true" />
         <setting id="after_playback" type="enum" label="30090" lvalues="30091|30092|30093|30094|30095" default="2" />
+        <setting id="open_last_history" type="bool" label="30132" default="false" />
         <setting id="enable_welcome_melody" type="bool" label="Povolit uvítací melodii" default="true" />
         <setting id="auto_start" type="bool" label="Automaticky spustit doplněk po startu Kodi" default="true" />
         <setting id="ssl_verify" type="bool" label="Ověřovat SSL certifikáty" default="true" />
