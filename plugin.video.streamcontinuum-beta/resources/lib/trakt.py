@@ -153,6 +153,42 @@ def get_watchlist():
         xbmc.log(f"StreamContinuum: Error getting Trakt watchlist: {e}", xbmc.LOGERROR)
     return []
 
+def add_to_watchlist(media_type, item_id, id_type='trakt'):
+    url = "https://api.trakt.tv/sync/watchlist"
+    headers = get_headers()
+    item_key = 'movies' if media_type == 'movie' else ('episodes' if media_type == 'episode' else 'shows')
+    id_field = 'tmdb' if id_type == 'tmdb' else 'trakt'
+    try:
+        item_id = int(item_id)
+    except (ValueError, TypeError):
+        return False
+    payload = {item_key: [{"ids": {id_field: item_id}}]}
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        if res.status_code in (200, 201):
+            return True
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error adding to watchlist on Trakt: {e}", xbmc.LOGERROR)
+    return False
+
+def remove_from_watchlist(media_type, item_id, id_type='trakt'):
+    url = "https://api.trakt.tv/sync/watchlist/remove"
+    headers = get_headers()
+    item_key = 'movies' if media_type == 'movie' else ('episodes' if media_type == 'episode' else 'shows')
+    id_field = 'tmdb' if id_type == 'tmdb' else 'trakt'
+    try:
+        item_id = int(item_id)
+    except (ValueError, TypeError):
+        return False
+    payload = {item_key: [{"ids": {id_field: item_id}}]}
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        if res.status_code in (200, 201):
+            return True
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error removing from watchlist on Trakt: {e}", xbmc.LOGERROR)
+    return False
+
 def get_playback():
     url = "https://api.trakt.tv/sync/playback"
     headers = get_headers()
@@ -230,11 +266,16 @@ def get_episodes(trakt_id, season_num):
         xbmc.log(f"StreamContinuum: Error getting Trakt episodes for {trakt_id} S{season_num}: {e}", xbmc.LOGERROR)
     return []
 
-def mark_watched(media_type, trakt_id):
+def mark_watched(media_type, item_id, id_type='trakt'):
     url = "https://api.trakt.tv/sync/history"
     headers = get_headers()
     item_key = 'movies' if media_type == 'movie' else ('episodes' if media_type == 'episode' else 'shows')
-    payload = {item_key: [{"ids": {"trakt": int(trakt_id)}}]}
+    id_field = 'tmdb' if id_type == 'tmdb' else 'trakt'
+    try:
+        item_id = int(item_id)
+    except (ValueError, TypeError):
+        return False
+    payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
         res = requests.post(url, json=payload, headers=headers, timeout=10)
         if res.status_code in (200, 201):
@@ -243,11 +284,16 @@ def mark_watched(media_type, trakt_id):
         xbmc.log(f"StreamContinuum: Error marking watched on Trakt: {e}", xbmc.LOGERROR)
     return False
 
-def mark_unwatched(media_type, trakt_id):
+def mark_unwatched(media_type, item_id, id_type='trakt'):
     url = "https://api.trakt.tv/sync/history/remove"
     headers = get_headers()
     item_key = 'movies' if media_type == 'movie' else ('episodes' if media_type == 'episode' else 'shows')
-    payload = {item_key: [{"ids": {"trakt": int(trakt_id)}}]}
+    id_field = 'tmdb' if id_type == 'tmdb' else 'trakt'
+    try:
+        item_id = int(item_id)
+    except (ValueError, TypeError):
+        return False
+    payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
         res = requests.post(url, json=payload, headers=headers, timeout=10)
         if res.status_code in (200, 201):
