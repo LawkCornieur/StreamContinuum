@@ -283,16 +283,22 @@ def play(ident, query=None):
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
 
-def show_history():
+def show_history(force_list=False):
     import history
-    xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
-    xbmcplugin.setContent(HANDLE, 'videos')
     items = history.get_history()
     
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
+
+    # If setting is enabled to open the last played item directly on history entry
+    if not force_list and ADDON.getSettingBool('open_last_history'):
+        history_menu(items[0].get('query', ''), show_full_history_link=True)
+        return
+
+    xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
+    xbmcplugin.setContent(HANDLE, 'videos')
         
     for item in items:
         query = item.get('query', '')
@@ -338,6 +344,7 @@ def show_history():
         cm = [
             (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=1)'),
             (ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=0)'),
+            (ADDON.getLocalizedString(30120), f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote(query)})'),
             (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote(query)})'),
             (ADDON.getLocalizedString(30066), f'RunPlugin({sys.argv[0]}?action=history_delete&query={urllib.parse.quote(query)})'),
         ]
@@ -348,7 +355,7 @@ def show_history():
         
     xbmcplugin.endOfDirectory(HANDLE)
 
-def history_menu(query, title=None):
+def history_menu(query, title=None, show_full_history_link=False):
     import history
     hist_item = history.get_history_item(query)
     raw_title = (hist_item.get('title') if hist_item else None) or title
@@ -368,13 +375,17 @@ def history_menu(query, title=None):
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
 
-    items = [
+    items = []
+    if show_full_history_link:
+        items.append((f"[COLOR #cc9900]📁 {ADDON.getLocalizedString(30131)}[/COLOR]", 'history_list', 'DefaultFolder.png'))
+
+    items.extend([
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
         (ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073), f'history_mark&query={urllib.parse.quote(query)}&watched={0 if is_watched else 1}', 'DefaultAddonVideo.png'),
         (ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
         (ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
         (ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'),
-    ]
+    ])
     if trakt_token and enable_trakt_menu:
         items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(raw_title or query)}', 'DefaultAddonVideo.png'))
     
@@ -418,7 +429,7 @@ def history_menu(query, title=None):
         if genres:
             info_tag.setGenres(genres if isinstance(genres, list) else [genres])
             
-        is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params
+        is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params or action_params == 'history_list'
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
         
     xbmcplugin.endOfDirectory(HANDLE)
@@ -1030,8 +1041,7 @@ def show_tmdb_search(query=None):
 
             if is_show:
                 url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
-                       f"&title={urllib.parse.quote(raw_title)}"
-                       f"&year={year}"
+                       f"&title={urllib.parse.quote(raw_title)}&year={year}"
                        f"&tmdb_id={tmdb_item_id if tmdb_item_id is not None else ''}")
             else:
                 ws_query = f"{raw_title} {year}".strip()
@@ -1072,7 +1082,7 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
         li.setArt(art)
 
         info_tag = li.getVideoInfoTag()
-        info_tag.setTitle(season_name if 'season_name' in locals() else season_title)
+        info_tag.setTitle(season_title)
         info_tag.setMediaType('season')
         info_tag.setSeason(season_num)
         if overview:
@@ -1086,7 +1096,6 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
             try:
                 if hasattr(info_tag, 'setEpisodeCount'):
                     info_tag.setEpisodeCount(ep_count)
-                    pass
             except Exception:
                 pass
             li.setProperty('TotalEpisodes', str(ep_count))
@@ -1617,6 +1626,8 @@ def run():
         trakt_search(params.get('query', ''))
     elif action == 'history':
         show_history()
+    elif action == 'history_list':
+        show_history(force_list=True)
     elif action == 'history_menu':
         history_menu(params.get('query'))
     elif action == 'history_tmdb_identify_search':
