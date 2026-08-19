@@ -410,3 +410,11 @@ msgstr "No main menu items could be displayed. Please check addon settings."
 msgctxt "#30130"
 msgid "Search catalog"
 msgstr "Search catalog"
+
+msgctxt "#30131"
+msgid "Show full history"
+msgstr "Show full history"
+
+msgctxt "#30132"
+msgid "Open last played item on history entry"
+msgstr "Open last played item on history entry"
