@@ -418,3 +418,15 @@ msgstr "Show full history"
 msgctxt "#30132"
 msgid "Open last played item on history entry"
 msgstr "Open last played item on history entry"
+
+msgctxt "#30133"
+msgid "Add to Watchlist"
+msgstr "Add to Watchlist"
+
+msgctxt "#30134"
+msgid "Remove from Watchlist"
+msgstr "Remove from Watchlist"
+
+msgctxt "#30135"
+msgid "Browse seasons and episodes"
+msgstr "Browse seasons and episodes"
