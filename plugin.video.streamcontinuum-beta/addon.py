@@ -341,13 +341,17 @@ def show_history(force_list=False):
         )
         
         # Context menu for history items
-        cm = [
-            (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=1)'),
-            (ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=0)'),
+        cm = []
+        if not is_watched:
+            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=1)'))
+        else:
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=0)'))
+            
+        cm.extend([
             (ADDON.getLocalizedString(30120), f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote(query)})'),
             (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote(query)})'),
             (ADDON.getLocalizedString(30066), f'RunPlugin({sys.argv[0]}?action=history_delete&query={urllib.parse.quote(query)})'),
-        ]
+        ])
         list_item.addContextMenuItems(cm)
         
         url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
@@ -491,6 +495,9 @@ def trakt_search(query=None):
                 cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
                 if media_type == 'show':
                     cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(title)})'))
+                else:
+                    ws_query = f"{title} {year}".strip()
+                    cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})'))
             list_item.addContextMenuItems(cm)
 
             if media_type == 'movie':
@@ -1320,6 +1327,9 @@ def show_trakt_discover(list_type, media_type, offset=0):
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={item_type_single}&id={trakt_id}&watched=0)'))
             if item_type_single == 'show':
                 cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(title)})'))
+            else:
+                ws_query = f"{title} {year}".strip()
+                cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})'))
         li.addContextMenuItems(cm)
 
         if item_type_single == 'movie':
