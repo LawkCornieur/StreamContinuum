@@ -377,7 +377,7 @@ def history_menu(query, title=None, show_full_history_link=False):
 
     items = []
     if show_full_history_link:
-        items.append((f"[COLOR #cc9900]📁 {ADDON.getLocalizedString(30131)}[/COLOR]", 'history_list', 'DefaultFolder.png'))
+        items.append((f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]", 'history_list', 'DefaultFolder.png'))
 
     items.extend([
         (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
