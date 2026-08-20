@@ -47,6 +47,16 @@ def get_history():
             if not isinstance(items, list):
                 return []
             
+            # Ensure backward compatibility for items lacking timestamp or is_watched
+            now = int(time.time())
+            for item in items:
+                if 'is_watched' not in item:
+                    item['is_watched'] = True
+                if 'added_at' not in item:
+                    item['added_at'] = now
+                if 'last_played_at' not in item:
+                    item['last_played_at'] = now
+            
             # Deduplicate series keeping only the latest watched episode
             seen_series = set()
             unique_items = []
@@ -137,6 +147,8 @@ def add_to_history(query):
         existing_item['query'] = query
         existing_item['is_watched'] = True
         existing_item['last_played_at'] = now
+        if 'added_at' not in existing_item or not existing_item['added_at']:
+            existing_item['added_at'] = now
         item_to_add = existing_item
     else:
         item_to_add = new_item_template
@@ -172,6 +184,7 @@ def delete_from_history(query):
 
 def update_history_item(old_query, new_query):
     history = get_history()
+    now = int(time.time())
     for item in history:
         if item.get('query') == old_query:
             item['query'] = new_query
@@ -186,6 +199,7 @@ def update_history_item(old_query, new_query):
             item['tmdb_id'] = None
             item['media_type'] = None
             item['identified_at'] = None
+            item['last_played_at'] = now
             break
     _save_history(history)
     
