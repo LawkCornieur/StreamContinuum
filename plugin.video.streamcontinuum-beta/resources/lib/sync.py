@@ -202,15 +202,22 @@ def sync_history():
                 except Exception as read_err:
                     xbmc.log(f"StreamContinuum: Error reading remote history from {f['name']}: {read_err}", xbmc.LOGERROR)
                     
-        # Merge histories, keeping unique queries or titles
-        final_history = []
-        seen = set()
+        # Merge histories intelligently by comparing timestamps
+        merged_map = {}
         for item in local_history + remote_history:
-            title = item.get('query') or item.get('title')
-            if title and title not in seen:
-                final_history.append(item)
-                seen.add(title)
+            key = item.get('query') or item.get('title')
+            if not key:
+                continue
+            if key not in merged_map:
+                merged_map[key] = item
+            else:
+                existing_time = merged_map[key].get('last_played_at') or merged_map[key].get('added_at') or 0
+                item_time = item.get('last_played_at') or item.get('added_at') or 0
+                if item_time >= existing_time:
+                    merged_map[key] = item
                 
+        final_history = list(merged_map.values())
+        final_history.sort(key=lambda x: x.get('last_played_at', 0) or x.get('added_at', 0), reverse=True)
         final_history = final_history[:50]
         
         if not os.path.exists(PROFILE_DIR):
