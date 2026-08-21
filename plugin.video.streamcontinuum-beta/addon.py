@@ -692,7 +692,7 @@ def show_trakt_playback(offset=0):
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
-        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
+        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None))
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
@@ -730,6 +730,11 @@ def show_tmdb_menu():
         (ADDON.getLocalizedString(30096), 'tmdb_category&category=tv_tips&offset=0', 'DefaultTVShows.png'),
         (ADDON.getLocalizedString(30097), 'tmdb_category&category=vod&offset=0', 'DefaultMovies.png'),
         (ADDON.getLocalizedString(30098), 'tmdb_category&category=disks&offset=0', 'DefaultMovies.png'),
+        (ADDON.getLocalizedString(30138), 'tmdb_category&category=top_movies&offset=0', 'DefaultMovies.png'),
+        (ADDON.getLocalizedString(30139), 'tmdb_category&category=top_shows&offset=0', 'DefaultTVShows.png'),
+        (ADDON.getLocalizedString(30136), 'tmdb_genres_menu&media_type=movies', 'DefaultMovies.png'),
+        (ADDON.getLocalizedString(30137), 'tmdb_genres_menu&media_type=shows', 'DefaultTVShows.png'),
+        (ADDON.getLocalizedString(30140), 'tmdb_category&category=random_tips&offset=0', 'DefaultAddonVideo.png'),
         (ADDON.getLocalizedString(30130), 'tmdb_search', 'DefaultAddonsSearch.png'),
     ]
     for label, action, icon in items:
@@ -740,14 +745,62 @@ def show_tmdb_menu():
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
-def show_tmdb_category(category, offset=0):
+def show_tmdb_genres_menu(media_type):
+    fanart = get_asset('fa.png')
+    if media_type == 'movies':
+        xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30136))
+        genres = [
+            (30141, 28),     # Akční
+            (30142, 12),     # Dobrodružné
+            (30143, 16),     # Animované
+            (30144, 35),     # Komedie
+            (30145, 80),     # Krimi
+            (30146, 99),     # Dokumentární
+            (30147, 18),     # Drama
+            (30148, 10751),  # Rodinné
+            (30149, 14),     # Fantasy
+            (30150, 27),     # Horor
+            (30151, 9648),   # Mysteriózní
+            (30152, 878),    # Sci-Fi
+            (30153, 53),     # Thriller
+            (30154, 10752),  # Válečné
+            (30155, 37),     # Western
+        ]
+        icon = 'DefaultMovies.png'
+    else:
+        xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30137))
+        genres = [
+            (30157, 10759),  # Akční a dobrodružné
+            (30143, 16),     # Animované
+            (30144, 35),     # Komedie
+            (30145, 80),     # Krimi
+            (30146, 99),     # Dokumentární
+            (30147, 18),     # Drama
+            (30148, 10751),  # Rodinné
+            (30151, 9648),   # Mysteriózní
+            (30156, 10765),  # Sci-Fi & Fantasy
+            (30155, 37),     # Western
+        ]
+        icon = 'DefaultTVShows.png'
+        
+    for str_id, genre_id in genres:
+        label = ADDON.getLocalizedString(str_id)
+        url = f"{sys.argv[0]}?action=tmdb_category&category=genre&media_type={media_type}&genre_id={genre_id}&genre_name={urllib.parse.quote(label)}&offset=0"
+        li = xbmcgui.ListItem(label=f"[COLOR #01b4e4]{label}[/COLOR]")
+        li.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
+        
+    xbmcplugin.setContent(HANDLE, 'addons')
+    xbmcplugin.endOfDirectory(HANDLE)
+
+def show_tmdb_category(category, offset=0, media_type=None, genre_id=None, genre_name=None):
     if tmdb_module is None:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
     offset = int(offset)
-    PAGE_SIZE = 10
+    PAGE_SIZE = 20
     if category == 'tv_tips':
         all_items = tmdb_module.get_tv_tips(0)
         cat_label = ADDON.getLocalizedString(30100)
@@ -762,6 +815,26 @@ def show_tmdb_category(category, offset=0):
         all_items = tmdb_module.get_disk_premieres(now.month, now.year)
         cat_label = ADDON.getLocalizedString(30102)
         content_type = 'movies'
+    elif category == 'top_movies':
+        page = (offset // PAGE_SIZE) + 1
+        all_items = tmdb_module.get_top_rated('movie', page)
+        cat_label = ADDON.getLocalizedString(30138)
+        content_type = 'movies'
+    elif category == 'top_shows':
+        page = (offset // PAGE_SIZE) + 1
+        all_items = tmdb_module.get_top_rated('tv', page)
+        cat_label = ADDON.getLocalizedString(30139)
+        content_type = 'tvshows'
+    elif category == 'random_tips':
+        all_items = tmdb_module.get_random_tips()
+        cat_label = ADDON.getLocalizedString(30140)
+        content_type = 'videos'
+    elif category == 'genre':
+        page = (offset // PAGE_SIZE) + 1
+        raw_mtype = 'movie' if media_type == 'movies' else 'tv'
+        all_items = tmdb_module.get_discover_by_genre(raw_mtype, genre_id, page)
+        cat_label = f"{ADDON.getLocalizedString(30136 if media_type == 'movies' else 30137)}: {genre_name or ''}"
+        content_type = 'movies' if media_type == 'movies' else 'tvshows'
     else:
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
@@ -772,8 +845,7 @@ def show_tmdb_category(category, offset=0):
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
-    page_items = all_items[offset:offset + PAGE_SIZE]
-    for item in page_items:
+    for item in all_items:
         raw_title = item.get('clean_title', item.get('title', ''))
         display_title = item.get('title', raw_title)
         year = item.get('year', '')
@@ -814,9 +886,12 @@ def show_tmdb_category(category, offset=0):
 
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
-    if len(all_items) > offset + PAGE_SIZE:
+    if len(all_items) >= PAGE_SIZE and category not in ('tv_tips', 'disks', 'random_tips'):
         next_offset = offset + PAGE_SIZE
-        next_url = f"{sys.argv[0]}?action=tmdb_category&category={category}&offset={next_offset}"
+        extra_params = ""
+        if category == 'genre':
+            extra_params = f"&media_type={media_type}&genre_id={genre_id}&genre_name={urllib.parse.quote(genre_name or '')}"
+        next_url = f"{sys.argv[0]}?action=tmdb_category&category={category}&offset={next_offset}{extra_params}"
         li_next = xbmcgui.ListItem(label=f"[COLOR gray]>> {ADDON.getLocalizedString(30117)} ({next_offset + 1}-{next_offset + PAGE_SIZE})[/COLOR]")
         li_next.setArt({'icon': 'DefaultFolder.png', 'thumb': 'DefaultFolder.png'})
         xbmcplugin.addDirectoryItem(HANDLE, next_url, li_next, isFolder=True)
@@ -1706,8 +1781,16 @@ def run():
         history_tmdb_identify_search(params.get('original_query', ''), params.get('custom_query'))
     elif action == 'tmdb_menu':
         show_tmdb_menu()
+    elif action == 'tmdb_genres_menu':
+        show_tmdb_genres_menu(params.get('media_type', 'movies'))
     elif action == 'tmdb_category':
-        show_tmdb_category(params.get('category'), params.get('offset', 0))
+        show_tmdb_category(
+            params.get('category'),
+            params.get('offset', 0),
+            media_type=params.get('media_type'),
+            genre_id=params.get('genre_id'),
+            genre_name=params.get('genre_name')
+        )
     elif action == 'tmdb_show_seasons':
         show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''), params.get('tmdb_id'))
     elif action == 'tmdb_show_episodes':
