@@ -430,3 +430,91 @@ msgstr "Odebrat ze seznamu k zhlédnutí"
 msgctxt "#30135"
 msgid "Browse seasons and episodes"
 msgstr "Procházet série a díly"
+
+msgctxt "#30136"
+msgid "Movies by Genre"
+msgstr "Filmy podle žánru"
+
+msgctxt "#30137"
+msgid "TV Shows by Genre"
+msgstr "Seriály podle žánru"
+
+msgctxt "#30138"
+msgid "Top Rated Movies"
+msgstr "Nejlépe hodnocené filmy"
+
+msgctxt "#30139"
+msgid "Top Rated TV Shows"
+msgstr "Nejlépe hodnocené seriály"
+
+msgctxt "#30140"
+msgid "Random Recommendations"
+msgstr "Náhodné tipy a doporučení"
+
+msgctxt "#30141"
+msgid "Action"
+msgstr "Akční"
+
+msgctxt "#30142"
+msgid "Adventure"
+msgstr "Dobrodružné"
+
+msgctxt "#30143"
+msgid "Animation"
+msgstr "Animované"
+
+msgctxt "#30144"
+msgid "Comedy"
+msgstr "Komedie"
+
+msgctxt "#30145"
+msgid "Crime"
+msgstr "Krimi"
+
+msgctxt "#30146"
+msgid "Documentary"
+msgstr "Dokumentární"
+
+msgctxt "#30147"
+msgid "Drama"
+msgstr "Drama"
+
+msgctxt "#30148"
+msgid "Family"
+msgstr "Rodinné"
+
+msgctxt "#30149"
+msgid "Fantasy"
+msgstr "Fantasy"
+
+msgctxt "#30150"
+msgid "Horror"
+msgstr "Horor"
+
+msgctxt "#30151"
+msgid "Mystery"
+msgstr "Mysteriózní"
+
+msgctxt "#30152"
+msgid "Sci-Fi"
+msgstr "Sci-Fi"
+
+msgctxt "#30153"
+msgid "Thriller"
+msgstr "Thriller"
+
+msgctxt "#30154"
+msgid "War"
+msgstr "Válečné"
+
+msgctxt "#30155"
+msgid "Western"
+msgstr "Western"
+
+msgctxt "#30156"
+msgid "Sci-Fi & Fantasy"
+msgstr "Sci-Fi a Fantasy"
+
+msgctxt "#30157"
+msgid "Action & Adventure"
+msgstr "Akční a dobrodružné"
