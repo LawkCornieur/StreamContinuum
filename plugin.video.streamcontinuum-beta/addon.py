@@ -370,6 +370,7 @@ def history_menu(query, title=None, show_full_history_link=False):
     poster = hist_item.get('poster') if hist_item and hist_item.get('poster') else None
     fanart = hist_item.get('fanart') if hist_item and hist_item.get('fanart') else get_asset('fa-history.png')
     is_watched = bool(hist_item.get('is_watched', True)) if hist_item else True
+    tmdb_id = hist_item.get('tmdb_id') if hist_item else None
     is_tv = (hist_item.get('media_type') in ('tvshow', 'tv', 'show') if hist_item else False) or history.is_series(query)
     media_type = 'tvshow' if is_tv else 'movie'
 
@@ -393,6 +394,9 @@ def history_menu(query, title=None, show_full_history_link=False):
     if trakt_token and enable_trakt_menu:
         items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(raw_title or query)}', 'DefaultAddonVideo.png'))
     
+    if is_tv:
+        items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={tmdb_id or ""}', 'DefaultTVShows.png'))
+
     series_pattern = re.compile(r'^(.*?)(?:\s+|_|\.)S(\d{2})E(\d{2})', re.IGNORECASE)
     match = series_pattern.search(query)
     if match:
@@ -400,12 +404,32 @@ def history_menu(query, title=None, show_full_history_link=False):
         season = int(match.group(2))
         episode = int(match.group(3))
         ws_base = raw_title or base_title
-        items.extend([
-            (f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'),
-            (f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png') if episode > 1 else None,
-            (f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'),
-            (f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png') if season > 1 else None,
-        ])
+
+        has_next_ep = True
+        has_next_season = True
+
+        if tmdb_id and tmdb_module:
+            try:
+                show_details = tmdb_module.get_show_seasons(tmdb_id)
+                if show_details and 'seasons' in show_details:
+                    seasons = show_details.get('seasons', [])
+                    curr_s_obj = next((s for s in seasons if s.get('season_number') == season), None)
+                    if curr_s_obj:
+                        max_eps = curr_s_obj.get('episode_count', 0)
+                        if max_eps > 0 and episode + 1 > max_eps:
+                            has_next_ep = False
+                    has_next_season = any(s.get('season_number') == season + 1 for s in seasons)
+            except Exception as e:
+                xbmc.log(f"StreamContinuum: Error validating TMDb show details in history_menu: {e}", xbmc.LOGWARNING)
+
+        if has_next_ep:
+            items.append((f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'))
+        if episode > 1:
+            items.append((f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png'))
+        if has_next_season:
+            items.append((f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'))
+        if season > 1:
+            items.append((f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png'))
     
     for label, action_params, icon in [i for i in items if i]:
         url = f"{sys.argv[0]}?action={action_params}"
@@ -433,7 +457,7 @@ def history_menu(query, title=None, show_full_history_link=False):
         if genres:
             info_tag.setGenres(genres if isinstance(genres, list) else [genres])
             
-        is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params or action_params == 'history_list'
+        is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params or 'tmdb_show_seasons' in action_params or action_params == 'history_list'
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
         
     xbmcplugin.endOfDirectory(HANDLE)
