@@ -397,13 +397,14 @@ def history_menu(query, title=None, show_full_history_link=False):
     if is_tv:
         items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={tmdb_id or ""}', 'DefaultTVShows.png'))
 
-    series_pattern = re.compile(r'^(.*?)(?:\s+|_|\.)S(\d{2})E(\d{2})', re.IGNORECASE)
-    match = series_pattern.search(query)
-    if match:
-        base_title = match.group(1).strip()
-        season = int(match.group(2))
-        episode = int(match.group(3))
-        ws_base = raw_title or base_title
+    # Robust detection of series episode numbers from original query
+    ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+    if ep_match:
+        base_title = ep_match.group(1).strip() if ep_match.group(1) else ""
+        season = int(ep_match.group(2) or ep_match.group(4))
+        episode = int(ep_match.group(3) or ep_match.group(5))
+        # Use original query base name for Webshare search to preserve user releases and tags
+        ws_base = base_title if base_title else history.get_base_name(query)
 
         has_next_ep = True
         has_next_season = True
