@@ -257,10 +257,27 @@ def play(ident, query=None):
             import history
             history.add_to_history(query)
             
+        player = xbmc.Player()
         monitor = xbmc.Monitor()
         xbmc.sleep(2000)
-        while not monitor.abortRequested() and (xbmc.getCondVisibility('Player.HasMedia') or xbmc.Player().isPlaying()):
+
+        total_time = 0
+        last_pos = 0
+        while not monitor.abortRequested() and (xbmc.getCondVisibility('Player.HasMedia') or player.isPlaying()):
+            try:
+                if player.isPlayingVideo():
+                    t = player.getTotalTime()
+                    p = player.getTime()
+                    if t > 0:
+                        total_time = t
+                        last_pos = p
+            except Exception:
+                pass
             xbmc.sleep(1000)
+
+        played_to_end = False
+        if total_time > 0 and (last_pos / total_time) >= 0.85:
+            played_to_end = True
 
         timeout = 50
         while timeout > 0 and xbmc.getCondVisibility('Window.IsActive(10025)'):
@@ -268,6 +285,57 @@ def play(ident, query=None):
             timeout -= 1
             
         xbmc.executebuiltin('Dialog.Close(all)')
+        
+        autoplay_enabled = ADDON.getSettingBool('autoplay_next')
+        if played_to_end and autoplay_enabled and query:
+            ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+            if ep_match:
+                raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
+                cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
+                season = int(ep_match.group(2) or ep_match.group(4))
+                episode = int(ep_match.group(3) or ep_match.group(5))
+                import history
+                ws_base = cleaned_base if cleaned_base else history.get_base_name(query)
+                next_ep_query = f"{ws_base} S{season:02d}E{episode+1:02d}"
+
+                hist_item = history.get_history_item(query)
+                clean_tmdb_id = hist_item.get('tmdb_id') if hist_item else None
+                has_next_ep = True
+                if clean_tmdb_id and tmdb_module:
+                    try:
+                        show_details = tmdb_module.get_show_seasons(clean_tmdb_id)
+                        if show_details and 'seasons' in show_details:
+                            seasons = show_details.get('seasons', [])
+                            curr_s_obj = next((s for s in seasons if s.get('season_number') == season), None)
+                            if curr_s_obj:
+                                max_eps = curr_s_obj.get('episode_count', 0)
+                                if max_eps > 0 and episode + 1 > max_eps:
+                                    has_next_ep = False
+                    except Exception as e:
+                        xbmc.log(f"StreamContinuum: TMDb validation error in autoplay: {e}", xbmc.LOGWARNING)
+
+                if has_next_ep:
+                    results = webshare.search(next_ep_query)
+                    if results:
+                        dialog = xbmcgui.DialogProgress()
+                        dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_ep_query}")
+                        seconds = 5
+                        canceled = False
+                        for i in range(seconds * 10):
+                            if dialog.iscanceled() or monitor.abortRequested():
+                                canceled = True
+                                break
+                            percent = int(100 - (i / (seconds * 10) * 100))
+                            dialog.update(percent, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\nSpuštění za {seconds - (i // 10)} s...")
+                            xbmc.sleep(100)
+                        dialog.close()
+
+                        if not canceled and not monitor.abortRequested():
+                            selected_item = results[0]
+                            safe_next_q = urllib.parse.quote(next_ep_query)
+                            xbmc.executebuiltin(f'RunPlugin({sys.argv[0]}?action=play&ident={selected_item["ident"]}&query={safe_next_q})')
+                            return
+
         after = ADDON.getSetting('after_playback')
         safe_query = urllib.parse.quote(query) if query else ""
         xbmc.sleep(2000)
