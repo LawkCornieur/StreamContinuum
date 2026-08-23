@@ -169,6 +169,65 @@ def add_to_history(query):
     
     _save_history(history)
 
+def add_to_watchlist_local(query, tmdb_data=None):
+    if not query:
+        return
+    history = get_history(deduplicate=False)
+    now = int(time.time())
+    
+    query_is_series = is_series(query) or (tmdb_data and tmdb_data.get('media_type') in ('tvshow', 'tv', 'show'))
+    query_base = get_base_name(query).lower().strip()
+    
+    existing_item = None
+    remaining_history = []
+    for item in history:
+        item_q = item.get('query', '')
+        item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')
+        item_base = get_base_name(item_q).lower().strip()
+        
+        is_same_exact = (item_q == query)
+        is_same_series = query_is_series and item_is_series and (query_base and item_base and query_base == item_base)
+        
+        if is_same_exact or is_same_series:
+            if not existing_item:
+                existing_item = item
+        else:
+            remaining_history.append(item)
+            
+    history = remaining_history
+    
+    if existing_item:
+        existing_item['query'] = query
+        existing_item['is_watched'] = False
+        existing_item['last_played_at'] = now
+        if tmdb_data:
+            for k in ['title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'tmdb_id', 'media_type']:
+                if k in tmdb_data and tmdb_data[k] is not None:
+                    existing_item[k] = tmdb_data[k]
+        item_to_add = existing_item
+    else:
+        item_to_add = {
+            'query': query,
+            'title': tmdb_data.get('title') if tmdb_data else None,
+            'year': tmdb_data.get('year') if tmdb_data else None,
+            'plot': tmdb_data.get('plot', '') if tmdb_data else '',
+            'genres': tmdb_data.get('genres', []) if tmdb_data else [],
+            'rating': tmdb_data.get('rating') if tmdb_data else None,
+            'runtime': tmdb_data.get('runtime') if tmdb_data else None,
+            'poster': tmdb_data.get('poster') if tmdb_data else None,
+            'fanart': tmdb_data.get('fanart') if tmdb_data else None,
+            'tmdb_id': tmdb_data.get('tmdb_id') if tmdb_data else None,
+            'media_type': tmdb_data.get('media_type') if tmdb_data else ('tvshow' if query_is_series else 'movie'),
+            'identified_at': now if (tmdb_data and tmdb_data.get('tmdb_id')) else None,
+            'is_watched': False,
+            'last_played_at': now,
+            'added_at': now
+        }
+        
+    history.insert(0, item_to_add)
+    history = history[:50]
+    _save_history(history)
+
 def set_watched_status(query, is_watched):
     if not query:
         return False
