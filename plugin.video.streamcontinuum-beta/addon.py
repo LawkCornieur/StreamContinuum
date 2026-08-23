@@ -360,6 +360,10 @@ def show_history(force_list=False):
     xbmcplugin.endOfDirectory(HANDLE)
 
 def history_menu(query, title=None, show_full_history_link=False):
+    if not query:
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
     import history
     hist_item = history.get_history_item(query)
     raw_title = (hist_item.get('title') if hist_item else None) or title
@@ -401,11 +405,12 @@ def history_menu(query, title=None, show_full_history_link=False):
     # Robust detection of series episode numbers from original query
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
     if ep_match:
-        base_title = ep_match.group(1).strip() if ep_match.group(1) else ""
+        raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
+        cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
         season = int(ep_match.group(2) or ep_match.group(4))
         episode = int(ep_match.group(3) or ep_match.group(5))
         # Use original query base name for Webshare search to preserve user releases and tags
-        ws_base = base_title if base_title else history.get_base_name(query)
+        ws_base = cleaned_base if cleaned_base else history.get_base_name(query)
 
         has_next_ep = True
         has_next_season = True
@@ -1726,7 +1731,7 @@ def run():
         return
     elif action == 'history_edit':
         old_query = params.get('query')
-        keyboard = xbmc.Keyboard(old_query, ADDON.getLocalizedString(30087))
+        keyboard = xbmc.Keyboard(old_query or '', ADDON.getLocalizedString(30087))
         keyboard.doModal()
         if keyboard.isConfirmed():
             new_query = keyboard.getText()
