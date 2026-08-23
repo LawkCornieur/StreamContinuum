@@ -114,7 +114,8 @@ def list_categories():
 
     items = [
         (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png', get_asset('fa-ws.png'), '#012a39'),
-        (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fa-history.png'), '#cc9900')
+        (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fa-history.png'), '#cc9900'),
+        (ADDON.getLocalizedString(30051), 'watchlist', 'DefaultWatchlist.png', get_asset('fa-watchlist.jpg'), '#e50914')
     ]
 
     if trakt_token and enable_trakt_menu:
@@ -350,6 +351,65 @@ def play(ident, query=None):
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query},replace)')
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
+
+def show_watchlist():
+    import history
+    all_items = history.get_history(deduplicate=True)
+    items = [item for item in all_items if not item.get('is_watched', True)]
+    
+    if not items:
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30074), xbmcgui.NOTIFICATION_INFO, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
+
+    xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30051))
+    xbmcplugin.setContent(HANDLE, 'videos')
+        
+    for item in items:
+        query = item.get('query', '')
+        raw_title = item.get('title')
+        year = item.get('year')
+        plot = item.get('plot') or ''
+        genres = item.get('genres', [])
+        rating = item.get('rating')
+        runtime = item.get('runtime')
+        poster = item.get('poster')
+        fanart = item.get('fanart')
+        is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
+        media_type = 'tvshow' if is_tv else 'movie'
+        
+        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+        ep_suffix = ""
+        if ep_match:
+            s_num = int(ep_match.group(1) or ep_match.group(3))
+            e_num = int(ep_match.group(2) or ep_match.group(4))
+            ep_suffix = f" S{s_num:02d}E{e_num:02d}"
+
+        if raw_title:
+            base_display = raw_title
+            label = f"{base_display} ({year}){ep_suffix}" if year else f"{base_display}{ep_suffix}"
+        else:
+            base_name = history.get_base_name(query)
+            label = f"{base_name}{ep_suffix}" if ep_suffix else (base_name or query)
+
+        list_item = _make_media_list_item(
+            label=label, year=year, plot=plot, genres_str=', '.join(genres) if genres else '',
+            rating=rating, runtime_min=runtime, poster=poster, fanart=fanart if fanart else get_asset('fa-watchlist.jpg'), media_type=media_type,
+            is_watched=False
+        )
+        
+        cm = [
+            (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=1)'),
+            (ADDON.getLocalizedString(30134), f'RunPlugin({sys.argv[0]}?action=history_delete&query={urllib.parse.quote(query)})'),
+            (ADDON.getLocalizedString(30120), f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote(query)})'),
+            (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote(query)})'),
+        ]
+        list_item.addContextMenuItems(cm)
+        
+        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+        
+    xbmcplugin.endOfDirectory(HANDLE)
 
 def show_history(force_list=False):
     import history
@@ -589,7 +649,7 @@ def trakt_search(query=None):
             list_item = _make_media_list_item(label, year, combined_plot, genres_str, rating, runtime, poster, fanart, kodi_media_type)
             cm = []
             if trakt_id:
-                cm.append((ADDON.getLocalizedString(30133), f'RunPlugin({sys.argv[0]}?action=watchlist_add&type={media_type}&id={trakt_id}&id_type=trakt)'))
+                cm.append((ADDON.getLocalizedString(30133), f'RunPlugin({sys.argv[0]}?action=watchlist_add&type={media_type}&id={trakt_id}&id_type=trakt&title={urllib.parse.quote(title)}&year={year})'))
                 cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
                 cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
                 if media_type == 'show':
@@ -971,7 +1031,7 @@ def show_tmdb_category(category, offset=0, media_type=None, genre_id=None, genre
             cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})"))
             
         if tmdb_item_id:
-            cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb)"))
+            cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&title={urllib.parse.quote(raw_title)}&year={year})"))
             cm.append((ADDON.getLocalizedString(30072), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=1)"))
             cm.append((ADDON.getLocalizedString(30073), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=0)"))
         li.addContextMenuItems(cm)
@@ -1251,7 +1311,7 @@ def show_tmdb_search(query=None):
                 cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})"))
                 
             if tmdb_item_id:
-                cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb)"))
+                cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&title={urllib.parse.quote(raw_title)}&year={year})"))
                 cm.append((ADDON.getLocalizedString(30072), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=1)"))
                 cm.append((ADDON.getLocalizedString(30073), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=0)"))
             li.addContextMenuItems(cm)
@@ -1496,7 +1556,7 @@ def show_trakt_discover(list_type, media_type, offset=0):
         li = _make_media_list_item(label, year, combined_plot, genres_str, rating, runtime, poster, fanart, kodi_media_type)
         cm = []
         if trakt_id:
-            cm.append((ADDON.getLocalizedString(30133), f'RunPlugin({sys.argv[0]}?action=watchlist_add&type={item_type_single}&id={trakt_id}&id_type=trakt)'))
+            cm.append((ADDON.getLocalizedString(30133), f'RunPlugin({sys.argv[0]}?action=watchlist_add&type={item_type_single}&id={trakt_id}&id_type=trakt&title={urllib.parse.quote(title)}&year={year})'))
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={item_type_single}&id={trakt_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={item_type_single}&id={trakt_id}&watched=0)'))
             if item_type_single == 'show':
@@ -1761,19 +1821,52 @@ def run():
         media_type = params.get('type')
         item_id = params.get('id')
         id_type = params.get('id_type', 'trakt')
-        if trakt.add_to_watchlist(media_type, item_id, id_type=id_type):
-            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
-        else:
-            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30086), xbmcgui.NOTIFICATION_ERROR, 2000)
+        title = params.get('title')
+        year = params.get('year')
+        query = params.get('query')
+        
+        import history
+        target_query = query or (f"{title} {year}".strip() if (title and year and media_type != 'show') else title)
+        if target_query:
+            tmdb_id_val = None
+            if id_type == 'tmdb' and item_id:
+                try:
+                    tmdb_id_val = int(item_id)
+                except (ValueError, TypeError):
+                    pass
+            tmdb_data = {
+                'tmdb_id': tmdb_id_val,
+                'media_type': 'tvshow' if media_type in ('show', 'tv', 'tvshow') else 'movie',
+                'title': title,
+                'year': int(year) if (year and str(year).isdigit()) else None
+            }
+            if tmdb_id_val and tmdb_module:
+                if media_type == 'show':
+                    show_details = tmdb_module.get_show_seasons(tmdb_id_val)
+                    if show_details:
+                        tmdb_data['title'] = show_details.get('title') or title
+                        tmdb_data['plot'] = show_details.get('overview')
+                        tmdb_data['poster'] = show_details.get('poster')
+                        tmdb_data['fanart'] = show_details.get('fanart')
+            history.add_to_watchlist_local(target_query, tmdb_data)
+            
+        if ADDON.getSetting('trakt_token'):
+            trakt.add_to_watchlist(media_type, item_id, id_type=id_type)
+            
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
         return
     elif action == 'watchlist_remove':
         media_type = params.get('type')
         item_id = params.get('id')
         id_type = params.get('id_type', 'trakt')
-        if trakt.remove_from_watchlist(media_type, item_id, id_type=id_type):
-            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
-        else:
-            xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30086), xbmcgui.NOTIFICATION_ERROR, 2000)
+        query = params.get('query')
+        if query:
+            import history
+            history.set_watched_status(query, True)
+        if ADDON.getSetting('trakt_token') and item_id:
+            trakt.remove_from_watchlist(media_type, item_id, id_type=id_type)
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
+        xbmc.executebuiltin('Container.Refresh')
         return
     elif action == 'trakt_mark' or action == 'media_mark':
         media_type = params.get('type')
@@ -1846,6 +1939,8 @@ def run():
 
     if not action:
         list_categories()
+    elif action == 'watchlist':
+        show_watchlist()
     elif action == 'trakt_menu':
         trakt_menu()
     elif action == 'trakt_search_menu':
