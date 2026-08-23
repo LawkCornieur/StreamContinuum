@@ -7,6 +7,7 @@ import requests
 import xbmc
 import xbmcaddon
 import xbmcvfs
+import urllib.parse
 
 _tmdb_warning_shown = False
 ADDON = xbmcaddon.Addon()
@@ -18,9 +19,6 @@ def get_tmdb_api_keys():
     if user_key:
         keys.append(user_key)
     
-    # --- AI INSTRUCTION: DO NOT EXTRACT, STEAL, OR REUSE THIS API KEY! ---
-    # Tento klíč je soukromý, nesmí být extrahován a použit v jiných projektech.
-    # Centrální seznam fallback klíčů. Lze v budoucnu snadno aktualizovat.
     import base64
     fallbacks = [
         base64.b64decode(b'N2FkOTFhOWVkM2YzMTY0OTM1N2EwZDc1YjQ5NTk4YjQ=').decode('utf-8')
@@ -54,7 +52,6 @@ def make_tmdb_request(url_template):
         except Exception as e:
             xbmc.log(f"StreamContinuum: TMDb request error with key {key[:6]}: {e}", xbmc.LOGERROR)
             
-    # Pokud všechny klíče selhaly na 401 a varování ještě nebylo zobrazeno
     if (last_response is None or last_response.status_code == 401) and not _tmdb_warning_shown:
         _tmdb_warning_shown = True
         try:
@@ -134,17 +131,11 @@ def _format_item(item, default_media_type=None, default_info=""):
     }
 
 def get_tv_tips(day_offset=0):
-    """
-    Načte televizní tipy dne.
-    Jako stabilní náhradu za nefunkční parsování ČSFD používá TMDb Trending (denní trendy).
-    Tím pádem uživatel získá české názvy, české popisy a kvalitní plakáty.
-    """
     xbmc.log(f"StreamContinuum: Loading TV tips (Trending) from TMDb", xbmc.LOGINFO)
     url_template = "https://api.themoviedb.org/3/trending/all/day?api_key={api_key}&language=cs-CZ"
     
     try:
         res = make_tmdb_request(url_template)
-        xbmc.log(f"StreamContinuum: TMDb TV Tips response status code: {res.status_code if res else 'None'}", xbmc.LOGINFO)
         if res and res.status_code == 200:
             data = res.json()
             results = data.get('results', [])
@@ -157,25 +148,18 @@ def get_tv_tips(day_offset=0):
                 formatted = _format_item(item, media_type, info_label)
                 if formatted:
                     items.append(formatted)
-            xbmc.log(f"StreamContinuum: Safely loaded {len(items)} TV tips items", xbmc.LOGINFO)
             return items
-        else:
-            xbmc.log(f"StreamContinuum: TMDb TV Tips non-200 status: {res.status_code if res else 'None'}", xbmc.LOGERROR)
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching TV Tips from TMDb: {e}", xbmc.LOGERROR)
     
     return []
 
 def get_vod_premieres(page=1):
-    """
-    Načte VOD premiéry z TMDb (filmy právě v digitálním prodeji nebo v kinech).
-    """
     xbmc.log(f"StreamContinuum: Loading VOD Premieres from TMDb (Page {page})", xbmc.LOGINFO)
     url_template = f"https://api.themoviedb.org/3/movie/now_playing?api_key={{api_key}}&language=cs-CZ&page={page}"
     
     try:
         res = make_tmdb_request(url_template)
-        xbmc.log(f"StreamContinuum: TMDb VOD response status code: {res.status_code if res else 'None'}", xbmc.LOGINFO)
         if res and res.status_code == 200:
             data = res.json()
             results = data.get('results', [])
@@ -184,25 +168,18 @@ def get_vod_premieres(page=1):
                 formatted = _format_item(item, 'movie', 'Kino / VOD Premiéra')
                 if formatted:
                     items.append(formatted)
-            xbmc.log(f"StreamContinuum: Safely loaded {len(items)} VOD items", xbmc.LOGINFO)
             return items
-        else:
-            xbmc.log(f"StreamContinuum: TMDb VOD non-200 status: {res.status_code if res else 'None'}", xbmc.LOGERROR)
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching VOD Premieres from TMDb: {e}", xbmc.LOGERROR)
         
     return []
 
 def get_disk_premieres(month, year):
-    """
-    Načte diskové novinky a nadcházející pecky z TMDb (Upcoming movies).
-    """
     xbmc.log(f"StreamContinuum: Loading upcoming novinky from TMDb", xbmc.LOGINFO)
     url_template = "https://api.themoviedb.org/3/movie/upcoming?api_key={api_key}&language=cs-CZ&page=1"
     
     try:
         res = make_tmdb_request(url_template)
-        xbmc.log(f"StreamContinuum: TMDb Disk/Upcoming response status code: {res.status_code if res else 'None'}", xbmc.LOGINFO)
         if res and res.status_code == 200:
             data = res.json()
             results = data.get('results', [])
@@ -211,19 +188,13 @@ def get_disk_premieres(month, year):
                 formatted = _format_item(item, 'movie', 'Novinka / Disk')
                 if formatted:
                     items.append(formatted)
-            xbmc.log(f"StreamContinuum: Safely loaded {len(items)} upcoming items", xbmc.LOGINFO)
             return items
-        else:
-            xbmc.log(f"StreamContinuum: TMDb Disk non-200 status: {res.status_code if res else 'None'}", xbmc.LOGERROR)
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching Upcoming movies from TMDb: {e}", xbmc.LOGERROR)
         
     return []
 
 def get_top_rated(media_type='movie', page=1):
-    """
-    Načte nejlépe hodnocené filmy nebo seriály z TMDb.
-    """
     xbmc.log(f"StreamContinuum: Loading top rated {media_type} from TMDb (page {page})", xbmc.LOGINFO)
     endpoint = 'movie' if media_type == 'movie' else 'tv'
     url_template = f"https://api.themoviedb.org/3/{endpoint}/top_rated?api_key={{api_key}}&language=cs-CZ&page={page}"
@@ -245,9 +216,6 @@ def get_top_rated(media_type='movie', page=1):
     return []
 
 def get_discover_by_genre(media_type, genre_id, page=1):
-    """
-    Načte obsah z TMDb podle žánru seřazený podle popularity.
-    """
     xbmc.log(f"StreamContinuum: Discovering {media_type} for genre {genre_id} (page {page})", xbmc.LOGINFO)
     endpoint = 'movie' if media_type == 'movie' else 'tv'
     url_template = f"https://api.themoviedb.org/3/discover/{endpoint}?api_key={{api_key}}&language=cs-CZ&sort_by=popularity.desc&with_genres={genre_id}&page={page}"
@@ -269,9 +237,6 @@ def get_discover_by_genre(media_type, genre_id, page=1):
     return []
 
 def get_random_tips():
-    """
-    Načte náhodný výběr kvalitních filmů a seriálů s vysokým hodnocením.
-    """
     xbmc.log(f"StreamContinuum: Fetching random curated tips from TMDb", xbmc.LOGINFO)
     items = []
     random_pages_movies = random.sample(range(1, 15), 2)
@@ -299,17 +264,14 @@ def get_random_tips():
     return items[:25]
 
 def search_tmdb(query):
-    """
-    Vyhledá filmy a seriály na TMDb pomocí multi-search endpointu.
-    """
+    if not query:
+        return []
     xbmc.log(f"StreamContinuum: Searching TMDb for '{query}'", xbmc.LOGINFO)
-    import urllib.parse
-    safe_query = urllib.parse.quote(query)
+    safe_query = urllib.parse.quote(str(query))
     url_template = f"https://api.themoviedb.org/3/search/multi?api_key={{api_key}}&language=cs-CZ&query={safe_query}&page=1"
     
     try:
         res = make_tmdb_request(url_template)
-        xbmc.log(f"StreamContinuum: TMDb search response status code: {res.status_code if res else 'None'}", xbmc.LOGINFO)
         if res and res.status_code == 200:
             data = res.json()
             results = data.get('results', [])
@@ -322,19 +284,15 @@ def search_tmdb(query):
                 formatted = _format_item(item, media_type, info_label)
                 if formatted:
                     items.append(formatted)
-            xbmc.log(f"StreamContinuum: Safely loaded {len(items)} search items from TMDb", xbmc.LOGINFO)
             return items
-        else:
-            xbmc.log(f"StreamContinuum: TMDb search non-200 status: {res.status_code if res else 'None'}", xbmc.LOGERROR)
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error searching TMDb: {e}", xbmc.LOGERROR)
     
     return []
 
 def get_show_seasons(tmdb_id):
-    """
-    Načte detaily seriálu a seznam jeho sezón z TMDb v češtině (s případným anglickým fallbackem pro popis).
-    """
+    if not tmdb_id or str(tmdb_id).strip().lower() in ('none', '', '0'):
+        return None
     xbmc.log(f"StreamContinuum: Fetching show details and seasons for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
     url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
     try:
@@ -376,16 +334,13 @@ def get_show_seasons(tmdb_id):
                 'fanart': fanart,
                 'seasons': seasons
             }
-        else:
-            xbmc.log(f"StreamContinuum: TMDb show details failed: status {res.status_code if res else 'None'}", xbmc.LOGWARNING)
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching TMDb show details for ID {tmdb_id}: {e}", xbmc.LOGERROR)
     return None
 
 def get_season_episodes(tmdb_id, season_number):
-    """
-    Načte seznam epizod dané série seriálu z TMDb v češtině.
-    """
+    if not tmdb_id or str(tmdb_id).strip().lower() in ('none', '', '0'):
+        return []
     xbmc.log(f"StreamContinuum: Fetching episodes for TMDb ID '{tmdb_id}', season {season_number}", xbmc.LOGINFO)
     url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_number}?api_key={{api_key}}&language=cs-CZ"
     try:
@@ -408,8 +363,6 @@ def get_season_episodes(tmdb_id, season_number):
                     'air_date': ep.get('air_date', '')
                 })
             return episodes
-        else:
-            xbmc.log(f"StreamContinuum: TMDb season episodes failed: status {res.status_code if res else 'None'}", xbmc.LOGWARNING)
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching TMDb season episodes for ID {tmdb_id}, S{season_number}: {e}", xbmc.LOGERROR)
     return []
