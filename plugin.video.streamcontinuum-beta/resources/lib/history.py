@@ -36,7 +36,7 @@ def get_base_name(query):
     q = re.sub(r'\s+', ' ', q).strip()
     return q if q else query
 
-def get_history():
+def get_history(deduplicate=True):
     if not os.path.exists(PROFILE_DIR):
         os.makedirs(PROFILE_DIR)
     if not os.path.exists(HISTORY_FILE):
@@ -60,6 +60,9 @@ def get_history():
             # Sort items by last_played_at descending
             items.sort(key=lambda x: x.get('last_played_at', 0) or x.get('added_at', 0), reverse=True)
             
+            if not deduplicate:
+                return items
+
             # Deduplicate series keeping only the latest watched episode
             seen_series = set()
             unique_items = []
@@ -80,7 +83,7 @@ def get_history():
 def get_history_item(query):
     if not query:
         return None
-    items = get_history()
+    items = get_history(deduplicate=False)
     norm_q = query.strip().lower()
     for item in items:
         if item.get('query') == query or item.get('query', '').strip().lower() == norm_q:
@@ -101,7 +104,7 @@ def _save_history(history_list):
         xbmc.log(f"StreamContinuum History: Error saving history.json: {e}", xbmc.LOGERROR)
 
 def add_to_history(query):
-    history = get_history()
+    history = get_history(deduplicate=False)
     now = int(time.time())
     
     # New item template with default values and timestamps
@@ -165,7 +168,7 @@ def add_to_history(query):
     _save_history(history)
 
 def set_watched_status(query, is_watched):
-    history = get_history()
+    history = get_history(deduplicate=False)
     norm_q = query.strip().lower() if query else ""
     q_base = get_base_name(query).strip().lower() if query else ""
     updated = False
@@ -181,12 +184,12 @@ def set_watched_status(query, is_watched):
     return updated
 
 def delete_from_history(query):
-    history = get_history()
+    history = get_history(deduplicate=False)
     history = [item for item in history if item.get('query') != query]
     _save_history(history)
 
 def update_history_item(old_query, new_query):
-    history = get_history()
+    history = get_history(deduplicate=False)
     now = int(time.time())
     for item in history:
         if item.get('query') == old_query:
@@ -207,7 +210,7 @@ def update_history_item(old_query, new_query):
     _save_history(history)
     
 def update_history_with_tmdb_data(original_query, tmdb_data):
-    history = get_history()
+    history = get_history(deduplicate=False)
     updated = False
     now = int(time.time())
     norm_orig = original_query.strip().lower() if original_query else ""
