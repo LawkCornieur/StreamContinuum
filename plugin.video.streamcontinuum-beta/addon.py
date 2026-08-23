@@ -285,7 +285,7 @@ def play(ident, query=None):
 
 def show_history(force_list=False):
     import history
-    items = history.get_history()
+    items = history.get_history(deduplicate=not force_list)
     
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
@@ -371,6 +371,7 @@ def history_menu(query, title=None, show_full_history_link=False):
     fanart = hist_item.get('fanart') if hist_item and hist_item.get('fanart') else get_asset('fa-history.png')
     is_watched = bool(hist_item.get('is_watched', True)) if hist_item else True
     tmdb_id = hist_item.get('tmdb_id') if hist_item else None
+    clean_tmdb_id = tmdb_id if (tmdb_id and str(tmdb_id).strip().lower() != 'none') else None
     is_tv = (hist_item.get('media_type') in ('tvshow', 'tv', 'show') if hist_item else False) or history.is_series(query)
     media_type = 'tvshow' if is_tv else 'movie'
 
@@ -395,7 +396,7 @@ def history_menu(query, title=None, show_full_history_link=False):
         items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(raw_title or query)}', 'DefaultAddonVideo.png'))
     
     if is_tv:
-        items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={tmdb_id or ""}', 'DefaultTVShows.png'))
+        items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={clean_tmdb_id or ""}', 'DefaultTVShows.png'))
 
     # Robust detection of series episode numbers from original query
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
@@ -409,9 +410,9 @@ def history_menu(query, title=None, show_full_history_link=False):
         has_next_ep = True
         has_next_season = True
 
-        if tmdb_id and tmdb_module:
+        if clean_tmdb_id and tmdb_module:
             try:
-                show_details = tmdb_module.get_show_seasons(tmdb_id)
+                show_details = tmdb_module.get_show_seasons(clean_tmdb_id)
                 if show_details and 'seasons' in show_details:
                     seasons = show_details.get('seasons', [])
                     curr_s_obj = next((s for s in seasons if s.get('season_number') == season), None)
