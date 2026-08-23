@@ -1,6 +1,5 @@
 import requests
 import time
-# This is a virtual module provided by Kodi, it must be imported for the addon to function.
 import xbmc
 import xbmcaddon
 import xbmcgui
@@ -13,6 +12,8 @@ BASE_URL = "https://webshare.cz/api/"
 HEADERS = {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'}
 
 def get_salt(username):
+    if not username:
+        return None
     url = BASE_URL + 'salt/'
     data = {'username_or_email': username}
     try:
@@ -66,6 +67,8 @@ def get_token():
     return token
 
 def search(query):
+    if not query:
+        return []
     url = BASE_URL + 'search/'
     data = {
         'what': query,
@@ -100,6 +103,8 @@ def search(query):
     return []
 
 def get_link(ident):
+    if not ident:
+        return None
     token = get_token()
     if not token:
         return None
@@ -137,7 +142,6 @@ def upload_file(filepath, filename):
             if url_node is not None and url_node.text:
                 upload_url = url_node.text
                 
-                # Retry upload up to 3 times in case of temporary network/server congestion
                 for attempt in range(3):
                     try:
                         xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (attempt {attempt + 1}/3)...", xbmc.LOGINFO)
@@ -147,7 +151,6 @@ def upload_file(filepath, filename):
                                 'wst': token,
                                 'private': 1
                             }
-                            # Increased timeout to 60 seconds for slower upload servers
                             up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60)
                             if up_resp.status_code == 200:
                                 try:
@@ -159,7 +162,6 @@ def upload_file(filepath, filename):
                                     else:
                                         xbmc.log(f"StreamContinuum: Upload of {filename} failed XML status: {up_resp.text}", xbmc.LOGWARNING)
                                 except Exception as parse_err:
-                                    # Fallback: if it's 200 but not parseable as XML, treat as successful (or log)
                                     xbmc.log(f"StreamContinuum: Upload of {filename} succeeded with HTTP 200 but failed to parse response XML: {parse_err}. Content: {up_resp.text}", xbmc.LOGWARNING)
                                     return True
                             else:
@@ -167,7 +169,7 @@ def upload_file(filepath, filename):
                     except Exception as e:
                         xbmc.log(f"StreamContinuum: Webshare upload_file attempt {attempt + 1} failed: {e}", xbmc.LOGWARNING)
                         if attempt < 2:
-                            time.sleep(2)  # Wait 2 seconds before retrying
+                            time.sleep(2)
                 
     except Exception as e:
         xbmc.log(f"Webshare upload_file error: {e}", xbmc.LOGERROR)
@@ -199,6 +201,8 @@ def get_user_files():
     return []
 
 def delete_file(ident):
+    if not ident:
+        return False
     token = get_token()
     if not token:
         return False
@@ -213,9 +217,6 @@ def delete_file(ident):
             if status is not None and status.text == 'OK':
                 xbmc.log(f"Webshare: remove_file {ident} OK", xbmc.LOGINFO)
                 return True
-            else:
-                xbmc.log(f"Webshare: remove_file {ident} failed, response: {response.text}", xbmc.LOGERROR)
-                return False
     except Exception as e:
         xbmc.log(f"Webshare remove_file error: {e}", xbmc.LOGERROR)
     return False
@@ -246,6 +247,8 @@ def get_sync_files():
     return []
 
 def move_to_sync(filename):
+    if not filename:
+        return False
     token = get_token()
     if not token:
         return False
@@ -266,10 +269,6 @@ def move_to_sync(filename):
             if status is not None and status.text == 'OK':
                 xbmc.log(f"Webshare: move_to_sync '{filename}' OK", xbmc.LOGINFO)
                 return True
-            else:
-                xbmc.log(f"Webshare: move_to_sync '{filename}' failed: {response.text}", xbmc.LOGERROR)
-                return False
-        xbmc.log(f"Webshare: move_to_sync HTTP error {response.status_code}", xbmc.LOGERROR)
     except Exception as e:
         xbmc.log(f"Webshare move_to_sync error: {e}", xbmc.LOGERROR)
     return False
