@@ -13,12 +13,12 @@ HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
 def is_series(query):
     if not query:
         return False
-    return bool(re.search(r'\b(s\d+\s*e\d+|season\s*\d+|série\s*\d+|serie\s*\d+|s\d+\b|e\d+\b|\d+x\d+)\b', query, re.IGNORECASE))
+    return bool(re.search(r'\b(s\d+\s*e\d+|season\s*\d+|série\s*\d+|serie\s*\d+|s\d+\b|e\d+\b|\d+x\d+)\b', str(query), re.IGNORECASE))
 
 def get_base_name(query):
     if not query:
         return ""
-    q = query
+    q = str(query)
     # Odstranění běžných video přípon
     q = re.sub(r'\.(mkv|avi|mp4|m4v|mov|wmv|ts|flv)$', '', q, flags=re.IGNORECASE)
     # Nahrazení teček, podtržítek a pomlček mezerami
@@ -34,7 +34,7 @@ def get_base_name(query):
     # Odstranění přebytečných znaků na konci a vícenásobných mezer
     q = re.sub(r'[\-\–\—\s]+$', '', q).strip()
     q = re.sub(r'\s+', ' ', q).strip()
-    return q if q else query
+    return q if q else str(query)
 
 def get_history(deduplicate=True):
     if not os.path.exists(PROFILE_DIR):
@@ -84,9 +84,9 @@ def get_history_item(query):
     if not query:
         return None
     items = get_history(deduplicate=False)
-    norm_q = query.strip().lower()
+    norm_q = str(query).strip().lower()
     for item in items:
-        if item.get('query') == query or item.get('query', '').strip().lower() == norm_q:
+        if item.get('query') == query or str(item.get('query', '')).strip().lower() == norm_q:
             return item
     q_base = get_base_name(query).strip().lower()
     if q_base:
@@ -104,6 +104,8 @@ def _save_history(history_list):
         xbmc.log(f"StreamContinuum History: Error saving history.json: {e}", xbmc.LOGERROR)
 
 def add_to_history(query):
+    if not query:
+        return
     history = get_history(deduplicate=False)
     now = int(time.time())
     
@@ -168,12 +170,14 @@ def add_to_history(query):
     _save_history(history)
 
 def set_watched_status(query, is_watched):
+    if not query:
+        return False
     history = get_history(deduplicate=False)
-    norm_q = query.strip().lower() if query else ""
-    q_base = get_base_name(query).strip().lower() if query else ""
+    norm_q = str(query).strip().lower()
+    q_base = get_base_name(query).strip().lower()
     updated = False
     for item in history:
-        item_query = item.get('query', '').strip().lower()
+        item_query = str(item.get('query', '')).strip().lower()
         item_base = get_base_name(item.get('query', '')).strip().lower()
         if item_query == norm_q or (q_base and item_base == q_base):
             item['is_watched'] = bool(is_watched)
@@ -184,11 +188,15 @@ def set_watched_status(query, is_watched):
     return updated
 
 def delete_from_history(query):
+    if not query:
+        return
     history = get_history(deduplicate=False)
     history = [item for item in history if item.get('query') != query]
     _save_history(history)
 
 def update_history_item(old_query, new_query):
+    if not old_query or not new_query:
+        return
     history = get_history(deduplicate=False)
     now = int(time.time())
     for item in history:
@@ -210,16 +218,18 @@ def update_history_item(old_query, new_query):
     _save_history(history)
     
 def update_history_with_tmdb_data(original_query, tmdb_data):
+    if not original_query:
+        return False
     history = get_history(deduplicate=False)
     updated = False
     now = int(time.time())
-    norm_orig = original_query.strip().lower() if original_query else ""
-    orig_base = get_base_name(original_query).strip().lower() if original_query else ""
+    norm_orig = str(original_query).strip().lower()
+    orig_base = get_base_name(original_query).strip().lower()
     
     for i, item in enumerate(history):
-        item_query = item.get('query', '').strip().lower()
+        item_query = str(item.get('query', '')).strip().lower()
         item_base = get_base_name(item.get('query', '')).strip().lower()
-        if item_query == norm_orig or item.get('query', '').strip() == original_query.strip() or (orig_base and item_base == orig_base):
+        if item_query == norm_orig or str(item.get('query', '')).strip() == str(original_query).strip() or (orig_base and item_base == orig_base):
             item['title'] = tmdb_data.get('title')
             item['year'] = tmdb_data.get('year')
             item['plot'] = tmdb_data.get('plot')
