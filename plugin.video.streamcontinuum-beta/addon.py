@@ -253,18 +253,35 @@ def play(ident, query=None):
     link = webshare.get_link(ident)
     if link:
         list_item = xbmcgui.ListItem(path=link)
-        xbmcplugin.setResolvedUrl(HANDLE, True, list_item)
         if query:
             import history
             history.add_to_history(query)
             
         player = xbmc.Player()
         monitor = xbmc.Monitor()
-        xbmc.sleep(2000)
+
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.setResolvedUrl(HANDLE, True, list_item)
+            except Exception as e:
+                xbmc.log(f"StreamContinuum: setResolvedUrl error: {e}", xbmc.LOGWARNING)
+
+        # Fast player state check loop without unnecessary sleep
+        for _ in range(15):
+            if player.isPlayingVideo() or xbmc.getCondVisibility('Player.HasMedia'):
+                break
+            xbmc.sleep(100)
+
+        if not player.isPlayingVideo() and not xbmc.getCondVisibility('Player.HasMedia'):
+            player.play(link, list_item)
+            for _ in range(15):
+                if player.isPlayingVideo() or xbmc.getCondVisibility('Player.HasMedia'):
+                    break
+                xbmc.sleep(100)
 
         total_time = 0
         last_pos = 0
-        while not monitor.abortRequested() and (xbmc.getCondVisibility('Player.HasMedia') or player.isPlaying()):
+        while not monitor.abortRequested() and (xbmc.getCondVisibility('Player.HasMedia') or player.isPlayingVideo()):
             try:
                 if player.isPlayingVideo():
                     t = player.getTotalTime()
@@ -274,15 +291,15 @@ def play(ident, query=None):
                         last_pos = p
             except Exception:
                 pass
-            xbmc.sleep(1000)
+            xbmc.sleep(500)
 
         played_to_end = False
         if total_time > 0 and (last_pos / total_time) >= 0.85:
             played_to_end = True
 
-        timeout = 50
+        timeout = 10
         while timeout > 0 and xbmc.getCondVisibility('Window.IsActive(10025)'):
-            xbmc.sleep(100)
+            xbmc.sleep(50)
             timeout -= 1
             
         xbmc.executebuiltin('Dialog.Close(all)')
@@ -333,13 +350,11 @@ def play(ident, query=None):
 
                         if not canceled and not monitor.abortRequested():
                             selected_item = results[0]
-                            safe_next_q = urllib.parse.quote(next_ep_query)
-                            xbmc.executebuiltin(f'RunPlugin({sys.argv[0]}?action=play&ident={selected_item["ident"]}&query={safe_next_q})')
+                            play(selected_item["ident"], next_ep_query)
                             return
 
         after = ADDON.getSetting('after_playback')
         safe_query = urllib.parse.quote(query) if query else ""
-        xbmc.sleep(2000)
 
         if after == '0' and query:
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
