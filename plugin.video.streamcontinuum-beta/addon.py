@@ -693,6 +693,7 @@ def show_changelog():
     try:
         with open(changelog_path, 'r', encoding='utf-8') as f:
             changelog = f.read()
+    
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error reading changelog: {e}", xbmc.LOGWARNING)
         changelog = "Changelog momentálně není k dispozici."
@@ -1387,6 +1388,7 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
             try:
                 if hasattr(info_tag, 'setEpisodeCount'):
                     info_tag.setEpisodeCount(ep_count)
+                    
             except Exception:
                 pass
             li.setProperty('TotalEpisodes', str(ep_count))
