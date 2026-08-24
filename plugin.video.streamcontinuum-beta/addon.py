@@ -260,19 +260,21 @@ def play(ident, query=None):
         player = xbmc.Player()
         monitor = xbmc.Monitor()
 
+        resolved = False
         if HANDLE >= 0:
             try:
                 xbmcplugin.setResolvedUrl(HANDLE, True, list_item)
+                resolved = True
             except Exception as e:
                 xbmc.log(f"StreamContinuum: setResolvedUrl error: {e}", xbmc.LOGWARNING)
 
-        # Fast player state check loop without unnecessary sleep
+        # Fast player state check loop
         for _ in range(15):
             if player.isPlayingVideo() or xbmc.getCondVisibility('Player.HasMedia'):
                 break
             xbmc.sleep(100)
 
-        if not player.isPlayingVideo() and not xbmc.getCondVisibility('Player.HasMedia'):
+        if not resolved and not player.isPlayingVideo() and not xbmc.getCondVisibility('Player.HasMedia'):
             player.play(link, list_item)
             for _ in range(15):
                 if player.isPlayingVideo() or xbmc.getCondVisibility('Player.HasMedia'):
@@ -297,13 +299,6 @@ def play(ident, query=None):
         if total_time > 0 and (last_pos / total_time) >= 0.85:
             played_to_end = True
 
-        timeout = 10
-        while timeout > 0 and xbmc.getCondVisibility('Window.IsActive(10025)'):
-            xbmc.sleep(50)
-            timeout -= 1
-            
-        xbmc.executebuiltin('Dialog.Close(all)')
-        
         autoplay_enabled = ADDON.getSettingBool('autoplay_next')
         if played_to_end and autoplay_enabled and query:
             ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
