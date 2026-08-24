@@ -57,8 +57,8 @@ def get_history(deduplicate=True):
                 if 'last_played_at' not in item:
                     item['last_played_at'] = now
             
-            # Sort items by last_played_at descending
-            items.sort(key=lambda x: x.get('last_played_at', 0) or x.get('added_at', 0), reverse=True)
+            # Sort items by last_played_at descending safely
+            items.sort(key=lambda x: (x.get('last_played_at') or x.get('added_at') or 0), reverse=True)
             
             if not deduplicate:
                 return items
