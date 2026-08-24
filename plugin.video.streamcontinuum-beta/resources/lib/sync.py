@@ -217,7 +217,7 @@ def sync_history():
                     merged_map[key] = item
                 
         final_history = list(merged_map.values())
-        final_history.sort(key=lambda x: x.get('last_played_at', 0) or x.get('added_at', 0), reverse=True)
+        final_history.sort(key=lambda x: (x.get('last_played_at') or x.get('added_at') or 0), reverse=True)
         final_history = final_history[:50]
         
         if not os.path.exists(PROFILE_DIR):
