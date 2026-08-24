@@ -99,7 +99,7 @@ def search(query):
                     })
             return files
     except Exception as e:
-        print(f"Webshare search error: {e}")
+        xbmc.log(f"Webshare search error: {e}", xbmc.LOGERROR)
     return []
 
 def get_link(ident):
@@ -123,7 +123,7 @@ def get_link(ident):
             if link is not None and link.text:
                 return link.text
     except Exception as e:
-        print(f"Webshare get_link error: {e}")
+        xbmc.log(f"Webshare get_link error: {e}", xbmc.LOGERROR)
         
     return None
 
@@ -197,7 +197,7 @@ def get_user_files():
                     })
             return files
     except Exception as e:
-        print(f"Webshare get_user_files error: {e}")
+        xbmc.log(f"Webshare get_user_files error: {e}", xbmc.LOGERROR)
     return []
 
 def delete_file(ident):
@@ -243,7 +243,7 @@ def get_sync_files():
                     })
             return files
     except Exception as e:
-        print(f"Webshare get_sync_files error: {e}")
+        xbmc.log(f"Webshare get_sync_files error: {e}", xbmc.LOGERROR)
     return []
 
 def move_to_sync(filename):
