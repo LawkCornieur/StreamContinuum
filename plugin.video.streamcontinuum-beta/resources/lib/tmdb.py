@@ -4,6 +4,7 @@ import json
 import time
 import random
 import requests
+import re
 import xbmc
 import xbmcaddon
 import xbmcvfs
@@ -81,11 +82,18 @@ def _extract_year(item, date_key):
         pass
     return ""
 
+def _has_non_latin(s):
+    if not s:
+        return False
+    return bool(re.search(r'[\u0400-\u04FF\u0600-\u06FF\u0800-\u083F\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]', str(s)))
+
 def _extract_title(item, media_type):
-    """Safely extract localized title or original title fallback."""
+    """Safely extract localized title or original title fallback, sanitized for non-latin scripts."""
     title = item.get('title') if media_type == 'movie' else item.get('name')
-    if not title:
-        title = item.get('original_title') if media_type == 'movie' else item.get('original_name')
+    orig_title = item.get('original_title') if media_type == 'movie' else item.get('original_name')
+    
+    if not title or (_has_non_latin(title) and orig_title and not _has_non_latin(orig_title)):
+        title = orig_title
     if not title:
         title = ""
     return str(title)
@@ -300,6 +308,8 @@ def get_show_seasons(tmdb_id):
         if res and res.status_code == 200:
             data = res.json()
             title = data.get('name') or data.get('original_name', '')
+            if _has_non_latin(title) and data.get('original_name') and not _has_non_latin(data.get('original_name')):
+                title = data.get('original_name')
             overview = data.get('overview', '')
             if not overview:
                 try:
@@ -352,10 +362,13 @@ def get_season_episodes(tmdb_id, season_number):
             for ep in raw_episodes:
                 still_path = ep.get('still_path')
                 still = f"https://image.tmdb.org/t/p/w500{still_path}" if still_path else ''
+                ep_name = ep.get('name', '')
+                if _has_non_latin(ep_name):
+                    ep_name = f"Episode {ep.get('episode_number', 0)}"
                 episodes.append({
                     'episode_number': ep.get('episode_number', 0),
                     'season_number': ep.get('season_number', season_number),
-                    'name': ep.get('name', ''),
+                    'name': ep_name,
                     'overview': ep.get('overview', ''),
                     'runtime': ep.get('runtime', 0),
                     'still': still,
