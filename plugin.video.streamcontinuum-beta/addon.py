@@ -332,7 +332,7 @@ def play(ident, query=None):
                     if results:
                         dialog = xbmcgui.DialogProgress()
                         dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_ep_query}")
-                        seconds = 5
+                        seconds = 10
                         canceled = False
                         for i in range(seconds * 10):
                             if dialog.iscanceled() or monitor.abortRequested():
@@ -367,13 +367,11 @@ def show_watchlist():
     all_items = history.get_history(deduplicate=True)
     items = [item for item in all_items if not item.get('is_watched', True)]
     
-    if not items:
-        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30074), xbmcgui.NOTIFICATION_INFO, 3000)
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-        return
-
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30051))
     xbmcplugin.setContent(HANDLE, 'videos')
+
+    if not items:
+        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30074), xbmcgui.NOTIFICATION_INFO, 3000)
         
     for item in items:
         query = item.get('query', '')
@@ -418,12 +416,20 @@ def show_watchlist():
         
         url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+
+    # Always add catalog quick link item at bottom
+    cat_label = f"[COLOR #01b4e4]+ {ADDON.getLocalizedString(30130)}[/COLOR]"
+    cat_item = xbmcgui.ListItem(label=cat_label)
+    cat_item.setArt({'icon': 'DefaultAddonVideo.png', 'thumb': 'DefaultAddonVideo.png', 'fanart': get_asset('fa-watchlist.jpg')})
+    cat_url = f"{sys.argv[0]}?action=tmdb_menu"
+    xbmcplugin.addDirectoryItem(HANDLE, cat_url, cat_item, isFolder=True)
         
-    xbmcplugin.endOfDirectory(HANDLE)
+    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
 
 def show_history(force_list=False):
     import history
-    items = history.get_history(deduplicate=not force_list)
+    all_items = history.get_history(deduplicate=not force_list)
+    items = [item for item in all_items if item.get('is_watched', True)]
     
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
@@ -570,7 +576,7 @@ def history_menu(query, title=None, show_full_history_link=False):
         if has_next_ep:
             items.append((f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'))
         if episode > 1:
-            items.append((f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png'))
+            items.append((f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season-1:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png'))
         if has_next_season:
             items.append((f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'))
         if season > 1:
@@ -1958,6 +1964,7 @@ def run():
     elif action == 'trakt_search_menu':
         trakt_search()
     elif action == 'settings':
+        ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
         ADDON.openSettings()
     elif action == 'search':
         search(params.get('query'))
