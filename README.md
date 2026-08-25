@@ -56,6 +56,9 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.4.0** - 2026-08-25
+- Přidání seznamu ke shlédnutí. Vylepšení katalogu o další sekce. Oprava vyhledávacího dotazu u seriálů při překladu.  Označování dílů jako shlédnuté a zase zpět.
+
 **Verze 1.3.13** - 2026-08-16
 - Opravena ztotožnění, již proběhne a zobrazuje název grafiku a popis, či překlady názvů s nestandardními znaky. Ale stále nezobrazuje exotické abecedy 2026-08-15.
 - Oprava u seriálů a jejich procházení v katalogu.
