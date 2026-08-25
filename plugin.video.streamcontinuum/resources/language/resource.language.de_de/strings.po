@@ -320,7 +320,7 @@ msgid "TMDb - DVD and Blu-ray premieres"
 msgstr "TMDb - DVD- und Blu-ray-Premieren"
 
 msgctxt "#30103"
-msgid "TMDb module is not available."
+msgid "TMDb-Modul ist nicht verfügbar."
 msgstr "TMDb-Modul ist nicht verfügbar."
 
 msgctxt "#30104"
@@ -404,5 +404,117 @@ msgid "No relevant items found on TMDb. Try a different search."
 msgstr "Keine relevanten Einträge auf TMDb gefunden. Versuchen Sie eine andere Suche."
 
 msgctxt "#30129"
-msgid "No main menu items could be displayed. Please check addon settings."
+msgid "No main menu items could be displayed. Bitte überprüfen Sie die Addon-Einstellungen."
 msgstr "Keine Hauptmenüpunkte konnten angezeigt werden. Bitte überprüfen Sie die Addon-Einstellungen."
+
+msgctxt "#30130"
+msgid "Search catalog"
+msgstr "Im Katalog suchen"
+
+msgctxt "#30131"
+msgid "Show full history"
+msgstr "Vollständigen Verlauf anzeigen"
+
+msgctxt "#30132"
+msgid "Open last played item on history entry"
+msgstr "Beim Öffnen des Verlaufs das zuletzt abgespielte Element öffnen"
+
+msgctxt "#30133"
+msgid "Add to Watchlist"
+msgstr "Zur Merkliste hinzufügen"
+
+msgctxt "#30134"
+msgid "Remove from Watchlist"
+msgstr "Von Merkliste entfernen"
+
+msgctxt "#30135"
+msgid "Browse seasons and episodes"
+msgstr "Staffeln und Episoden durchsuchen"
+
+msgctxt "#30136"
+msgid "Movies by Genre"
+msgstr "Filme nach Genre"
+
+msgctxt "#30137"
+msgid "TV Shows by Genre"
+msgstr "Serien nach Genre"
+
+msgctxt "#30138"
+msgid "Top Rated Movies"
+msgstr "Bestbewertete Filme"
+
+msgctxt "#30139"
+msgid "Top Rated TV Shows"
+msgstr "Bestbewertete Serien"
+
+msgctxt "#30140"
+msgid "Random Recommendations"
+msgstr "Zufällige Tipps & Empfehlungen"
+
+msgctxt "#30141"
+msgid "Action"
+msgstr "Action"
+
+msgctxt "#30142"
+msgid "Adventure"
+msgstr "Abenteuer"
+
+msgctxt "#30143"
+msgid "Animation"
+msgstr "Animation"
+
+msgctxt "#30144"
+msgid "Comedy"
+msgstr "Komödie"
+
+msgctxt "#30145"
+msgid "Crime"
+msgstr "Krimi"
+
+msgctxt "#30146"
+msgid "Documentary"
+msgstr "Dokumentarfilm"
+
+msgctxt "#30147"
+msgid "Drama"
+msgstr "Drama"
+
+msgctxt "#30148"
+msgid "Family"
+msgstr "Familie"
+
+msgctxt "#30149"
+msgid "Fantasy"
+msgstr "Fantasy"
+
+msgctxt "#30150"
+msgid "Horror"
+msgstr "Horror"
+
+msgctxt "#30151"
+msgid "Mystery"
+msgstr "Mystery"
+
+msgctxt "#30152"
+msgid "Sci-Fi"
+msgstr "Sci-Fi"
+
+msgctxt "#30153"
+msgid "Thriller"
+msgstr "Thriller"
+
+msgctxt "#30154"
+msgid "War"
+msgstr "Kriegsfilm"
+
+msgctxt "#30155"
+msgid "Western"
+msgstr "Western"
+
+msgctxt "#30156"
+msgid "Sci-Fi & Fantasy"
+msgstr "Sci-Fi & Fantasy"
+
+msgctxt "#30157"
+msgid "Action & Adventure"
+msgstr "Action & Abenteuer"
