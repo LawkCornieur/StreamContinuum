@@ -249,7 +249,7 @@ def search(query=None):
         
         xbmcplugin.endOfDirectory(HANDLE)
 
-def play(ident, query=None):
+def play(ident, query=None, is_autoplay=False):
     link = webshare.get_link(ident)
     if link:
         list_item = xbmcgui.ListItem(path=link)
@@ -261,7 +261,7 @@ def play(ident, query=None):
         monitor = xbmc.Monitor()
 
         resolved = False
-        if HANDLE >= 0:
+        if HANDLE >= 0 and not is_autoplay:
             try:
                 xbmcplugin.setResolvedUrl(HANDLE, True, list_item)
                 resolved = True
@@ -330,6 +330,8 @@ def play(ident, query=None):
                 if has_next_ep:
                     results = webshare.search(next_ep_query)
                     if results:
+                        selected_item = results[0]
+                        item_name = selected_item.get('name', next_ep_query)
                         dialog = xbmcgui.DialogProgress()
                         dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_ep_query}")
                         seconds = 10
@@ -339,13 +341,12 @@ def play(ident, query=None):
                                 canceled = True
                                 break
                             percent = int(100 - (i / (seconds * 10) * 100))
-                            dialog.update(percent, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\nSpuštění za {seconds - (i // 10)} s...")
+                            dialog.update(percent, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\n{item_name}\nSpuštění za {seconds - (i // 10)} s...")
                             xbmc.sleep(100)
                         dialog.close()
 
                         if not canceled and not monitor.abortRequested():
-                            selected_item = results[0]
-                            play(selected_item["ident"], next_ep_query)
+                            play(selected_item["ident"], next_ep_query, is_autoplay=True)
                             return
 
         after = ADDON.getSetting('after_playback')
