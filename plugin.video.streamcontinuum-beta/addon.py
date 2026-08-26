@@ -1749,7 +1749,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
     success = history.update_history_with_tmdb_data(original_query, tmdb_data)
     if success:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30126), xbmcgui.NOTIFICATION_INFO, 2000)
-        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={urllib.parse.quote(original_query)},replace)')
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30127), xbmcgui.NOTIFICATION_ERROR, 3000)
 
