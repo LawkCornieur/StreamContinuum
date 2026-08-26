@@ -249,10 +249,15 @@ def search(query=None):
         
         xbmcplugin.endOfDirectory(HANDLE)
 
-def play(ident, query=None, is_autoplay=False):
+def play(ident, query=None, title=None, is_autoplay=False):
     link = webshare.get_link(ident)
     if link:
-        list_item = xbmcgui.ListItem(path=link)
+        item_title = title or query or "StreamContinuum"
+        list_item = xbmcgui.ListItem(label=item_title, path=link)
+        info_tag = list_item.getVideoInfoTag()
+        info_tag.setTitle(item_title)
+        info_tag.setMediaType('video')
+
         if query:
             import history
             history.add_to_history(query)
@@ -269,30 +274,27 @@ def play(ident, query=None, is_autoplay=False):
                 xbmc.log(f"StreamContinuum: setResolvedUrl error: {e}", xbmc.LOGWARNING)
 
         if not resolved:
-            # Wait for previous playback to finish/stop if still active
-            for _ in range(20):
-                if not player.isPlayingVideo():
-                    break
-                xbmc.sleep(100)
+            if player.isPlayingVideo():
+                player.stop()
+                xbmc.sleep(300)
 
             player.play(link, list_item)
 
-            # Wait for new playback to start
-            for _ in range(30):
-                if player.isPlayingVideo() or xbmc.getCondVisibility('Player.HasMedia'):
-                    break
-                xbmc.sleep(100)
+        # Wait for playback to start (max 5 seconds)
+        for _ in range(50):
+            if player.isPlayingVideo() or monitor.abortRequested():
+                break
+            xbmc.sleep(100)
 
         total_time = 0
         last_pos = 0
-        while not monitor.abortRequested() and (xbmc.getCondVisibility('Player.HasMedia') or player.isPlayingVideo()):
+        while not monitor.abortRequested() and player.isPlayingVideo():
             try:
-                if player.isPlayingVideo():
-                    t = player.getTotalTime()
-                    p = player.getTime()
-                    if t > 0:
-                        total_time = t
-                        last_pos = p
+                t = player.getTotalTime()
+                p = player.getTime()
+                if t > 0:
+                    total_time = t
+                    last_pos = p
             except Exception:
                 pass
             xbmc.sleep(500)
@@ -330,12 +332,14 @@ def play(ident, query=None, is_autoplay=False):
                         xbmc.log(f"StreamContinuum: TMDb validation error in autoplay: {e}", xbmc.LOGWARNING)
 
                 if has_next_ep:
+                    dialog = xbmcgui.DialogProgress()
+                    dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_ep_query}")
+                    dialog.update(0, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\nVyhledávání na Webshare...")
+
                     results = webshare.search(next_ep_query)
-                    if results:
+                    if results and not dialog.iscanceled() and not monitor.abortRequested():
                         selected_item = results[0]
                         item_name = selected_item.get('name', next_ep_query)
-                        dialog = xbmcgui.DialogProgress()
-                        dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_ep_query}")
                         seconds = 10
                         canceled = False
                         for i in range(seconds * 10):
@@ -348,8 +352,10 @@ def play(ident, query=None, is_autoplay=False):
                         dialog.close()
 
                         if not canceled and not monitor.abortRequested():
-                            play(selected_item["ident"], next_ep_query, is_autoplay=True)
+                            play(selected_item["ident"], next_ep_query, title=item_name, is_autoplay=True)
                             return
+                    else:
+                        dialog.close()
 
         after = ADDON.getSetting('after_playback')
         safe_query = urllib.parse.quote(query) if query else ""
@@ -1974,7 +1980,7 @@ def run():
     elif action == 'search_prefill':
         search_prefill(params.get('query', ''))
     elif action == 'play':
-        play(params.get('ident'), params.get('query'))
+        play(params.get('ident'), params.get('query'), params.get('title'))
     elif action == 'trending_movies':
         xbmcgui.Dialog().ok("StreamContinuum", f"{ADDON.getLocalizedString(30055)} (WIP)")
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
