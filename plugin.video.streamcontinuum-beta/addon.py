@@ -268,15 +268,17 @@ def play(ident, query=None, is_autoplay=False):
             except Exception as e:
                 xbmc.log(f"StreamContinuum: setResolvedUrl error: {e}", xbmc.LOGWARNING)
 
-        # Fast player state check loop
-        for _ in range(15):
-            if player.isPlayingVideo() or xbmc.getCondVisibility('Player.HasMedia'):
-                break
-            xbmc.sleep(100)
+        if not resolved:
+            # Wait for previous playback to finish/stop if still active
+            for _ in range(20):
+                if not player.isPlayingVideo():
+                    break
+                xbmc.sleep(100)
 
-        if not resolved and not player.isPlayingVideo() and not xbmc.getCondVisibility('Player.HasMedia'):
             player.play(link, list_item)
-            for _ in range(15):
+
+            # Wait for new playback to start
+            for _ in range(30):
                 if player.isPlayingVideo() or xbmc.getCondVisibility('Player.HasMedia'):
                     break
                 xbmc.sleep(100)
