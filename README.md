@@ -56,6 +56,9 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.4.2** - 2026-08-26
+- Oprava funkce autoplay. Přidání procházení do seznamu k zhlédnutí.
+
 **Verze 1.4.0** - 2026-08-25
 - Přidání seznamu ke shlédnutí. Vylepšení katalogu o další sekce. Oprava vyhledávacího dotazu u seriálů při překladu.  Označování dílů jako shlédnuté a zase zpět.
 

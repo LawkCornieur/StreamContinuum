@@ -35,7 +35,7 @@
         <setting id="tmdb_api_key" type="text" label="TMDb API klíč (volitelný)" default="" />
     </category>
     <category label="30040">
-        <setting id="about_version" type="text" label="30041" default="1.4.1" enable="false" />
+        <setting id="about_version" type="text" label="30041" default="1.4.3" enable="false" />
         <setting id="about_changelog" type="action" label="30042" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=show_changelog)" />
     </category>
 </settings>
