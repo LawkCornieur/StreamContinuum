@@ -68,8 +68,16 @@ def get_history(deduplicate=True):
             unique_items = []
             for item in items:
                 q = item.get('query', '')
-                if is_series(q) or item.get('media_type') in ('tvshow', 'tv', 'show'):
-                    base = get_base_name(q).lower().strip()
+                tmdb_id = item.get('tmdb_id')
+                title = item.get('title')
+                is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
+                if is_tv:
+                    if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+                        base = f"tmdb_{tmdb_id}"
+                    elif title:
+                        base = get_base_name(title).lower().strip()
+                    else:
+                        base = get_base_name(q).lower().strip()
                     if base:
                         if base in seen_series:
                             continue
@@ -109,7 +117,6 @@ def add_to_history(query):
     history = get_history(deduplicate=False)
     now = int(time.time())
     
-    # New item template with default values and timestamps
     new_item_template = {
         'query': query,
         'title': None,
@@ -131,7 +138,6 @@ def add_to_history(query):
     query_is_series = is_series(query)
     query_base = get_base_name(query).lower().strip()
 
-    # Find existing item (either exact query match, or same TV series)
     existing_item = None
     remaining_history = []
     for item in history:
@@ -150,7 +156,6 @@ def add_to_history(query):
     
     history = remaining_history
     
-    # If an existing item was found, use its data (to preserve TMDb info if already identified)
     if existing_item:
         existing_item['query'] = query
         existing_item['is_watched'] = True
@@ -161,12 +166,8 @@ def add_to_history(query):
     else:
         item_to_add = new_item_template
         
-    # Add to top
     history.insert(0, item_to_add)
-    
-    # Keep only last 50
     history = history[:50]
-    
     _save_history(history)
 
 def add_to_watchlist_local(query, tmdb_data=None):
