@@ -12,10 +12,22 @@ on:
           - patch
           - minor
           - major
-      changelog:
-        description: 'Záznam do changelogu'
+      changelog_line1:
+        description: 'Záznam do changelogu - řádek 1 (povinný)'
         required: true
         default: 'Opravy a vylepšení.'
+      changelog_line2:
+        description: 'Záznam do changelogu - řádek 2 (volitelné)'
+        required: false
+        default: ''
+      changelog_line3:
+        description: 'Záznam do changelogu - řádek 3 (volitelné)'
+        required: false
+        default: ''
+      changelog_line4:
+        description: 'Záznam do changelogu - řádek 4 (volitelné)'
+        required: false
+        default: ''
 
 jobs:
   promote:
@@ -48,7 +60,27 @@ jobs:
           beta_dir = "plugin.video.streamcontinuum-beta"
           prod_dir = "plugin.video.streamcontinuum"
 
-          # 1. Překopírování bety do produkce
+          # 1. Zjištění základní verze pro navýšení
+          # Pokud existuje produkční složka, vezmeme základní verzi z ní.
+          # Pokud neexistuje, vezmeme verzi z bety a odečteme z ní 1 patch krok.
+          base_version = None
+          if os.path.exists(os.path.join(prod_dir, "addon.xml")):
+              tree = ET.parse(os.path.join(prod_dir, "addon.xml"))
+              base_version = tree.getroot().get("version")
+          elif os.path.exists(os.path.join(beta_dir, "addon.xml")):
+              tree = ET.parse(os.path.join(beta_dir, "addon.xml"))
+              beta_ver = tree.getroot().get("version")
+              if beta_ver:
+                  b_parts = beta_ver.split(".")
+                  if len(b_parts) == 3:
+                      b_parts[2] = str(max(0, int(b_parts[2]) - 1))
+                      base_version = ".".join(b_parts)
+
+          if not base_version:
+              print("Chyba: Nepodařilo se zjistit základní verzi z produkce ani z bety!")
+              sys.exit(1)
+
+          # 2. Překopírování bety do produkce
           if os.path.exists(beta_dir):
               print(f"Kopíruji z {beta_dir} do {prod_dir}")
               if os.path.exists(prod_dir):
@@ -67,20 +99,12 @@ jobs:
               print("Chyba: addon.xml nenalezen!")
               sys.exit(1)
 
-          # 2. Povýšení verze produkce
-          tree = ET.parse(addon_xml)
-          root = tree.getroot()
-          version = root.get("version")
-          
-          if not version:
-              print("Chyba: Verze nenalezena v addon.xml")
-              sys.exit(1)
-          
-          parts = version.split(".")
+          # 3. Výpočet nové produkční verze ze základní verze
+          parts = base_version.split(".")
           if len(parts) != 3:
-              print(f"Chyba: Neplatný formát verze: {version} (očekáváno X.Y.Z)")
+              print(f"Chyba: Neplatný formát základní verze: {base_version} (očekáváno X.Y.Z)")
               sys.exit(1)
-          
+
           bump_type = os.environ.get("INPUT_VERSION_TYPE", "patch")
           if bump_type == "patch":
               parts[2] = str(int(parts[2]) + 1)
@@ -91,53 +115,63 @@ jobs:
               parts[0] = str(int(parts[0]) + 1)
               parts[1] = "0"
               parts[2] = "0"
-          
+
           new_version = ".".join(parts)
+
+          tree = ET.parse(addon_xml)
+          root = tree.getroot()
           root.set("version", new_version)
           root.set("id", "plugin.video.streamcontinuum")
           root.set("name", "StreamContinuum")
-          
-          tree.write(addon_xml, encoding="UTF-8", xml_declaration=True)
-          print(f"Úspěšně povýšeno na verzi {new_version}")
 
-          # 3. Zápis do changelog.txt
-          changelog_msg = os.environ.get("INPUT_CHANGELOG", "").strip()
-          if changelog_msg:
+          tree.write(addon_xml, encoding="UTF-8", xml_declaration=True)
+          print(f"Úspěšně povýšeno ze základní verze {base_version} na novou produkční verzi {new_version}")
+
+          # 4. Zápis do changelog.txt
+          changelog_lines = [
+              os.environ.get("INPUT_CHANGELOG_LINE1", "").strip(),
+              os.environ.get("INPUT_CHANGELOG_LINE2", "").strip(),
+              os.environ.get("INPUT_CHANGELOG_LINE3", "").strip(),
+              os.environ.get("INPUT_CHANGELOG_LINE4", "").strip()
+          ]
+          valid_lines = [line for line in changelog_lines if line]
+
+          if valid_lines:
               changelog_path = os.path.join(source_dir, "changelog.txt")
               existing_changelog = ""
               if os.path.exists(changelog_path):
                   with open(changelog_path, "r", encoding="utf-8") as f:
                       existing_changelog = f.read()
-              
+
               date_str = datetime.now().strftime("%Y-%m-%d")
-              new_entry = f"[B]Verze {new_version}[/B] - {date_str}\n- {changelog_msg}\n\n"
-              
+              formatted_lines = "\n".join([f"- {line}" for line in valid_lines])
+              new_entry = f"[B]Verze {new_version}[/B] - {date_str}\n{formatted_lines}\n\n"
+
               with open(changelog_path, "w", encoding="utf-8") as f:
                   f.write(new_entry + existing_changelog)
-              
+
               print("Changelog byl úspěšně aktualizován.")
           else:
               print("Varování: Záznam do changelogu nebyl poskytnut.")
 
-          # 4. Povýšení verze budoucí bety
+          # 5. Povýšení verze budoucí bety (o jeden patch level výše než nová produkce)
           if os.path.exists(beta_dir) and source_dir != beta_dir:
               # Aktualizace changelogu i v betě
-              if changelog_msg:
+              if valid_lines:
                   beta_changelog_path = os.path.join(beta_dir, "changelog.txt")
                   with open(beta_changelog_path, "w", encoding="utf-8") as f:
                       f.write(new_entry + existing_changelog)
-              
-              # Povýšení verze bety (o jeden patch level výše než nová produkce)
+
+              # Povýšení verze bety
               beta_addon_xml = os.path.join(beta_dir, "addon.xml")
               if os.path.exists(beta_addon_xml):
                   beta_tree = ET.parse(beta_addon_xml)
                   beta_root = beta_tree.getroot()
-                  
-                  # Vytvoření nové verze pro betu
+
                   beta_parts = new_version.split(".")
                   beta_parts[2] = str(int(beta_parts[2]) + 1)
                   next_beta_version = ".".join(beta_parts)
-                  
+
                   beta_root.set("id", "plugin.video.streamcontinuum")
                   beta_root.set("name", "StreamContinuum")
                   beta_root.set("version", next_beta_version)
@@ -146,7 +180,10 @@ jobs:
           '
         env:
           INPUT_VERSION_TYPE: ${{ github.event.inputs.version_type }}
-          INPUT_CHANGELOG: ${{ github.event.inputs.changelog }}
+          INPUT_CHANGELOG_LINE1: ${{ github.event.inputs.changelog_line1 }}
+          INPUT_CHANGELOG_LINE2: ${{ github.event.inputs.changelog_line2 }}
+          INPUT_CHANGELOG_LINE3: ${{ github.event.inputs.changelog_line3 }}
+          INPUT_CHANGELOG_LINE4: ${{ github.event.inputs.changelog_line4 }}
 
       - name: Commit and Push
         run: |
