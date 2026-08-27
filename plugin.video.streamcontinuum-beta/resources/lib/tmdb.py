@@ -85,7 +85,11 @@ def _extract_year(item, date_key):
 def _has_non_latin(s):
     if not s:
         return False
-    return bool(re.search(r'[\u0400-\u04FF\u0600-\u06FF\u0800-\u083F\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]', str(s)))
+    for ch in str(s):
+        o = ord(ch)
+        if o > 0x024F and not (0x1E00 <= o <= 0x1EFF or 0x2000 <= o <= 0x206F):
+            return True
+    return False
 
 def _extract_title(item, media_type):
     """Safely extract localized title or original title fallback, sanitized for non-latin scripts."""
