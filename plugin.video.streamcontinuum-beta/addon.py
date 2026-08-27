@@ -535,22 +535,12 @@ def history_menu(query, title=None, show_full_history_link=False):
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
 
+    if show_full_history_link or ADDON.getSettingBool('open_last_history'):
+        show_full_history_link = True
+
     items = []
     if show_full_history_link:
         items.append((f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]", 'history_list', 'DefaultFolder.png'))
-
-    items.extend([
-        (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
-        (ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073), f'history_mark&query={urllib.parse.quote(query)}&watched={0 if is_watched else 1}', 'DefaultAddonVideo.png'),
-        (ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
-        (ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
-        (ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'),
-    ])
-    if trakt_token and enable_trakt_menu:
-        items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(raw_title or query)}', 'DefaultAddonVideo.png'))
-    
-    if is_tv:
-        items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={clean_tmdb_id or ""}', 'DefaultTVShows.png'))
 
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
     if ep_match:
@@ -559,7 +549,15 @@ def history_menu(query, title=None, show_full_history_link=False):
         season = int(ep_match.group(2) or ep_match.group(4))
         episode = int(ep_match.group(3) or ep_match.group(5))
         ws_base = cleaned_base if cleaned_base else history.get_base_name(query)
+        search_label = f"{ADDON.getLocalizedString(30057)} (S{season:02d}E{episode:02d})"
+    else:
+        search_label = ADDON.getLocalizedString(30057)
+        ws_base = None
 
+    items.append((search_label, f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'))
+    items.append((ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'))
+
+    if ep_match and ws_base:
         has_next_ep = True
         has_next_season = True
 
@@ -580,11 +578,22 @@ def history_menu(query, title=None, show_full_history_link=False):
         if has_next_ep:
             items.append((f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'))
         if episode > 1:
-            items.append((f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season-1:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png'))
+            items.append((f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png'))
         if has_next_season:
             items.append((f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'))
         if season > 1:
             items.append((f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png'))
+
+    if is_tv:
+        items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={clean_tmdb_id or ""}', 'DefaultTVShows.png'))
+
+    items.append((ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'))
+    items.append((ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073), f'history_mark&query={urllib.parse.quote(query)}&watched={0 if is_watched else 1}', 'DefaultAddonVideo.png'))
+
+    if trakt_token and enable_trakt_menu:
+        items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(raw_title or query)}', 'DefaultAddonVideo.png'))
+
+    items.append((ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'))
     
     for label, action_params, icon in [i for i in items if i]:
         url = f"{sys.argv[0]}?action={action_params}"
@@ -1626,7 +1635,7 @@ def history_tmdb_identify_search(original_query, custom_query=None):
         xbmc.log(f"StreamContinuum: Searching TMDb fallback with raw query '{original_query}'", xbmc.LOGINFO)
         all_items = tmdb_module.search_tmdb(original_query)
 
-    edit_label = f"[COLOR #01b4e4]✎ {ADDON.getLocalizedString(30087)} TMDb ({search_term})...[/COLOR]"
+    edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} TMDb ({search_term})...[/COLOR]"
     edit_url = f"{sys.argv[0]}?action=history_tmdb_custom_search&original_query={urllib.parse.quote_plus(original_query)}&prefill={urllib.parse.quote_plus(search_term)}"
     edit_item = xbmcgui.ListItem(label=edit_label)
     edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa.png')})
@@ -1906,7 +1915,7 @@ def run():
     elif action == 'history_delete':
         import history
         history.delete_from_history(params.get('query'))
-        xbmc.executebuiltin('Container.Refresh')
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
         return
     elif action == 'history_edit':
         old_query = params.get('query')
