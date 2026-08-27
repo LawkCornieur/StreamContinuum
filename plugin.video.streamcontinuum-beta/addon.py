@@ -8,7 +8,6 @@ import urllib.parse
 import re
 import datetime
 
-# Add addon root and resources/lib to sys.path
 ADDON_ROOT = os.path.dirname(__file__)
 sys.path.append(ADDON_ROOT)
 sys.path.append(os.path.join(ADDON_ROOT, 'resources', 'lib'))
@@ -280,7 +279,6 @@ def play(ident, query=None, title=None, is_autoplay=False):
 
             player.play(link, list_item)
 
-        # Wait for playback to start (max 5 seconds)
         for _ in range(50):
             if player.isPlayingVideo() or monitor.abortRequested():
                 break
@@ -378,6 +376,7 @@ def show_watchlist():
     
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30051))
     xbmcplugin.setContent(HANDLE, 'videos')
+    xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
 
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30074), xbmcgui.NOTIFICATION_INFO, 3000)
@@ -426,7 +425,6 @@ def show_watchlist():
         url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
 
-    # Always add catalog quick link item at bottom
     cat_label = f"[COLOR #01b4e4]+ {ADDON.getLocalizedString(30130)}[/COLOR]"
     cat_item = xbmcgui.ListItem(label=cat_label)
     cat_item.setArt({'icon': 'DefaultAddonVideo.png', 'thumb': 'DefaultAddonVideo.png', 'fanart': get_asset('fa-watchlist.jpg')})
@@ -445,13 +443,13 @@ def show_history(force_list=False):
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
-    # If setting is enabled to open the last played item directly on history entry
     if not force_list and ADDON.getSettingBool('open_last_history'):
         history_menu(items[0].get('query', ''), show_full_history_link=True)
         return
 
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
     xbmcplugin.setContent(HANDLE, 'videos')
+    xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
         
     for item in items:
         query = item.get('query', '')
@@ -493,7 +491,6 @@ def show_history(force_list=False):
             is_watched=is_watched
         )
         
-        # Context menu for history items
         cm = []
         if not is_watched:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=1)'))
@@ -555,14 +552,12 @@ def history_menu(query, title=None, show_full_history_link=False):
     if is_tv:
         items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={clean_tmdb_id or ""}', 'DefaultTVShows.png'))
 
-    # Robust detection of series episode numbers from original query
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
     if ep_match:
         raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
         cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
         season = int(ep_match.group(2) or ep_match.group(4))
         episode = int(ep_match.group(3) or ep_match.group(5))
-        # Use original query base name for Webshare search to preserve user releases and tags
         ws_base = cleaned_base if cleaned_base else history.get_base_name(query)
 
         has_next_ep = True
@@ -1157,7 +1152,6 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
             xbmcplugin.endOfDirectory(HANDLE)
             return
 
-    # Fallback to Trakt if TMDb direct retrieval fails
     trakt_id = None
     if clean_tmdb_id:
         try:
@@ -1632,7 +1626,6 @@ def history_tmdb_identify_search(original_query, custom_query=None):
         xbmc.log(f"StreamContinuum: Searching TMDb fallback with raw query '{original_query}'", xbmc.LOGINFO)
         all_items = tmdb_module.search_tmdb(original_query)
 
-    # Add item at top to allow manual search term customization
     edit_label = f"[COLOR #01b4e4]✎ {ADDON.getLocalizedString(30087)} TMDb ({search_term})...[/COLOR]"
     edit_url = f"{sys.argv[0]}?action=history_tmdb_custom_search&original_query={urllib.parse.quote_plus(original_query)}&prefill={urllib.parse.quote_plus(search_term)}"
     edit_item = xbmcgui.ListItem(label=edit_label)
@@ -1760,7 +1753,6 @@ def history_mark_watched(query, watched):
     is_watched = bool(watched)
     history.set_watched_status(query, is_watched)
     
-    # Sync with Trakt if item is identified and Trakt is connected
     trakt_token = ADDON.getSetting('trakt_token')
     if trakt_token:
         hist_item = history.get_history_item(query)
@@ -1782,7 +1774,6 @@ def run():
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:])) if len(sys.argv) > 2 else {}
     action = params.get('action')
 
-    # Actions that do not require an active directory handle
     if action == 'show_changelog':
         show_changelog()
         return
@@ -1946,7 +1937,6 @@ def run():
         )
         return
 
-    # If the action requires directory handle but handle is invalid, redirect to window
     if HANDLE < 0:
         addon_id = ADDON.getAddonInfo('id')
         target_url = f"plugin://{addon_id}/"
