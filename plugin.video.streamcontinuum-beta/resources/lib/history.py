@@ -10,6 +10,14 @@ ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
 HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
 
+def _safe_timestamp(val):
+    if not val:
+        return 0
+    try:
+        return int(float(val))
+    except (ValueError, TypeError):
+        return 0
+
 def is_series(query):
     if not query:
         return False
@@ -57,8 +65,8 @@ def get_history(deduplicate=True):
                 if 'last_played_at' not in item:
                     item['last_played_at'] = now
             
-            # Sort items by last_played_at descending safely
-            items.sort(key=lambda x: (x.get('last_played_at') or x.get('added_at') or 0), reverse=True)
+            # Sort items by most recent timestamp descending safely
+            items.sort(key=lambda x: max(_safe_timestamp(x.get('last_played_at')), _safe_timestamp(x.get('added_at'))), reverse=True)
             
             if not deduplicate:
                 return items
