@@ -401,8 +401,8 @@ def show_watchlist():
             e_num = int(ep_match.group(2) or ep_match.group(4))
             ep_suffix = f" S{s_num:02d}E{e_num:02d}"
 
-        if raw_title:
-            base_display = raw_title
+        if raw_title and not history.has_non_latin(raw_title):
+            base_display = history.sanitize_title(raw_title)
             label = f"{base_display} ({year}){ep_suffix}" if year else f"{base_display}{ep_suffix}"
         else:
             base_name = history.get_base_name(query)
@@ -472,8 +472,8 @@ def show_history(force_list=False):
             e_num = int(ep_match.group(2) or ep_match.group(4))
             ep_suffix = f" S{s_num:02d}E{e_num:02d}"
 
-        if raw_title:
-            base_display = raw_title
+        if raw_title and not history.has_non_latin(raw_title):
+            base_display = history.sanitize_title(raw_title)
             if year:
                 label = f"{base_display} ({year}){ep_suffix}"
             else:
@@ -517,6 +517,8 @@ def history_menu(query, title=None, show_full_history_link=False):
     import history
     hist_item = history.get_history_item(query)
     raw_title = (hist_item.get('title') if hist_item else None) or title
+    if raw_title and history.has_non_latin(raw_title):
+        raw_title = None
     year = hist_item.get('year') if hist_item else None
     plot = (hist_item.get('plot') if hist_item else '') or ''
     genres = hist_item.get('genres', []) if hist_item else []
@@ -529,7 +531,7 @@ def history_menu(query, title=None, show_full_history_link=False):
     is_tv = (hist_item.get('media_type') in ('tvshow', 'tv', 'show') if hist_item else False) or history.is_series(query)
     media_type = 'tvshow' if is_tv else 'movie'
 
-    display_title = raw_title or history.get_base_name(query) or query
+    display_title = history.sanitize_title(raw_title) or history.get_base_name(query) or query
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {display_title}")
     xbmcplugin.setContent(HANDLE, 'movies' if media_type == 'movie' else 'tvshows')
     trakt_token = ADDON.getSetting('trakt_token')
@@ -1666,6 +1668,12 @@ def history_tmdb_identify_search(original_query, custom_query=None):
             )
         
         final_title = full_tmdb_meta.get('title') or raw_title
+        if history.has_non_latin(final_title):
+            if raw_title and not history.has_non_latin(raw_title):
+                final_title = raw_title
+            else:
+                final_title = history.get_base_name(original_query)
+        final_title = history.sanitize_title(final_title)
         final_year = full_tmdb_meta.get('year') or year
         final_plot = full_tmdb_meta.get('overview') or plot
         final_genres = full_tmdb_meta.get('genres', [])
@@ -1726,7 +1734,10 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
                 if not meta.get('fanart'):
                     meta['fanart'] = show_data.get('fanart')
 
-    title = meta.get('title')
+    raw_title = meta.get('title')
+    title = history.sanitize_title(raw_title)
+    if history.has_non_latin(title):
+        title = history.get_base_name(original_query)
     year = meta.get('year')
     plot = meta.get('overview')
     genres = meta.get('genres', [])
