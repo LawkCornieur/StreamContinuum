@@ -14,7 +14,6 @@ _tmdb_warning_shown = False
 ADDON = xbmcaddon.Addon()
 
 def get_tmdb_api_keys():
-    """Vrací seznam TMDb API klíčů: uživatelský jako první, následovaný fallback klíči."""
     keys = []
     user_key = ADDON.getSetting('tmdb_api_key').strip()
     if user_key:
@@ -30,10 +29,6 @@ def get_tmdb_api_keys():
     return keys
 
 def make_tmdb_request(url_template):
-    """
-    Provede HTTP GET požadavek na TMDb s rotací API klíčů v případě chyby 401.
-    url_template: URL řetězec obsahující placeholder {api_key}
-    """
     global _tmdb_warning_shown
     keys = get_tmdb_api_keys()
     last_response = None
@@ -70,7 +65,6 @@ def make_tmdb_request(url_template):
     return last_response
 
 def _extract_year(item, date_key):
-    """Safely extract 4-digit year from TMDb item without crashing on None or invalid values."""
     val = item.get(date_key)
     if not val:
         return ""
@@ -91,16 +85,30 @@ def _has_non_latin(s):
             return True
     return False
 
+def _sanitize_string(s):
+    if not s:
+        return ""
+    cleaned = []
+    for ch in str(s):
+        o = ord(ch)
+        if o < 32 or (0x007F <= o <= 0x009F) or (0xD800 <= o <= 0xDFFF) or (0xFFF0 <= o <= 0xFFFF) or o >= 0x10000:
+            continue
+        cleaned.append(ch)
+    return "".join(cleaned).strip()
+
 def _extract_title(item, media_type):
-    """Safely extract localized title or original title fallback, sanitized for non-latin scripts."""
     title = item.get('title') if media_type == 'movie' else item.get('name')
     orig_title = item.get('original_title') if media_type == 'movie' else item.get('original_name')
     
-    if not title or (_has_non_latin(title) and orig_title and not _has_non_latin(orig_title)):
-        title = orig_title
-    if not title:
-        title = ""
-    return str(title)
+    title = _sanitize_string(title)
+    orig_title = _sanitize_string(orig_title)
+    
+    if title and not _has_non_latin(title):
+        return title
+    if orig_title and not _has_non_latin(orig_title):
+        return orig_title
+        
+    return orig_title or title or ""
 
 def _format_item(item, default_media_type=None, default_info=""):
     media_type = item.get('media_type', default_media_type or 'movie')
@@ -314,6 +322,7 @@ def get_show_seasons(tmdb_id):
             title = data.get('name') or data.get('original_name', '')
             if _has_non_latin(title) and data.get('original_name') and not _has_non_latin(data.get('original_name')):
                 title = data.get('original_name')
+            title = _sanitize_string(title)
             overview = data.get('overview', '')
             if not overview:
                 try:
@@ -333,7 +342,7 @@ def get_show_seasons(tmdb_id):
                 s_poster = f"https://image.tmdb.org/t/p/w500{s.get('poster_path')}" if s.get('poster_path') else poster
                 seasons.append({
                     'season_number': s.get('season_number', 0),
-                    'name': s.get('name', ''),
+                    'name': _sanitize_string(s.get('name', '')),
                     'overview': s.get('overview', ''),
                     'episode_count': s.get('episode_count', 0),
                     'poster': s_poster,
@@ -369,6 +378,7 @@ def get_season_episodes(tmdb_id, season_number):
                 ep_name = ep.get('name', '')
                 if _has_non_latin(ep_name):
                     ep_name = f"Episode {ep.get('episode_number', 0)}"
+                ep_name = _sanitize_string(ep_name)
                 episodes.append({
                     'episode_number': ep.get('episode_number', 0),
                     'season_number': ep.get('season_number', season_number),
