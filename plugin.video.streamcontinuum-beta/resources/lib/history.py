@@ -18,6 +18,26 @@ def _safe_timestamp(val):
     except (ValueError, TypeError):
         return 0
 
+def has_non_latin(s):
+    if not s:
+        return False
+    for ch in str(s):
+        o = ord(ch)
+        if o > 0x024F and not (0x1E00 <= o <= 0x1EFF or 0x2000 <= o <= 0x206F):
+            return True
+    return False
+
+def sanitize_title(s):
+    if not s:
+        return ""
+    cleaned = []
+    for ch in str(s):
+        o = ord(ch)
+        if o < 32 or (0x007F <= o <= 0x009F) or (0xD800 <= o <= 0xDFFF) or (0xFFF0 <= o <= 0xFFFF) or o >= 0x10000:
+            continue
+        cleaned.append(ch)
+    return "".join(cleaned).strip()
+
 def is_series(query):
     if not query:
         return False
@@ -27,22 +47,15 @@ def get_base_name(query):
     if not query:
         return ""
     q = str(query)
-    # Odstranění běžných video přípon
     q = re.sub(r'\.(mkv|avi|mp4|m4v|mov|wmv|ts|flv)$', '', q, flags=re.IGNORECASE)
-    # Nahrazení teček, podtržítek a pomlček mezerami
     q = re.sub(r'[._]', ' ', q)
-    # Odstranění označení sezón a epizod (S01E01, s1e1, 1x01, Season, Serie apod.)
     q = re.sub(r'\s*(?:s\d+\s*e\d+|\bseason\s*\d+|\bsérie\s*\d+|\bserie\s*\d+|\bs\d+\b|\be\d+\b|\d+x\d+).*$', '', q, flags=re.IGNORECASE).strip()
-    # Odstranění kvality a formátů videa/audia/médií
     q = re.sub(r'\b(2160p|1080p|720p|480p|4k|uhd|hd|hdtv|web-?dl|bluray|blu-?ray|bdrip|brrip|dvdrip|dvd|laserdisk|laserdisc|cd|vhs|remux|x264|x265|h264|hevc|aac|ac3|dts)\b.*$', '', q, flags=re.IGNORECASE).strip()
-    # Odstranění jazykových tagů a vydání
     q = re.sub(r'\b(cz|sk|en|de|czech|czdab|skdab|dabing|dab|czsub|sksub|sub|titulky|tit|cztit|sktit|repack|proper|extended|unrated)\b.*$', '', q, flags=re.IGNORECASE).strip()
-    # Odstranění roku (YYYY) na konci
     q = re.sub(r'\s*\(?\d{4}\)?$', '', q).strip()
-    # Odstranění přebytečných znaků na konci a vícenásobných mezer
     q = re.sub(r'[\-\–\—\s]+$', '', q).strip()
     q = re.sub(r'\s+', ' ', q).strip()
-    return q if q else str(query)
+    return sanitize_title(q) if q else sanitize_title(str(query))
 
 def get_history(deduplicate=True):
     if not os.path.exists(PROFILE_DIR):
@@ -55,7 +68,6 @@ def get_history(deduplicate=True):
             if not isinstance(items, list):
                 return []
             
-            # Ensure backward compatibility for items lacking timestamp or is_watched
             now = int(time.time())
             for item in items:
                 if 'is_watched' not in item:
@@ -64,14 +76,14 @@ def get_history(deduplicate=True):
                     item['added_at'] = now
                 if 'last_played_at' not in item:
                     item['last_played_at'] = now
+                if item.get('title'):
+                    item['title'] = sanitize_title(item['title'])
             
-            # Sort items by most recent timestamp descending safely
             items.sort(key=lambda x: max(_safe_timestamp(x.get('last_played_at')), _safe_timestamp(x.get('added_at'))), reverse=True)
             
             if not deduplicate:
                 return items
 
-            # Deduplicate series keeping only the latest watched episode
             seen_series = set()
             unique_items = []
             for item in items:
@@ -82,7 +94,7 @@ def get_history(deduplicate=True):
                 if is_tv:
                     if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
                         base = f"tmdb_{tmdb_id}"
-                    elif title:
+                    elif title and not has_non_latin(title):
                         base = get_base_name(title).lower().strip()
                     else:
                         base = get_base_name(q).lower().strip()
@@ -212,12 +224,15 @@ def add_to_watchlist_local(query, tmdb_data=None):
         if tmdb_data:
             for k in ['title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'tmdb_id', 'media_type']:
                 if k in tmdb_data and tmdb_data[k] is not None:
-                    existing_item[k] = tmdb_data[k]
+                    val = tmdb_data[k]
+                    if k == 'title':
+                        val = sanitize_title(val)
+                    existing_item[k] = val
         item_to_add = existing_item
     else:
         item_to_add = {
             'query': query,
-            'title': tmdb_data.get('title') if tmdb_data else None,
+            'title': sanitize_title(tmdb_data.get('title')) if tmdb_data else None,
             'year': tmdb_data.get('year') if tmdb_data else None,
             'plot': tmdb_data.get('plot', '') if tmdb_data else '',
             'genres': tmdb_data.get('genres', []) if tmdb_data else [],
@@ -294,11 +309,15 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
     norm_orig = str(original_query).strip().lower()
     orig_base = get_base_name(original_query).strip().lower()
     
+    clean_title = sanitize_title(tmdb_data.get('title'))
+    if has_non_latin(clean_title):
+        clean_title = orig_base or original_query
+
     for i, item in enumerate(history):
         item_query = str(item.get('query', '')).strip().lower()
         item_base = get_base_name(item.get('query', '')).strip().lower()
         if item_query == norm_orig or str(item.get('query', '')).strip() == str(original_query).strip() or (orig_base and item_base == orig_base):
-            item['title'] = tmdb_data.get('title')
+            item['title'] = clean_title
             item['year'] = tmdb_data.get('year')
             item['plot'] = tmdb_data.get('plot')
             item['genres'] = tmdb_data.get('genres', [])
@@ -314,7 +333,7 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
     if not updated and original_query:
         new_item = {
             'query': original_query,
-            'title': tmdb_data.get('title'),
+            'title': clean_title,
             'year': tmdb_data.get('year'),
             'plot': tmdb_data.get('plot'),
             'genres': tmdb_data.get('genres', []),
