@@ -15,7 +15,7 @@ ADDON = xbmcaddon.Addon()
 
 def get_tmdb_api_keys():
     keys = []
-    user_key = ADDON.getSetting('tmdb_api_key').strip()
+    user_key = (ADDON.getSetting('tmdb_api_key') or '').strip()
     if user_key:
         keys.append(user_key)
     
