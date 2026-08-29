@@ -327,7 +327,7 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
     orig_base = get_base_name(original_query).strip().lower()
     
     clean_title = sanitize_title(tmdb_data.get('title'))
-    if has_non_latin(clean_title):
+    if has_non_latin(clean_title) or not clean_title:
         clean_title = orig_base or original_query
 
     for i, item in enumerate(history):
