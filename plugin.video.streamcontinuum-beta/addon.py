@@ -1696,7 +1696,7 @@ def history_tmdb_identify_search(original_query, custom_query=None):
             )
         
         final_title = full_tmdb_meta.get('title') or raw_title
-        if history.has_non_latin(final_title):
+        if history.has_non_latin(final_title) or not final_title:
             if raw_title and not history.has_non_latin(raw_title):
                 final_title = raw_title
             else:
@@ -1764,7 +1764,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
 
     raw_title = meta.get('title')
     title = history.sanitize_title(raw_title)
-    if history.has_non_latin(title):
+    if history.has_non_latin(title) or not title:
         title = history.get_base_name(original_query)
     year = meta.get('year')
     plot = meta.get('overview')
