@@ -59,7 +59,10 @@ def get_base_name(query):
 
 def get_history(deduplicate=True):
     if not os.path.exists(PROFILE_DIR):
-        os.makedirs(PROFILE_DIR)
+        try:
+            os.makedirs(PROFILE_DIR)
+        except Exception:
+            pass
     if not os.path.exists(HISTORY_FILE):
         return []
     try:
@@ -84,7 +87,7 @@ def get_history(deduplicate=True):
             if not deduplicate:
                 return items
 
-            seen_series = set()
+            seen_series_keys = set()
             unique_items = []
             for item in items:
                 q = item.get('query', '')
@@ -92,16 +95,22 @@ def get_history(deduplicate=True):
                 title = item.get('title')
                 is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
                 if is_tv:
+                    keys = []
                     if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                        base = f"tmdb_{tmdb_id}"
-                    elif title and not has_non_latin(title):
-                        base = get_base_name(title).lower().strip()
-                    else:
-                        base = get_base_name(q).lower().strip()
-                    if base:
-                        if base in seen_series:
-                            continue
-                        seen_series.add(base)
+                        keys.append(f"tmdb_{tmdb_id}")
+                    if title and not has_non_latin(title):
+                        t_base = get_base_name(title).lower().strip()
+                        if t_base:
+                            keys.append(f"title_{t_base}")
+                    q_base = get_base_name(q).lower().strip()
+                    if q_base:
+                        keys.append(f"query_{q_base}")
+                    
+                    if keys and any(k in seen_series_keys for k in keys):
+                        continue
+                    
+                    for k in keys:
+                        seen_series_keys.add(k)
                 unique_items.append(item)
             return unique_items
     except Exception as e:
@@ -126,6 +135,8 @@ def get_history_item(query):
 
 def _save_history(history_list):
     try:
+        if not os.path.exists(PROFILE_DIR):
+            os.makedirs(PROFILE_DIR)
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(history_list, f, ensure_ascii=False, indent=4)
     except Exception as e:
@@ -166,7 +177,10 @@ def add_to_history(query):
         item_base = get_base_name(item_q).lower().strip()
         
         is_same_exact = (item_q == query)
-        is_same_series = (query_is_series or item.get('media_type') in ('tvshow', 'tv', 'show')) and item_is_series and (query_base and item_base and query_base == item_base)
+        is_same_series = (query_is_series or item.get('media_type') in ('tvshow', 'tv', 'show')) and item_is_series and (
+            (query_base and item_base and query_base == item_base) or
+            (item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base)
+        )
         
         if is_same_exact or is_same_series:
             if not existing_item:
@@ -207,7 +221,10 @@ def add_to_watchlist_local(query, tmdb_data=None):
         item_base = get_base_name(item_q).lower().strip()
         
         is_same_exact = (item_q == query)
-        is_same_series = query_is_series and item_is_series and (query_base and item_base and query_base == item_base)
+        is_same_series = query_is_series and item_is_series and (
+            (query_base and item_base and query_base == item_base) or
+            (item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base)
+        )
         
         if is_same_exact or is_same_series:
             if not existing_item:
@@ -357,5 +374,8 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
 
 def clear_history():
     if os.path.exists(HISTORY_FILE):
-        os.remove(HISTORY_FILE)
-        xbmc.log(f"StreamContinuum History: Cleared history file: {HISTORY_FILE}", xbmc.LOGINFO)
+        try:
+            os.remove(HISTORY_FILE)
+            xbmc.log(f"StreamContinuum History: Cleared history file: {HISTORY_FILE}", xbmc.LOGINFO)
+        except Exception as e:
+            xbmc.log(f"StreamContinuum History: Error clearing history file: {e}", xbmc.LOGERROR)
