@@ -315,6 +315,16 @@ def play(ident, query=None, title=None, is_autoplay=False):
 
                 hist_item = history.get_history_item(query)
                 clean_tmdb_id = hist_item.get('tmdb_id') if hist_item else None
+                if not clean_tmdb_id and tmdb_module and ws_base:
+                    try:
+                        search_res = tmdb_module.search_tmdb(ws_base)
+                        for s_item in search_res:
+                            if s_item.get('type') == 'show' and s_item.get('id'):
+                                clean_tmdb_id = s_item.get('id')
+                                break
+                    except Exception:
+                        pass
+
                 has_next_ep = True
                 if clean_tmdb_id and tmdb_module:
                     try:
@@ -554,10 +564,22 @@ def history_menu(query, title=None, show_full_history_link=False):
         search_label = f"{ADDON.getLocalizedString(30057)} (S{season:02d}E{episode:02d})"
     else:
         search_label = ADDON.getLocalizedString(30057)
-        ws_base = None
+        ws_base = history.get_base_name(query) if is_tv else None
 
     items.append((search_label, f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'))
     items.append((ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'))
+
+    if is_tv and clean_tmdb_id is None and tmdb_module:
+        try:
+            search_title = raw_title or ws_base or display_title
+            if search_title:
+                search_res = tmdb_module.search_tmdb(search_title)
+                for s_item in search_res:
+                    if s_item.get('type') == 'show' and s_item.get('id'):
+                        clean_tmdb_id = s_item.get('id')
+                        break
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Auto TMDb lookup error in history_menu: {e}", xbmc.LOGWARNING)
 
     if ep_match and ws_base:
         has_next_ep = True
@@ -587,7 +609,7 @@ def history_menu(query, title=None, show_full_history_link=False):
             items.append((f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png'))
 
     if is_tv:
-        items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={clean_tmdb_id or ""}', 'DefaultTVShows.png'))
+        items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={clean_tmdb_id or ""}&ws_base={urllib.parse.quote(ws_base or "")}', 'DefaultTVShows.png'))
 
     items.append((ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'))
     items.append((ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073), f'history_mark&query={urllib.parse.quote(query)}&watched={0 if is_watched else 1}', 'DefaultAddonVideo.png'))
@@ -1090,9 +1112,9 @@ def show_tmdb_category(category, offset=0, media_type=None, genre_id=None, genre
     xbmcplugin.setContent(HANDLE, content_type)
     xbmcplugin.endOfDirectory(HANDLE)
 
-def show_tmdb_show_seasons(title, year='', tmdb_id=None):
+def show_tmdb_show_seasons(title, year='', tmdb_id=None, ws_base=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{title} - {ADDON.getLocalizedString(30105)}")
-    xbmc.log(f"StreamContinuum: show_tmdb_show_seasons called for title='{title}', year='{year}', tmdb_id='{tmdb_id}'", xbmc.LOGINFO)
+    xbmc.log(f"StreamContinuum: show_tmdb_show_seasons called for title='{title}', year='{year}', tmdb_id='{tmdb_id}', ws_base='{ws_base}'", xbmc.LOGINFO)
 
     clean_tmdb_id = tmdb_id if (tmdb_id and str(tmdb_id).strip().lower() != 'none') else None
 
@@ -1151,12 +1173,14 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
                         pass
                     li.setProperty('TotalEpisodes', str(ep_count))
                     
+                extra_ws = f"&ws_base={urllib.parse.quote(ws_base)}" if ws_base else ""
                 url = (f"{sys.argv[0]}?action=tmdb_show_episodes"
                        f"&show_title={urllib.parse.quote(show_name)}"
                        f"&tmdb_id={clean_tmdb_id}"
                        f"&season={season_num}"
                        f"&poster={urllib.parse.quote(season_poster)}"
-                       f"&fanart={urllib.parse.quote(fanart)}")
+                       f"&fanart={urllib.parse.quote(fanart)}"
+                       f"{extra_ws}")
                 xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
                 
             xbmcplugin.setContent(HANDLE, 'seasons')
@@ -1192,13 +1216,13 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
             poster = ''
             fanart = ''
         final_show_title = show_meta.get('title') or title
-        show_seasons(final_show_title, str(trakt_id), poster, fanart)
+        show_seasons(final_show_title, str(trakt_id), poster, fanart, ws_base=ws_base)
     else:
         ws_query = f"{title} {year}".strip()
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
 
-def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart=''):
+def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='', ws_base=None):
     season_num = int(season_num)
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)} {season_num}")
     
@@ -1214,6 +1238,7 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         return
         
     today = datetime.date.today()
+    search_base = ws_base if (ws_base and ws_base.strip()) else show_title
 
     for ep in episodes:
         ep_num = ep.get('episode_number', 0)
@@ -1240,7 +1265,7 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         else:
             date_label = ""
 
-        ws_query = f"{show_title} S{season_num:02d}E{ep_num:02d}"
+        ws_query = f"{search_base} S{season_num:02d}E{ep_num:02d}"
         label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
 
         li = xbmcgui.ListItem(label=label)
@@ -1359,7 +1384,7 @@ def show_tmdb_search(query=None):
         xbmcplugin.setContent(HANDLE, 'movies')
         xbmcplugin.endOfDirectory(HANDLE)
 
-def show_seasons(show_title, trakt_id, poster='', fanart=''):
+def show_seasons(show_title, trakt_id, poster='', fanart='', ws_base=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)}")
     seasons = trakt.get_seasons(trakt_id)
     if not seasons:
@@ -1408,18 +1433,20 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
                 pass
             li.setProperty('TotalEpisodes', str(ep_count))
 
+        extra_ws = f"&ws_base={urllib.parse.quote(ws_base)}" if ws_base else ""
         url = (f"{sys.argv[0]}?action=show_episodes"
                f"&show_title={urllib.parse.quote(show_title)}"
                f"&trakt_id={trakt_id}"
                f"&season={season_num}"
                f"&poster={urllib.parse.quote(poster)}"
-               f"&fanart={urllib.parse.quote(fanart)}")
+               f"&fanart={urllib.parse.quote(fanart)}"
+               f"{extra_ws}")
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
     xbmcplugin.setContent(HANDLE, 'seasons')
     xbmcplugin.endOfDirectory(HANDLE)
 
-def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
+def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_base=None):
     season_num = int(season_num)
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)} {season_num}")
     episodes = trakt.get_episodes(trakt_id, season_num)
@@ -1429,6 +1456,7 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
         return
 
     today = datetime.date.today()
+    search_base = ws_base if (ws_base and ws_base.strip()) else show_title
 
     for episode in episodes:
         ep_num = episode.get('number', 0)
@@ -1455,7 +1483,7 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
         else:
             date_label = ""
 
-        ws_query = f"{show_title} S{season_num:02d}E{ep_num:02d}"
+        ws_query = f"{search_base} S{season_num:02d}E{ep_num:02d}"
         label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
 
         li = xbmcgui.ListItem(label=label)
@@ -2024,15 +2052,15 @@ def run():
             genre_name=params.get('genre_name')
         )
     elif action == 'tmdb_show_seasons':
-        show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''), params.get('tmdb_id'))
+        show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''), params.get('tmdb_id'), ws_base=params.get('ws_base'))
     elif action == 'tmdb_show_episodes':
-        show_tmdb_show_episodes(params.get('show_title', ''), params.get('tmdb_id'), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
+        show_tmdb_show_episodes(params.get('show_title', ''), params.get('tmdb_id'), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''), ws_base=params.get('ws_base'))
     elif action == 'tmdb_search':
         show_tmdb_search(params.get('query'))
     elif action == 'show_seasons':
-        show_seasons(params.get('show_title', ''), params.get('trakt_id', ''), params.get('poster', ''), params.get('fanart', ''))
+        show_seasons(params.get('show_title', ''), params.get('trakt_id', ''), params.get('poster', ''), params.get('fanart', ''), ws_base=params.get('ws_base'))
     elif action == 'show_episodes':
-        show_episodes(params.get('show_title', ''), params.get('trakt_id', ''), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
+        show_episodes(params.get('show_title', ''), params.get('trakt_id', ''), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''), ws_base=params.get('ws_base'))
     elif action == 'trakt_discover_menu':
         show_trakt_discover_menu()
     elif action == 'trakt_discover':
