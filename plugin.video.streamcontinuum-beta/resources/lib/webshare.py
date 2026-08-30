@@ -130,7 +130,7 @@ def get_link(ident):
 def upload_file(filepath, filename):
     token = get_token()
     if not token:
-        return None
+        return False
         
     url = BASE_URL + 'upload_url/'
     data = {'wst': token}
