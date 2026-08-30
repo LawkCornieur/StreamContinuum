@@ -47,36 +47,37 @@ def authenticate():
     progress.create("Trakt.tv Activation", 
                     f"Go to: trakt.tv/activate\nEnter code: {user_code}")
     
-    start_time = time.time()
-    while time.time() - start_time < expires_in:
-        if progress.iscanceled():
-            break
+    try:
+        start_time = time.time()
+        while time.time() - start_time < expires_in:
+            if progress.iscanceled():
+                break
+                
+            token_url = "https://api.trakt.tv/oauth/device/token"
+            token_payload = {
+                "code": device_code,
+                "client_id": client_id,
+                "client_secret": client_secret
+            }
             
-        token_url = "https://api.trakt.tv/oauth/device/token"
-        token_payload = {
-            "code": device_code,
-            "client_id": client_id,
-            "client_secret": client_secret
-        }
-        
-        token_res = requests.post(token_url, json=token_payload)
-        
-        if token_res.status_code == 200:
-            data = token_res.json()
-            ADDON.setSetting('trakt_token', data['access_token'])
+            token_res = requests.post(token_url, json=token_payload)
             
-            user_info = get_user_info()
-            if user_info:
-                ADDON.setSetting('trakt_username', user_info.get('username', 'Připojeno'))
-            
-            xbmcgui.Dialog().notification("Trakt.tv", "Successfully connected!", xbmcgui.NOTIFICATION_INFO)
-            break
-        elif token_res.status_code == 400:
-            time.sleep(interval)
-        else:
-            break
-            
-    progress.close()
+            if token_res.status_code == 200:
+                data = token_res.json()
+                ADDON.setSetting('trakt_token', data['access_token'])
+                
+                user_info = get_user_info()
+                if user_info:
+                    ADDON.setSetting('trakt_username', user_info.get('username', 'Připojeno'))
+                
+                xbmcgui.Dialog().notification("Trakt.tv", "Successfully connected!", xbmcgui.NOTIFICATION_INFO)
+                break
+            elif token_res.status_code == 400:
+                time.sleep(interval)
+            else:
+                break
+    finally:
+        progress.close()
 
 def get_headers():
     client_id = ADDON.getSetting('trakt_client_id')
