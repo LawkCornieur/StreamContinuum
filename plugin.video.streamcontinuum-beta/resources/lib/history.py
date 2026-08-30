@@ -104,7 +104,7 @@ def get_history(deduplicate=True):
                     if t_base:
                         series_tmdb_map[f"title_{t_base}"] = item
 
-            seen_series_keys = set()
+            seen_keys = set()
             unique_items = []
             for item in items:
                 q = item.get('query', '')
@@ -139,13 +139,34 @@ def get_history(deduplicate=True):
                     if q_base:
                         keys.append(f"query_{q_base}")
                     
-                    if keys and any(k in seen_series_keys for k in keys):
+                    if keys and any(k in seen_keys for k in keys):
                         continue
                     
                     for k in keys:
-                        seen_series_keys.add(k)
+                        seen_keys.add(k)
+                else:
+                    m_keys = []
+                    if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+                        m_keys.append(f"movie_tmdb_{tmdb_id}")
+                    q_norm = str(q).strip().lower()
+                    if q_norm:
+                        m_keys.append(f"movie_q_{q_norm}")
+                    
+                    if m_keys and any(k in seen_keys for k in m_keys):
+                        continue
+                    for k in m_keys:
+                        seen_keys.add(k)
                 unique_items.append(item)
             return unique_items
+    except json.JSONDecodeError as jde:
+        xbmc.log(f"StreamContinuum History: Corrupted history.json detected: {jde}", xbmc.LOGERROR)
+        try:
+            bak_file = HISTORY_FILE + '.corrupted'
+            if os.path.exists(HISTORY_FILE):
+                os.rename(HISTORY_FILE, bak_file)
+        except Exception:
+            pass
+        return []
     except Exception as e:
         xbmc.log(f"StreamContinuum History: Error loading history.json: {e}", xbmc.LOGERROR)
         return []
@@ -170,19 +191,24 @@ def _save_history(history_list):
     try:
         if not os.path.exists(PROFILE_DIR):
             os.makedirs(PROFILE_DIR)
-        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        temp_file = HISTORY_FILE + '.tmp'
+        with open(temp_file, 'w', encoding='utf-8') as f:
             json.dump(history_list, f, ensure_ascii=False, indent=4)
+        if os.path.exists(HISTORY_FILE):
+            os.remove(HISTORY_FILE)
+        os.rename(temp_file, HISTORY_FILE)
     except Exception as e:
         xbmc.log(f"StreamContinuum History: Error saving history.json: {e}", xbmc.LOGERROR)
 
 def add_to_history(query):
     if not query:
         return
+    query_str = str(query).strip()
     history = get_history(deduplicate=False)
     now = int(time.time())
     
     new_item_template = {
-        'query': query,
+        'query': query_str,
         'title': None,
         'year': None,
         'plot': None,
@@ -199,8 +225,8 @@ def add_to_history(query):
         'added_at': now
     }
 
-    query_is_series = is_series(query)
-    query_base = get_base_name(query).lower().strip()
+    query_is_series = is_series(query_str)
+    query_base = get_base_name(query_str).lower().strip()
 
     existing_item = None
     matching_tmdb_item = None
@@ -210,7 +236,7 @@ def add_to_history(query):
         item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')
         item_base = get_base_name(item_q).lower().strip()
         
-        is_same_exact = (item_q == query)
+        is_same_exact = (item_q == query_str)
         is_same_series = (query_is_series or item.get('media_type') in ('tvshow', 'tv', 'show')) and item_is_series and (
             (query_base and item_base and query_base == item_base) or
             (item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base)
@@ -231,7 +257,7 @@ def add_to_history(query):
     history = remaining_history
     
     if existing_item:
-        existing_item['query'] = query
+        existing_item['query'] = query_str
         existing_item['is_watched'] = True
         existing_item['last_played_at'] = now
         if 'added_at' not in existing_item or not existing_item['added_at']:
@@ -255,11 +281,12 @@ def add_to_history(query):
 def add_to_watchlist_local(query, tmdb_data=None):
     if not query:
         return
+    query_str = str(query).strip()
     history = get_history(deduplicate=False)
     now = int(time.time())
     
-    query_is_series = is_series(query) or (tmdb_data and tmdb_data.get('media_type') in ('tvshow', 'tv', 'show'))
-    query_base = get_base_name(query).lower().strip()
+    query_is_series = is_series(query_str) or (tmdb_data and tmdb_data.get('media_type') in ('tvshow', 'tv', 'show'))
+    query_base = get_base_name(query_str).lower().strip()
     
     existing_item = None
     remaining_history = []
@@ -268,7 +295,7 @@ def add_to_watchlist_local(query, tmdb_data=None):
         item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')
         item_base = get_base_name(item_q).lower().strip()
         
-        is_same_exact = (item_q == query)
+        is_same_exact = (item_q == query_str)
         is_same_series = query_is_series and item_is_series and (
             (query_base and item_base and query_base == item_base) or
             (item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base)
@@ -283,7 +310,7 @@ def add_to_watchlist_local(query, tmdb_data=None):
     history = remaining_history
     
     if existing_item:
-        existing_item['query'] = query
+        existing_item['query'] = query_str
         existing_item['is_watched'] = False
         existing_item['last_played_at'] = now
         if tmdb_data:
@@ -296,7 +323,7 @@ def add_to_watchlist_local(query, tmdb_data=None):
         item_to_add = existing_item
     else:
         item_to_add = {
-            'query': query,
+            'query': query_str,
             'title': sanitize_title(tmdb_data.get('title')) if tmdb_data else None,
             'year': tmdb_data.get('year') if tmdb_data else None,
             'plot': tmdb_data.get('plot', '') if tmdb_data else '',
@@ -394,7 +421,7 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
             item['media_type'] = tmdb_data.get('media_type')
             item['identified_at'] = now
             updated = True
-            break
+            
     if not updated and original_query:
         new_item = {
             'query': original_query,
