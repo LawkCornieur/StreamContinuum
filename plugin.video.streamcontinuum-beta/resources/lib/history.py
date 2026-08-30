@@ -87,6 +87,23 @@ def get_history(deduplicate=True):
             if not deduplicate:
                 return items
 
+            series_tmdb_map = {}
+            for item in items:
+                q = item.get('query', '')
+                is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
+                if is_tv and item.get('tmdb_id'):
+                    tmdb_id = item.get('tmdb_id')
+                    q_base = get_base_name(q).lower().strip()
+                    t_title = item.get('title', '')
+                    t_base = get_base_name(t_title).lower().strip() if (t_title and not has_non_latin(t_title)) else ''
+                    
+                    if tmdb_id:
+                        series_tmdb_map[f"tmdb_{tmdb_id}"] = item
+                    if q_base:
+                        series_tmdb_map[f"query_{q_base}"] = item
+                    if t_base:
+                        series_tmdb_map[f"title_{t_base}"] = item
+
             seen_series_keys = set()
             unique_items = []
             for item in items:
@@ -95,14 +112,30 @@ def get_history(deduplicate=True):
                 title = item.get('title')
                 is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
                 if is_tv:
+                    q_base = get_base_name(q).lower().strip()
+                    t_base = get_base_name(title).lower().strip() if (title and not has_non_latin(title)) else ''
+                    
+                    if not tmdb_id:
+                        matched_source = None
+                        if q_base and f"query_{q_base}" in series_tmdb_map:
+                            matched_source = series_tmdb_map[f"query_{q_base}"]
+                        elif t_base and f"title_{t_base}" in series_tmdb_map:
+                            matched_source = series_tmdb_map[f"title_{t_base}"]
+                        
+                        if matched_source:
+                            for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
+                                if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
+                                    item[meta_k] = matched_source[meta_k]
+                            tmdb_id = item.get('tmdb_id')
+                            title = item.get('title')
+
                     keys = []
                     if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
                         keys.append(f"tmdb_{tmdb_id}")
                     if title and not has_non_latin(title):
-                        t_base = get_base_name(title).lower().strip()
-                        if t_base:
-                            keys.append(f"title_{t_base}")
-                    q_base = get_base_name(q).lower().strip()
+                        tb = get_base_name(title).lower().strip()
+                        if tb:
+                            keys.append(f"title_{tb}")
                     if q_base:
                         keys.append(f"query_{q_base}")
                     
@@ -170,6 +203,7 @@ def add_to_history(query):
     query_base = get_base_name(query).lower().strip()
 
     existing_item = None
+    matching_tmdb_item = None
     remaining_history = []
     for item in history:
         item_q = item.get('query', '')
@@ -187,6 +221,12 @@ def add_to_history(query):
                 existing_item = item
         else:
             remaining_history.append(item)
+            
+        if item_is_series and item.get('tmdb_id') and not matching_tmdb_item:
+            if query_base and item_base == query_base:
+                matching_tmdb_item = item
+            elif item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base:
+                matching_tmdb_item = item
     
     history = remaining_history
     
@@ -196,9 +236,17 @@ def add_to_history(query):
         existing_item['last_played_at'] = now
         if 'added_at' not in existing_item or not existing_item['added_at']:
             existing_item['added_at'] = now
+        if not existing_item.get('tmdb_id') and matching_tmdb_item:
+            for k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
+                if matching_tmdb_item.get(k) is not None:
+                    existing_item[k] = matching_tmdb_item[k]
         item_to_add = existing_item
     else:
         item_to_add = new_item_template
+        if matching_tmdb_item:
+            for k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
+                if matching_tmdb_item.get(k) is not None:
+                    item_to_add[k] = matching_tmdb_item[k]
         
     history.insert(0, item_to_add)
     history = history[:50]
