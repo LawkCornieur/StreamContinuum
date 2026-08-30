@@ -358,7 +358,8 @@ def play(ident, query=None, title=None, is_autoplay=False):
                                 dialog.update(percent, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\n{item_name}\nSpuštění za {seconds - (i // 10)} s...")
                                 xbmc.sleep(100)
 
-                            if not canceled and not monitor.abortRequested():                                dialog.close()
+                            if not canceled and not monitor.abortRequested():
+                                dialog.close()
                                 play(selected_item["ident"], next_ep_query, title=item_name, is_autoplay=True)
                                 return
                     finally:
