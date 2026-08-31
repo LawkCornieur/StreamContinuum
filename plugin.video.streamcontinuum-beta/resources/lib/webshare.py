@@ -6,10 +6,22 @@ import xbmcgui
 import hashlib
 from xml.etree import ElementTree
 from resources.lib.md5crypt import md5crypt
+import urllib3
+
+try:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
 
 ADDON = xbmcaddon.Addon()
 BASE_URL = "https://webshare.cz/api/"
 HEADERS = {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'}
+
+def get_ssl_verify():
+    try:
+        return ADDON.getSettingBool('ssl_verify')
+    except Exception:
+        return True
 
 def get_salt(username):
     if not username:
@@ -17,7 +29,7 @@ def get_salt(username):
     url = BASE_URL + 'salt/'
     data = {'username_or_email': username}
     try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
             if root.find('status') is not None and root.find('status').text == 'OK':
@@ -47,7 +59,7 @@ def login():
     }
     
     try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
             if root.find('status') is not None and root.find('status').text == 'OK':
@@ -79,7 +91,7 @@ def search(query):
     }
     
     try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
             files = []
@@ -116,7 +128,7 @@ def get_link(ident):
     }
     
     try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
             link = root.find('link')
@@ -135,7 +147,7 @@ def upload_file(filepath, filename):
     url = BASE_URL + 'upload_url/'
     data = {'wst': token}
     try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
             url_node = root.find('url')
@@ -151,7 +163,7 @@ def upload_file(filepath, filename):
                                 'wst': token,
                                 'private': 1
                             }
-                            up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60)
+                            up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60, verify=get_ssl_verify())
                             if up_resp.status_code == 200:
                                 try:
                                     root = ElementTree.fromstring(up_resp.content)
@@ -183,7 +195,7 @@ def get_user_files():
     url = BASE_URL + 'user_files/'
     data = {'wst': token, 'limit': 100, 'offset': 0}
     try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
             files = []
@@ -210,7 +222,7 @@ def delete_file(ident):
     url = BASE_URL + 'remove_file/'
     data = {'wst': token, 'ident': ident}
     try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
             status = root.find('status')
@@ -229,7 +241,7 @@ def get_sync_files():
     url = BASE_URL + 'files/'
     data = {'wst': token, 'path': '/StreamContinuum_Sync/', 'private': 1}
     try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
             files = []
@@ -262,7 +274,7 @@ def move_to_sync(filename):
         'dest_private': 1
     }
     try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
             status = root.find('status')
