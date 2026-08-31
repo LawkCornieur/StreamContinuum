@@ -180,6 +180,12 @@ def search(query=None):
             xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
             return
         
+        edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} ({query})...[/COLOR]"
+        edit_url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
+        edit_item = xbmcgui.ListItem(label=edit_label)
+        edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa-ws.png')})
+        xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=False)
+
         optimize_results = ADDON.getSetting('optimize_results') == 'true'
         
         for item in results:
@@ -370,6 +376,7 @@ def play(ident, query=None, title=None, is_autoplay=False):
 
         after = ADDON.getSetting('after_playback')
         safe_query = urllib.parse.quote_plus(query) if query else ""
+        xbmc.sleep(300)
 
         if after == '0' and query:
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
