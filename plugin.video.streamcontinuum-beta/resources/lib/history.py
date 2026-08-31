@@ -431,17 +431,17 @@ def update_history_item(old_query, new_query):
     for item in history:
         if item.get('query') == old_query:
             item['query'] = new_query
-            item['title'] = None
-            item['year'] = None
-            item['plot'] = None
-            item['genres'] = []
-            item['rating'] = None
-            item['runtime'] = None
-            item['poster'] = None
-            item['fanart'] = None
-            item['tmdb_id'] = None
-            item['media_type'] = None
-            item['identified_at'] = None
+            if not item.get('tmdb_id') and not item.get('title'):
+                item['title'] = None
+                item['year'] = None
+                item['plot'] = None
+                item['genres'] = []
+                item['rating'] = None
+                item['runtime'] = None
+                item['poster'] = None
+                item['fanart'] = None
+                item['media_type'] = None
+                item['identified_at'] = None
             item['last_played_at'] = now
             break
     _save_history(history)
