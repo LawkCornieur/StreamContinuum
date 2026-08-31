@@ -9,9 +9,21 @@ import xbmc
 import xbmcaddon
 import xbmcvfs
 import urllib.parse
+import urllib3
+
+try:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
 
 _tmdb_warning_shown = False
 ADDON = xbmcaddon.Addon()
+
+def get_ssl_verify():
+    try:
+        return ADDON.getSettingBool('ssl_verify')
+    except Exception:
+        return True
 
 def get_tmdb_api_keys():
     keys = []
@@ -36,7 +48,7 @@ def make_tmdb_request(url_template):
     for key in keys:
         url = url_template.format(api_key=key)
         try:
-            res = requests.get(url, timeout=15)
+            res = requests.get(url, timeout=15, verify=get_ssl_verify())
             last_response = res
             if res.status_code == 200:
                 return res
