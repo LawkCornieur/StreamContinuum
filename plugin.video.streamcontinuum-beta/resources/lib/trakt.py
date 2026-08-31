@@ -4,6 +4,12 @@ import xbmcaddon
 import requests
 import time
 import urllib.parse
+import urllib3
+
+try:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
 
 try:
     import tmdb
@@ -12,6 +18,12 @@ except Exception as _tmdb_e:
     tmdb = None
 
 ADDON = xbmcaddon.Addon()
+
+def get_ssl_verify():
+    try:
+        return ADDON.getSettingBool('ssl_verify')
+    except Exception:
+        return True
 
 def authenticate():
     client_id = ADDON.getSetting('trakt_client_id')
@@ -25,7 +37,7 @@ def authenticate():
     payload = {"client_id": client_id}
     
     try:
-        res = requests.post(url, json=payload)
+        res = requests.post(url, json=payload, verify=get_ssl_verify())
         if res.status_code != 200:
             xbmcgui.Dialog().ok("Trakt.tv Error", f"Chyba při komunikaci s Trakt.tv (Status: {res.status_code})\nZkontrolujte Client ID.")
             return
@@ -60,7 +72,7 @@ def authenticate():
                 "client_secret": client_secret
             }
             
-            token_res = requests.post(token_url, json=token_payload)
+            token_res = requests.post(token_url, json=token_payload, verify=get_ssl_verify())
             
             if token_res.status_code == 200:
                 data = token_res.json()
@@ -95,7 +107,7 @@ def get_user_info():
     url = "https://api.trakt.tv/users/me"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -111,7 +123,7 @@ def get_trakt_id_from_tmdb_id(tmdb_id, media_type):
     headers = get_headers()
 
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             results = res.json()
             if results:
@@ -132,7 +144,7 @@ def search_trakt(query):
     headers = get_headers()
 
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -143,7 +155,7 @@ def get_watchlist():
     url = "https://api.trakt.tv/sync/watchlist"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -161,7 +173,7 @@ def add_to_watchlist(media_type, item_id, id_type='trakt'):
         return False
     payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        res = requests.post(url, json=payload, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code in (200, 201):
             return True
     except Exception as e:
@@ -179,7 +191,7 @@ def remove_from_watchlist(media_type, item_id, id_type='trakt'):
         return False
     payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        res = requests.post(url, json=payload, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code in (200, 201):
             return True
     except Exception as e:
@@ -190,7 +202,7 @@ def get_playback():
     url = "https://api.trakt.tv/sync/playback"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -201,7 +213,7 @@ def get_progress():
     url = "https://api.trakt.tv/sync/playback/episodes"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -212,7 +224,7 @@ def get_trending(media_type):
     url = f"https://api.trakt.tv/{media_type}/trending"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -223,7 +235,7 @@ def get_popular(media_type):
     url = f"https://api.trakt.tv/{media_type}/popular"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -234,7 +246,7 @@ def get_recommended(media_type):
     url = f"https://api.trakt.tv/recommendations/{media_type}"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -245,7 +257,7 @@ def get_seasons(trakt_id):
     url = f"https://api.trakt.tv/shows/{trakt_id}/seasons?extended=full"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -256,7 +268,7 @@ def get_episodes(trakt_id, season_num):
     url = f"https://api.trakt.tv/shows/{trakt_id}/seasons/{season_num}?extended=full"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -274,7 +286,7 @@ def mark_watched(media_type, item_id, id_type='trakt'):
         return False
     payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        res = requests.post(url, json=payload, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code in (200, 201):
             return True
     except Exception as e:
@@ -292,7 +304,7 @@ def mark_unwatched(media_type, item_id, id_type='trakt'):
         return False
     payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        res = requests.post(url, json=payload, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code in (200, 201):
             return True
     except Exception as e:
@@ -310,7 +322,7 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
         trakt_endpoint_type = 'movies' if media_type == 'movie' else 'shows'
         url = f"https://api.trakt.tv/{trakt_endpoint_type}/{item_id}"
         try:
-            res = requests.get(url, headers=get_headers(), timeout=10)
+            res = requests.get(url, headers=get_headers(), timeout=10, verify=get_ssl_verify())
             if res.status_code == 200:
                 trakt_item_data = res.json()
                 tmdb_id = trakt_item_data.get('ids', {}).get('tmdb')
