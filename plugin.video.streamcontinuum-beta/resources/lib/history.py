@@ -5,6 +5,7 @@ import xbmcvfs
 import re
 import time
 import xbmc
+import datetime
 
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
@@ -16,7 +17,15 @@ def _safe_timestamp(val):
     try:
         return int(float(val))
     except (ValueError, TypeError):
-        return 0
+        pass
+    try:
+        val_str = str(val).replace('T', ' ').strip()
+        if len(val_str) >= 10:
+            dt = datetime.datetime.fromisoformat(val_str[:19])
+            return int(dt.timestamp())
+    except Exception:
+        pass
+    return 0
 
 def has_non_latin(s):
     if not s:
@@ -72,13 +81,13 @@ def get_history(deduplicate=True):
                 return []
             
             now = int(time.time())
-            for item in items:
+            for idx, item in enumerate(items):
                 if 'is_watched' not in item:
                     item['is_watched'] = True
-                if 'added_at' not in item:
-                    item['added_at'] = now
-                if 'last_played_at' not in item:
-                    item['last_played_at'] = now
+                if not item.get('added_at'):
+                    item['added_at'] = now - idx
+                if not item.get('last_played_at'):
+                    item['last_played_at'] = item['added_at']
                 if item.get('title'):
                     item['title'] = sanitize_title(item['title'])
             
@@ -87,22 +96,42 @@ def get_history(deduplicate=True):
             if not deduplicate:
                 return items
 
-            series_tmdb_map = {}
+            series_map = {}
+            movie_map = {}
             for item in items:
                 q = item.get('query', '')
+                tmdb_id = item.get('tmdb_id')
+                t_title = item.get('title', '')
+                t_base = get_base_name(t_title).lower().strip() if (t_title and not has_non_latin(t_title)) else ''
+                q_base = get_base_name(q).lower().strip()
                 is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
-                if is_tv and item.get('tmdb_id'):
-                    tmdb_id = item.get('tmdb_id')
-                    q_base = get_base_name(q).lower().strip()
-                    t_title = item.get('title', '')
-                    t_base = get_base_name(t_title).lower().strip() if (t_title and not has_non_latin(t_title)) else ''
-                    
-                    if tmdb_id:
-                        series_tmdb_map[f"tmdb_{tmdb_id}"] = item
-                    if q_base:
-                        series_tmdb_map[f"query_{q_base}"] = item
+
+                if is_tv:
+                    if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+                        key = f"tmdb_{tmdb_id}"
+                        if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
+                            series_map[key] = item
                     if t_base:
-                        series_tmdb_map[f"title_{t_base}"] = item
+                        key = f"title_{t_base}"
+                        if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
+                            series_map[key] = item
+                    if q_base:
+                        key = f"query_{q_base}"
+                        if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
+                            series_map[key] = item
+                else:
+                    if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+                        key = f"movie_tmdb_{tmdb_id}"
+                        if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
+                            movie_map[key] = item
+                    if t_base:
+                        key = f"movie_title_{t_base}"
+                        if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
+                            movie_map[key] = item
+                    if q_base:
+                        key = f"movie_query_{q_base}"
+                        if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
+                            movie_map[key] = item
 
             seen_keys = set()
             unique_items = []
@@ -111,23 +140,27 @@ def get_history(deduplicate=True):
                 tmdb_id = item.get('tmdb_id')
                 title = item.get('title')
                 is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
+                
+                q_base = get_base_name(q).lower().strip()
+                t_base = get_base_name(title).lower().strip() if (title and not has_non_latin(title)) else ''
+
                 if is_tv:
-                    q_base = get_base_name(q).lower().strip()
-                    t_base = get_base_name(title).lower().strip() if (title and not has_non_latin(title)) else ''
-                    
-                    if not tmdb_id:
-                        matched_source = None
-                        if q_base and f"query_{q_base}" in series_tmdb_map:
-                            matched_source = series_tmdb_map[f"query_{q_base}"]
-                        elif t_base and f"title_{t_base}" in series_tmdb_map:
-                            matched_source = series_tmdb_map[f"title_{t_base}"]
-                        
-                        if matched_source:
-                            for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
-                                if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
-                                    item[meta_k] = matched_source[meta_k]
-                            tmdb_id = item.get('tmdb_id')
-                            title = item.get('title')
+                    matched_source = None
+                    if tmdb_id and f"tmdb_{tmdb_id}" in series_map:
+                        matched_source = series_map[f"tmdb_{tmdb_id}"]
+                    elif t_base and f"title_{t_base}" in series_map:
+                        matched_source = series_map[f"title_{t_base}"]
+                    elif q_base and f"query_{q_base}" in series_map:
+                        matched_source = series_map[f"query_{q_base}"]
+
+                    if matched_source and matched_source is not item:
+                        for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
+                            if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
+                                item[meta_k] = matched_source[meta_k]
+                        tmdb_id = item.get('tmdb_id')
+                        title = item.get('title')
+                        if title:
+                            t_base = get_base_name(title).lower().strip() if not has_non_latin(title) else t_base
 
                     keys = []
                     if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
@@ -138,24 +171,45 @@ def get_history(deduplicate=True):
                             keys.append(f"title_{tb}")
                     if q_base:
                         keys.append(f"query_{q_base}")
-                    
+
                     if keys and any(k in seen_keys for k in keys):
                         continue
-                    
                     for k in keys:
                         seen_keys.add(k)
                 else:
+                    matched_source = None
+                    if tmdb_id and f"movie_tmdb_{tmdb_id}" in movie_map:
+                        matched_source = movie_map[f"movie_tmdb_{tmdb_id}"]
+                    elif t_base and f"movie_title_{t_base}" in movie_map:
+                        matched_source = movie_map[f"movie_title_{t_base}"]
+                    elif q_base and f"movie_query_{q_base}" in movie_map:
+                        matched_source = movie_map[f"movie_query_{q_base}"]
+
+                    if matched_source and matched_source is not item:
+                        for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
+                            if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
+                                item[meta_k] = matched_source[meta_k]
+                        tmdb_id = item.get('tmdb_id')
+                        title = item.get('title')
+
                     m_keys = []
                     if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
                         m_keys.append(f"movie_tmdb_{tmdb_id}")
+                    if title and not has_non_latin(title):
+                        tb = get_base_name(title).lower().strip()
+                        if tb:
+                            m_keys.append(f"movie_title_{tb}")
                     q_norm = str(q).strip().lower()
                     if q_norm:
                         m_keys.append(f"movie_q_{q_norm}")
-                    
+                    if q_base:
+                        m_keys.append(f"movie_query_{q_base}")
+
                     if m_keys and any(k in seen_keys for k in m_keys):
                         continue
                     for k in m_keys:
                         seen_keys.add(k)
+
                 unique_items.append(item)
             return unique_items
     except json.JSONDecodeError as jde:
