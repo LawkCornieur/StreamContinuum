@@ -14,10 +14,22 @@ import xbmcaddon
 import xbmcvfs
 import webshare
 import requests
+import urllib3
+
+try:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
 
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
 HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
+
+def get_ssl_verify():
+    try:
+        return ADDON.getSettingBool('ssl_verify')
+    except Exception:
+        return True
 
 def get_key(pin):
     return hashlib.sha256(pin.encode('utf-8')).digest()
@@ -46,8 +58,16 @@ def export_settings(pin):
             return False, "Není vyplněno uživatelské jméno nebo heslo pro Webshare."
 
         settings = {}
-        for key in ['ws_username', 'ws_password', 'trakt_token', 'trakt_username', 'trakt_client_id', 'trakt_client_secret', 'tmdb_api_key']:
-            settings[key] = ADDON.getSetting(key)
+        settings_keys = [
+            'ws_username', 'ws_password', 'trakt_token', 'trakt_username', 
+            'trakt_client_id', 'trakt_client_secret', 'tmdb_api_key',
+            'autoplay_next', 'optimize_results', 'after_playback', 
+            'open_last_history', 'enable_welcome_melody', 'auto_start', 
+            'ssl_verify', 'enable_trakt_menu'
+        ]
+        for key in settings_keys:
+            val = ADDON.getSetting(key)
+            settings[key] = val
         
         data = json.dumps(settings)
         encrypted = encrypt_data(data, pin)
@@ -134,7 +154,7 @@ def import_settings(pin):
         if not link:
             return False, "Nelze získat odkaz pro stažení souboru z Webshare."
             
-        resp = requests.get(link)
+        resp = requests.get(link, verify=get_ssl_verify())
         if resp.status_code != 200:
             return False, f"Chyba při stahování souboru z Webshare (HTTP {resp.status_code})."
             
@@ -153,7 +173,12 @@ def import_settings(pin):
             return False, "Soubor obsahuje neplatná data (poškozená záloha)."
             
         for key, value in settings.items():
-            ADDON.setSetting(key, value)
+            if isinstance(value, bool):
+                ADDON.setSettingBool(key, value)
+            elif isinstance(value, int):
+                ADDON.setSettingInt(key, value)
+            else:
+                ADDON.setSetting(key, str(value))
             
         xbmc.log("StreamContinuum: Settings imported successfully", xbmc.LOGINFO)
         return True, None
@@ -194,7 +219,7 @@ def sync_history():
             link = webshare.get_link(f['ident'])
             if link:
                 try:
-                    resp = requests.get(link, timeout=10)
+                    resp = requests.get(link, timeout=10, verify=get_ssl_verify())
                     if resp.status_code == 200:
                         data = resp.json()
                         if isinstance(data, list):
