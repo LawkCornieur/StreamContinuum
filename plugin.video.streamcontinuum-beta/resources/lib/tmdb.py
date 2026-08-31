@@ -120,6 +120,12 @@ def _extract_title(item, media_type):
     if orig_title and not _has_non_latin(orig_title):
         return orig_title
         
+    for t in (title, orig_title):
+        if t:
+            latin_part = "".join([c for c in t if ord(c) <= 0x024F or (0x1E00 <= ord(c) <= 0x1EFF)]).strip()
+            if len(latin_part) >= 2:
+                return _sanitize_string(latin_part)
+
     return orig_title or title or ""
 
 def _format_item(item, default_media_type=None, default_info=""):
