@@ -284,3 +284,109 @@ def move_to_sync(filename):
     except Exception as e:
         xbmc.log(f"Webshare move_to_sync error: {e}", xbmc.LOGERROR)
     return False
+
+def run_speedtest(dialog=None):
+    ssl_verify = get_ssl_verify()
+    
+    if dialog:
+        dialog.update(5, "Měření odezvy serveru (Ping)...")
+    
+    ping_url = BASE_URL + 'salt/'
+    pings = []
+    for _ in range(3):
+        try:
+            t0 = time.time()
+            requests.post(ping_url, data={'username_or_email': 'speedtest'}, timeout=5, verify=ssl_verify)
+            pings.append((time.time() - t0) * 1000)
+        except Exception:
+            pass
+        if dialog and dialog.iscanceled():
+            return None
+    
+    avg_ping = (sum(pings) / len(pings)) if pings else 0.0
+    
+    test_urls = []
+    try:
+        results = search('1080p')
+        if results:
+            for r in results[:3]:
+                link = get_link(r.get('ident'))
+                if link:
+                    test_urls.append(link)
+                    break
+    except Exception:
+        pass
+        
+    if not test_urls:
+        test_urls.append("https://webshare.cz/speedtest/download")
+        
+    total_bytes = 0
+    start_time = None
+    peak_mbps = 0.0
+    duration_target = 8.0
+    
+    for test_url in test_urls:
+        try:
+            if dialog:
+                dialog.update(20, f"Měření rychlosti stahování...\nOdezva: {avg_ping:.0f} ms")
+            
+            with requests.get(test_url, stream=True, timeout=10, verify=ssl_verify) as resp:
+                if resp.status_code == 200:
+                    start_time = time.time()
+                    last_update = start_time
+                    chunk_size = 128 * 1024
+                    
+                    for chunk in resp.iter_content(chunk_size=chunk_size):
+                        if not chunk:
+                            break
+                        total_bytes += len(chunk)
+                        now = time.time()
+                        elapsed = now - start_time
+                        
+                        if elapsed >= duration_target:
+                            break
+                            
+                        if dialog and dialog.iscanceled():
+                            return None
+                            
+                        if now - last_update >= 0.25:
+                            last_update = now
+                            current_mbps = (total_bytes * 8.0) / (elapsed * 1000000.0) if elapsed > 0 else 0.0
+                            current_mbs = (total_bytes / (1024.0 * 1024.0)) / elapsed if elapsed > 0 else 0.0
+                            if current_mbps > peak_mbps:
+                                peak_mbps = current_mbps
+                            
+                            pct = int(20 + (elapsed / duration_target) * 75)
+                            pct = min(95, max(20, pct))
+                            
+                            if dialog:
+                                dialog.update(
+                                    pct,
+                                    f"Měření rychlosti stahování...\n"
+                                    f"Aktuální rychlost: {current_mbps:.2f} Mbps ({current_mbs:.2f} MB/s)\n"
+                                    f"Přeneseno: {total_bytes / (1024*1024):.1f} MB | Odezva: {avg_ping:.0f} ms"
+                                )
+                    
+                    if total_bytes > 0:
+                        break
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Speedtest chunk download error: {e}", xbmc.LOGWARNING)
+            continue
+            
+    if not start_time or total_bytes == 0:
+        return None
+        
+    total_elapsed = max(0.1, time.time() - start_time)
+    avg_mbps = (total_bytes * 8.0) / (total_elapsed * 1000000.0)
+    avg_mbs = (total_bytes / (1024.0 * 1024.0)) / total_elapsed
+    if avg_mbps > peak_mbps:
+        peak_mbps = avg_mbps
+        
+    return {
+        'ping_ms': avg_ping,
+        'avg_mbps': avg_mbps,
+        'avg_mbs': avg_mbs,
+        'peak_mbps': peak_mbps,
+        'total_bytes': total_bytes,
+        'duration': total_elapsed
+    }
