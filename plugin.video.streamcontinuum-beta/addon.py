@@ -184,7 +184,7 @@ def search(query=None):
         edit_url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
         edit_item = xbmcgui.ListItem(label=edit_label)
         edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa-ws.png')})
-        xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=False)
+        xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=True)
 
         optimize_results = ADDON.getSetting('optimize_results') == 'true'
         
@@ -916,7 +916,7 @@ def show_trakt_playback(offset=0):
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
-        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None))
+        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
@@ -935,16 +935,14 @@ def show_trakt_playback(offset=0):
     xbmcplugin.endOfDirectory(HANDLE)
 
 def search_prefill(query):
-    keyboard = xbmc.Keyboard(query, ADDON.getLocalizedString(30076))
+    keyboard = xbmc.Keyboard(query or '', ADDON.getLocalizedString(30087))
     keyboard.doModal()
     if keyboard.isConfirmed():
         new_query = keyboard.getText()
         if new_query:
-            search(new_query)
-        else:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(new_query)})')
             return
-    else:
+    if HANDLE >= 0:
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
 
 def show_tmdb_menu():
@@ -1996,10 +1994,10 @@ def run():
         keyboard.doModal()
         if keyboard.isConfirmed():
             new_query = keyboard.getText()
-            if new_query:
+            if new_query and new_query != old_query:
                 import history
                 history.update_history_item(old_query, new_query)
-                xbmc.executebuiltin('Container.Refresh')
+                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(new_query)},replace)')
         return
     elif action == 'history_tmdb_custom_search':
         orig_q = params.get('original_query', '')
