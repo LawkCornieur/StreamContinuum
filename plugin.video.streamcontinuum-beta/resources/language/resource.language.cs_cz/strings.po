@@ -518,3 +518,15 @@ msgstr "Sci-Fi a Fantasy"
 msgctxt "#30157"
 msgid "Action & Adventure"
 msgstr "Akční a dobrodružné"
+
+msgctxt "#30158"
+msgid "Test connection speed to Webshare"
+msgstr "Otestovat rychlost připojení k Webshare"
+
+msgctxt "#30159"
+msgid "Measuring download speed..."
+msgstr "Měření rychlosti stahování z Webshare..."
+
+msgctxt "#30160"
+msgid "Speed test results"
+msgstr "Výsledky testu rychlosti"
