@@ -428,12 +428,21 @@ def update_history_item(old_query, new_query):
         return
     history = get_history(deduplicate=False)
     now = int(time.time())
+    norm_old = str(old_query).strip().lower()
+    old_base = get_base_name(old_query).strip().lower()
+    
+    updated = False
     for item in history:
-        if item.get('query') == old_query:
+        item_q = str(item.get('query', '')).strip()
+        item_q_lower = item_q.lower()
+        item_base = get_base_name(item_q).strip().lower()
+        if item_q == str(old_query).strip() or item_q_lower == norm_old or (old_base and item_base == old_base):
             item['query'] = new_query
             item['last_played_at'] = now
+            updated = True
             break
-    _save_history(history)
+    if updated:
+        _save_history(history)
     
 def update_history_with_tmdb_data(original_query, tmdb_data):
     if not original_query:
