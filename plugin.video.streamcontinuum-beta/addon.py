@@ -169,7 +169,8 @@ def search(query=None):
         if keyboard.isConfirmed():
             query = keyboard.getText()
         else:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            if HANDLE >= 0:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
     if query:
@@ -679,7 +680,8 @@ def trakt_search(query=None):
         if keyboard.isConfirmed():
             query = keyboard.getText()
         else:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            if HANDLE >= 0:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
     if query:
@@ -953,14 +955,14 @@ def search_prefill(query):
         if new_query:
             if HANDLE >= 0:
                 try:
-                    xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
                 except Exception:
                     pass
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(new_query)})')
             return
     if HANDLE >= 0:
         try:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
         except Exception:
             pass
 
@@ -1357,7 +1359,8 @@ def show_tmdb_search(query=None):
         if keyboard.isConfirmed():
             query = keyboard.getText()
         else:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            if HANDLE >= 0:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
     if query:
@@ -2043,14 +2046,14 @@ def run():
             if new_search_term:
                 if HANDLE >= 0:
                     try:
-                        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                        xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
                     except Exception:
                         pass
                 xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote_plus(orig_q)}&custom_query={urllib.parse.quote_plus(new_search_term)},replace)')
                 return
         if HANDLE >= 0:
             try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             except Exception:
                 pass
         return
