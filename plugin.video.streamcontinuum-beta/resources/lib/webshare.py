@@ -139,6 +139,24 @@ def get_link(ident):
         
     return None
 
+def create_folder(foldername):
+    token = get_token()
+    if not token:
+        return False
+    url = BASE_URL + 'mkdir/'
+    data = {
+        'wst': token,
+        'name': foldername,
+        'private': 1
+    }
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+        if response.status_code == 200:
+            return True
+    except Exception as e:
+        xbmc.log(f"Webshare create_folder error: {e}", xbmc.LOGERROR)
+    return False
+
 def upload_file(filepath, filename):
     token = get_token()
     if not token:
@@ -173,9 +191,15 @@ def upload_file(filepath, filename):
                                         return True
                                     else:
                                         xbmc.log(f"StreamContinuum: Upload of {filename} failed XML status: {up_resp.text}", xbmc.LOGWARNING)
-                                except Exception as parse_err:
-                                    xbmc.log(f"StreamContinuum: Upload of {filename} succeeded with HTTP 200 but failed to parse response XML: {parse_err}. Content: {up_resp.text}", xbmc.LOGWARNING)
-                                    return True
+                                except Exception:
+                                    try:
+                                        js = up_resp.json()
+                                        if js.get('ident') or js.get('result') == 'OK' or 'ident' in js:
+                                            xbmc.log(f"StreamContinuum: Upload of {filename} successful (JSON response) on attempt {attempt + 1}", xbmc.LOGINFO)
+                                            return True
+                                    except Exception as parse_err:
+                                        xbmc.log(f"StreamContinuum: Upload of {filename} succeeded with HTTP 200 but failed to parse response: {parse_err}. Content: {up_resp.text}", xbmc.LOGWARNING)
+                                        return True
                             else:
                                 xbmc.log(f"StreamContinuum: Upload of {filename} failed with status {up_resp.status_code}", xbmc.LOGWARNING)
                     except Exception as e:
@@ -276,11 +300,27 @@ def move_to_sync(filename):
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
-            root = ElementTree.fromstring(response.content)
-            status = root.find('status')
-            if status is not None and status.text == 'OK':
-                xbmc.log(f"Webshare: move_to_sync '{filename}' OK", xbmc.LOGINFO)
-                return True
+            try:
+                root = ElementTree.fromstring(response.content)
+                status = root.find('status')
+                if status is not None and status.text == 'OK':
+                    xbmc.log(f"Webshare: move_to_sync '{filename}' OK", xbmc.LOGINFO)
+                    return True
+            except Exception:
+                try:
+                    js = response.json()
+                    if js.get('status') == 'OK' or js.get('result') == 'OK':
+                        return True
+                except Exception:
+                    pass
+                    
+        xbmc.log(f"Webshare: move_to_sync '{filename}' first attempt failed. Ensuring /StreamContinuum_Sync/ folder exists and retrying...", xbmc.LOGINFO)
+        create_folder('StreamContinuum_Sync')
+        time.sleep(1)
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+        if response.status_code == 200 and ('OK' in response.text or 'ident' in response.text):
+            xbmc.log(f"Webshare: move_to_sync '{filename}' retry OK", xbmc.LOGINFO)
+            return True
     except Exception as e:
         xbmc.log(f"Webshare move_to_sync error: {e}", xbmc.LOGERROR)
     return False
