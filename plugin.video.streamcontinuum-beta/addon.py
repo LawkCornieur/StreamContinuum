@@ -184,7 +184,7 @@ def search(query=None):
         edit_url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
         edit_item = xbmcgui.ListItem(label=edit_label)
         edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa-ws.png')})
-        xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=True)
+        xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=False)
 
         optimize_results = ADDON.getSetting('optimize_results') == 'true'
         
