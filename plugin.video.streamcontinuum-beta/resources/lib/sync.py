@@ -8,13 +8,13 @@ try:
 except ImportError:
     from Cryptodome.Cipher import AES
     from Cryptodome.Util.Padding import pad, unpad
-# This is a virtual module provided by Kodi, it must be imported for the addon to function.
 import xbmc
 import xbmcaddon
 import xbmcvfs
 import webshare
 import requests
 import urllib3
+import history
 
 try:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -53,7 +53,6 @@ def export_settings(pin):
     try:
         xbmc.log("StreamContinuum: Starting export_settings", xbmc.LOGINFO)
         
-        # Check credentials
         if not ADDON.getSetting('ws_username') or not ADDON.getSetting('ws_password'):
             return False, "Není vyplněno uživatelské jméno nebo heslo pro Webshare."
 
@@ -81,7 +80,6 @@ def export_settings(pin):
             
         xbmc.log(f"StreamContinuum: Settings encrypted and saved to {filepath}", xbmc.LOGINFO)
             
-        # Clean up sync folder
         files = webshare.get_sync_files()
         for f in files:
             name = f['name']
@@ -90,7 +88,6 @@ def export_settings(pin):
                 webshare.delete_file(f['ident'])
                 time.sleep(0.5)
                 
-        # Clean up public root
         public_files = webshare.get_user_files()
         for f in public_files:
             name = f['name']
@@ -99,12 +96,10 @@ def export_settings(pin):
                 webshare.delete_file(f['ident'])
                 time.sleep(0.5)
                 
-        # Pauza, aby Webshare stačil zpracovat smazání před nahráváním nového souboru
         time.sleep(3)
         
         success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
         if success:
-            # Sleep 2 seconds to allow Webshare backend indexing to complete
             time.sleep(2)
             moved = webshare.move_to_sync('streamcontinuum_settings.enc')
             if not moved:
@@ -121,7 +116,6 @@ def export_settings(pin):
 def import_settings(pin):
     import xbmc
     try:
-        # Check credentials
         if not ADDON.getSetting('ws_username') or not ADDON.getSetting('ws_password'):
             return False, "Není vyplněno uživatelské jméno nebo heslo pro Webshare."
 
@@ -129,14 +123,12 @@ def import_settings(pin):
         ident = None
         matched_name = None
         
-        # First try to find exact name match
         for f in files:
             if f['name'] == 'streamcontinuum_settings.enc':
                 ident = f['ident']
                 matched_name = f['name']
                 break
                 
-        # Fallback to any matching name
         if not ident:
             for f in files:
                 name = f['name']
@@ -191,7 +183,6 @@ def sync_history():
     try:
         xbmc.log("StreamContinuum: Starting sync_history", xbmc.LOGINFO)
         
-        # Check credentials
         if not ADDON.getSetting('ws_username') or not ADDON.getSetting('ws_password'):
             xbmc.log("StreamContinuum: Missing Webshare credentials for history sync", xbmc.LOGERROR)
             return False
@@ -206,7 +197,6 @@ def sync_history():
                     
         files = webshare.get_sync_files()
         
-        # Find all history files
         remote_history_files = []
         for f in files:
             name = f['name']
@@ -227,22 +217,44 @@ def sync_history():
                 except Exception as read_err:
                     xbmc.log(f"StreamContinuum: Error reading remote history from {f['name']}: {read_err}", xbmc.LOGERROR)
                     
-        # Merge histories intelligently by comparing timestamps
         merged_map = {}
         for item in local_history + remote_history:
-            key = item.get('query') or item.get('title')
+            q = item.get('query', '')
+            t_title = item.get('title', '')
+            tmdb_id = item.get('tmdb_id')
+            is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(q)
+            
+            if is_tv:
+                base = history.get_base_name(t_title if (t_title and not history.has_non_latin(t_title)) else q).lower().strip()
+                if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+                    key = f"tv_tmdb_{tmdb_id}"
+                elif base:
+                    key = f"tv_base_{base}"
+                else:
+                    key = q or t_title
+            else:
+                key = q or t_title
+                
             if not key:
                 continue
+                
             if key not in merged_map:
                 merged_map[key] = item
             else:
-                existing_time = merged_map[key].get('last_played_at') or merged_map[key].get('added_at') or 0
-                item_time = item.get('last_played_at') or item.get('added_at') or 0
+                existing_time = history._safe_timestamp(merged_map[key].get('last_played_at')) or history._safe_timestamp(merged_map[key].get('added_at'))
+                item_time = history._safe_timestamp(item.get('last_played_at')) or history._safe_timestamp(item.get('added_at'))
                 if item_time >= existing_time:
+                    for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
+                        if item.get(meta_k) is None and merged_map[key].get(meta_k) is not None:
+                            item[meta_k] = merged_map[key][meta_k]
                     merged_map[key] = item
+                else:
+                    for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
+                        if merged_map[key].get(meta_k) is None and item.get(meta_k) is not None:
+                            merged_map[key][meta_k] = item[meta_k]
                 
         final_history = list(merged_map.values())
-        final_history.sort(key=lambda x: (x.get('last_played_at') or x.get('added_at') or 0), reverse=True)
+        final_history.sort(key=lambda x: (history._safe_timestamp(x.get('last_played_at')) or history._safe_timestamp(x.get('added_at')) or 0), reverse=True)
         final_history = final_history[:50]
         
         if not os.path.exists(PROFILE_DIR):
@@ -251,13 +263,11 @@ def sync_history():
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(final_history, f, ensure_ascii=False, indent=4)
             
-        # Delete all remote history files from sync folder
         for f in remote_history_files:
             xbmc.log(f"StreamContinuum: Deleting old remote history file {f['name']} ({f['ident']})", xbmc.LOGINFO)
             webshare.delete_file(f['ident'])
             time.sleep(0.5)
             
-        # Also delete all history files from public root just in case
         public_files = webshare.get_user_files()
         for f in public_files:
             name = f['name']
@@ -266,12 +276,10 @@ def sync_history():
                 webshare.delete_file(f['ident'])
                 time.sleep(0.5)
                 
-        # Pauza, aby Webshare stačil zpracovat smazání před nahráváním nové historie
         time.sleep(3)
         
         success = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
         if success:
-            # Sleep 2 seconds to allow Webshare backend indexing to complete
             time.sleep(2)
             moved = webshare.move_to_sync('streamcontinuum_history.json')
             if not moved:
