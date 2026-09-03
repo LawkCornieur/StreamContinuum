@@ -454,7 +454,7 @@ def show_watchlist():
         ]
         list_item.addContextMenuItems(cm)
         
-        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(query)}"
+        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(query)}&source=watchlist"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
 
     cat_label = f"[COLOR #01b4e4]+ {ADDON.getLocalizedString(30130)}[/COLOR]"
@@ -541,7 +541,7 @@ def show_history(force_list=False):
         
     xbmcplugin.endOfDirectory(HANDLE)
 
-def history_menu(query, title=None, show_full_history_link=False):
+def history_menu(query, title=None, show_full_history_link=False, source=None):
     if not query:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
         if HANDLE >= 0:
@@ -570,27 +570,30 @@ def history_menu(query, title=None, show_full_history_link=False):
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
 
-    if show_full_history_link or ADDON.getSettingBool('open_last_history'):
-        show_full_history_link = True
-
     items = []
-    if show_full_history_link:
-        items.append((f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]", 'history_list', 'DefaultFolder.png'))
+    if show_full_history_link and source != 'watchlist':
+        items.append({
+            'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
+            'action': 'history_list',
+            'icon': 'DefaultFolder.png',
+            'poster': poster,
+            'fanart': fanart,
+            'plot': '',
+            'is_folder': True
+        })
 
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+    season = None
+    episode = None
+    ws_base = None
     if ep_match:
         raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
         cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
         season = int(ep_match.group(2) or ep_match.group(4))
         episode = int(ep_match.group(3) or ep_match.group(5))
         ws_base = cleaned_base if cleaned_base else history.get_base_name(query)
-        search_label = f"{ADDON.getLocalizedString(30057)} (S{season:02d}E{episode:02d})"
     else:
-        search_label = ADDON.getLocalizedString(30057)
         ws_base = history.get_base_name(query) if is_tv else None
-
-    items.append((search_label, f'search&query={urllib.parse.quote_plus(query)}', 'DefaultAddonsSearch.png'))
-    items.append((ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote_plus(query)}', 'DefaultEdit.png'))
 
     if is_tv and clean_tmdb_id is None and tmdb_module:
         try:
@@ -604,72 +607,252 @@ def history_menu(query, title=None, show_full_history_link=False):
         except Exception as e:
             xbmc.log(f"StreamContinuum: Auto TMDb lookup error in history_menu: {e}", xbmc.LOGWARNING)
 
+    cached_episodes_curr = []
+    cached_episodes_next = []
+    cached_episodes_prev = []
+    seasons_meta = []
+    today = datetime.date.today()
+
+    if clean_tmdb_id and tmdb_module and ep_match:
+        try:
+            show_details = tmdb_module.get_show_seasons(clean_tmdb_id)
+            if show_details and 'seasons' in show_details:
+                seasons_meta = show_details.get('seasons', [])
+            if season is not None:
+                cached_episodes_curr = tmdb_module.get_season_episodes(clean_tmdb_id, season) or []
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: TMDb fetch error for history_menu: {e}", xbmc.LOGWARNING)
+
+    def _format_ep_info(ep_obj, default_label, prefix=""):
+        if not ep_obj:
+            help_text = "" if clean_tmdb_id else f"\n\n[COLOR #01b4e4]{ADDON.getLocalizedString(30120)}[/COLOR]"
+            return default_label, poster, plot + help_text, year, rating
+        ep_n = ep_obj.get('episode_number', 0)
+        ep_s = ep_obj.get('season_number', season)
+        ep_t = ep_obj.get('name') or ADDON.getLocalizedString(30108).format(ep_n)
+        ep_o = ep_obj.get('overview') or plot
+        ep_still = ep_obj.get('still') or poster
+        ep_r = ep_obj.get('rating') or rating
+        air_date = ep_obj.get('air_date', '')
+        date_label = ""
+        if air_date:
+            try:
+                dt = datetime.datetime.strptime(str(air_date)[:10], '%Y-%m-%d').date()
+                formatted_date = dt.strftime('%d.%m.%Y')
+                date_label = f" [COLOR red]({formatted_date})[/COLOR]" if dt > today else f" [COLOR gray]({formatted_date})[/COLOR]"
+            except Exception:
+                date_label = f" [COLOR gray]({str(air_date)[:10]})[/COLOR]"
+        full_label = f"{prefix} (S{ep_s:02d}E{ep_n:02d} - {ep_t}){date_label}" if prefix else f"S{ep_s:02d}E{ep_n:02d} - {ep_t}{date_label}"
+        return full_label, ep_still, ep_o, str(air_date)[:4] if air_date else year, ep_r
+
+    if ep_match:
+        curr_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode), None)
+        search_lbl, s_poster, s_plot, s_year, s_rating = _format_ep_info(curr_ep_obj, f"{ADDON.getLocalizedString(30057)} (S{season:02d}E{episode:02d})", ADDON.getLocalizedString(30057))
+        items.append({
+            'label': search_lbl,
+            'action': f'search&query={urllib.parse.quote_plus(query)}',
+            'icon': 'DefaultAddonsSearch.png',
+            'poster': s_poster,
+            'fanart': fanart,
+            'plot': s_plot,
+            'year': s_year,
+            'rating': s_rating,
+            'is_folder': True
+        })
+    else:
+        items.append({
+            'label': ADDON.getLocalizedString(30057),
+            'action': f'search&query={urllib.parse.quote_plus(query)}',
+            'icon': 'DefaultAddonsSearch.png',
+            'poster': poster,
+            'fanart': fanart,
+            'plot': plot if clean_tmdb_id else (plot + f"\n\n[COLOR #01b4e4]{ADDON.getLocalizedString(30120)}[/COLOR]"),
+            'year': year,
+            'rating': rating,
+            'is_folder': True
+        })
+
+    items.append({
+        'label': ADDON.getLocalizedString(30065),
+        'action': f'history_edit&query={urllib.parse.quote_plus(query)}',
+        'icon': 'DefaultEdit.png',
+        'poster': poster,
+        'fanart': fanart,
+        'plot': plot,
+        'is_folder': False
+    })
+
     if ep_match and ws_base:
         has_next_ep = True
         has_next_season = True
-
-        if clean_tmdb_id and tmdb_module:
-            try:
-                show_details = tmdb_module.get_show_seasons(clean_tmdb_id)
-                if show_details and 'seasons' in show_details:
-                    seasons = show_details.get('seasons', [])
-                    curr_s_obj = next((s for s in seasons if s.get('season_number') == season), None)
-                    if curr_s_obj:
-                        max_eps = curr_s_obj.get('episode_count', 0)
-                        if max_eps > 0 and episode + 1 > max_eps:
-                            has_next_ep = False
-                    has_next_season = any(s.get('season_number') == season + 1 for s in seasons)
-            except Exception as e:
-                xbmc.log(f"StreamContinuum: Error validating TMDb show details in history_menu: {e}", xbmc.LOGWARNING)
+        if seasons_meta:
+            curr_s_obj = next((s for s in seasons_meta if s.get('season_number') == season), None)
+            if curr_s_obj:
+                max_eps = curr_s_obj.get('episode_count', 0)
+                if max_eps > 0 and episode + 1 > max_eps:
+                    has_next_ep = False
+            has_next_season = any(s.get('season_number') == season + 1 for s in seasons_meta)
 
         if has_next_ep:
-            items.append((f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'))
+            next_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode + 1), None)
+            n_lbl, n_pos, n_plot, n_yr, n_rt = _format_ep_info(next_ep_obj, f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', ADDON.getLocalizedString(30068))
+            items.append({
+                'label': n_lbl,
+                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season:02d}E{episode+1:02d}")}',
+                'icon': 'DefaultVideoEpisodes.png',
+                'poster': n_pos,
+                'fanart': fanart,
+                'plot': n_plot,
+                'year': n_yr,
+                'rating': n_rt,
+                'is_folder': True
+            })
+
         if episode > 1:
-            items.append((f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png'))
+            prev_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode - 1), None)
+            p_lbl, p_pos, p_plot, p_yr, p_rt = _format_ep_info(prev_ep_obj, f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', ADDON.getLocalizedString(30069))
+            items.append({
+                'label': p_lbl,
+                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season:02d}E{episode-1:02d}")}',
+                'icon': 'DefaultVideoEpisodes.png',
+                'poster': p_pos,
+                'fanart': fanart,
+                'plot': p_plot,
+                'year': p_yr,
+                'rating': p_rt,
+                'is_folder': True
+            })
+
         if has_next_season:
-            items.append((f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'))
+            next_s_first_ep = None
+            if clean_tmdb_id and tmdb_module:
+                try:
+                    cached_episodes_next = tmdb_module.get_season_episodes(clean_tmdb_id, season + 1) or []
+                    next_s_first_ep = next((e for e in cached_episodes_next if e.get('episode_number') == 1), None)
+                except Exception:
+                    pass
+            ns_lbl, ns_pos, ns_plot, ns_yr, ns_rt = _format_ep_info(next_s_first_ep, f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', ADDON.getLocalizedString(30070))
+            items.append({
+                'label': ns_lbl,
+                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season+1:02d}E01")}',
+                'icon': 'DefaultVideoEpisodes.png',
+                'poster': ns_pos,
+                'fanart': fanart,
+                'plot': ns_plot,
+                'year': ns_yr,
+                'rating': ns_rt,
+                'is_folder': True
+            })
+
         if season > 1:
-            items.append((f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png'))
+            prev_s_first_ep = None
+            if clean_tmdb_id and tmdb_module:
+                try:
+                    cached_episodes_prev = tmdb_module.get_season_episodes(clean_tmdb_id, season - 1) or []
+                    prev_s_first_ep = next((e for e in cached_episodes_prev if e.get('episode_number') == 1), None)
+                except Exception:
+                    pass
+            ps_lbl, ps_pos, ps_plot, ps_yr, ps_rt = _format_ep_info(prev_s_first_ep, f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', ADDON.getLocalizedString(30071))
+            items.append({
+                'label': ps_lbl,
+                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season-1:02d}E01")}',
+                'icon': 'DefaultVideoEpisodes.png',
+                'poster': ps_pos,
+                'fanart': fanart,
+                'plot': ps_plot,
+                'year': ps_yr,
+                'rating': ps_rt,
+                'is_folder': True
+            })
 
     if is_tv:
-        items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote_plus(display_title)}&tmdb_id={clean_tmdb_id or ""}&ws_base={urllib.parse.quote_plus(ws_base or "")}', 'DefaultTVShows.png'))
+        items.append({
+            'label': ADDON.getLocalizedString(30135),
+            'action': f'tmdb_show_seasons&title={urllib.parse.quote_plus(display_title)}&tmdb_id={clean_tmdb_id or ""}&ws_base={urllib.parse.quote_plus(ws_base or "")}',
+            'icon': 'DefaultTVShows.png',
+            'poster': poster,
+            'fanart': fanart,
+            'plot': plot,
+            'is_folder': True
+        })
 
-    items.append((ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote_plus(query)}', 'DefaultAddonVideo.png'))
-    items.append((ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073), f'history_mark&query={urllib.parse.quote_plus(query)}&watched={0 if is_watched else 1}', 'DefaultAddonVideo.png'))
+    items.append({
+        'label': ADDON.getLocalizedString(30120),
+        'action': f'history_tmdb_identify_search&original_query={urllib.parse.quote_plus(query)}',
+        'icon': 'DefaultAddonVideo.png',
+        'poster': poster,
+        'fanart': fanart,
+        'plot': plot,
+        'is_folder': True
+    })
+    items.append({
+        'label': ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073),
+        'action': f'history_mark&query={urllib.parse.quote_plus(query)}&watched={0 if is_watched else 1}',
+        'icon': 'DefaultAddonVideo.png',
+        'poster': poster,
+        'fanart': fanart,
+        'plot': plot,
+        'is_folder': False
+    })
 
     if trakt_token and enable_trakt_menu:
-        items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote_plus(raw_title or query)}', 'DefaultAddonVideo.png'))
+        items.append({
+            'label': ADDON.getLocalizedString(30067),
+            'action': f'trakt_search&query={urllib.parse.quote_plus(raw_title or query)}',
+            'icon': 'DefaultAddonVideo.png',
+            'poster': poster,
+            'fanart': fanart,
+            'plot': plot,
+            'is_folder': True
+        })
 
-    items.append((ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote_plus(query)}', 'DefaultDelete.png'))
+    items.append({
+        'label': ADDON.getLocalizedString(30066),
+        'action': f'history_delete&query={urllib.parse.quote_plus(query)}',
+        'icon': 'DefaultDelete.png',
+        'poster': poster,
+        'fanart': fanart,
+        'plot': plot,
+        'is_folder': False
+    })
     
-    for label, action_params, icon in [i for i in items if i]:
-        url = f"{sys.argv[0]}?action={action_params}"
-        list_item = xbmcgui.ListItem(label=label)
-        art = {'icon': icon, 'thumb': poster or icon, 'fanart': fanart}
-        if poster:
-            art['poster'] = poster
+    for it in items:
+        lbl = it['label']
+        act = it['action']
+        icn = it['icon']
+        pos = it.get('poster') or poster
+        fan = it.get('fanart') or fanart
+        plt = it.get('plot') if it.get('plot') is not None else plot
+        yr = it.get('year') or year
+        rt = it.get('rating') or rating
+        is_fld = it.get('is_folder', True)
+        
+        url = f"{sys.argv[0]}?action={act}"
+        list_item = xbmcgui.ListItem(label=lbl)
+        art = {'icon': icn, 'thumb': pos or icn, 'fanart': fan}
+        if pos:
+            art['poster'] = pos
         list_item.setArt(art)
         
         info_tag = list_item.getVideoInfoTag()
-        info_tag.setTitle(label)
+        info_tag.setTitle(lbl)
         info_tag.setMediaType('movie' if media_type == 'movie' else 'tvshow')
-        if plot:
-            info_tag.setPlot(str(plot))
-        if year:
+        if plt:
+            info_tag.setPlot(str(plt))
+        if yr:
             try:
-                info_tag.setYear(int(str(year)[:4]))
+                info_tag.setYear(int(str(yr)[:4]))
             except (ValueError, TypeError):
                 pass
-        if rating:
+        if rt:
             try:
-                info_tag.setRating(float(rating))
+                info_tag.setRating(float(rt))
             except (ValueError, TypeError):
                 pass
         if genres:
             info_tag.setGenres(genres if isinstance(genres, list) else [genres])
             
-        is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params or 'tmdb_show_seasons' in action_params or action_params == 'history_list'
-        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_fld)
         
     xbmcplugin.endOfDirectory(HANDLE)
 
@@ -929,7 +1112,7 @@ def show_trakt_playback(offset=0):
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
-        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
+        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None))
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
@@ -1459,6 +1642,7 @@ def show_seasons(show_title, trakt_id, poster='', fanart='', ws_base=None):
             try:
                 if hasattr(info_tag, 'setEpisodeCount'):
                     info_tag.setEpisodeCount(ep_count)
+                    info_tag.setSeason(season_num)
             except Exception:
                 pass
             li.setProperty('TotalEpisodes', str(ep_count))
@@ -2116,7 +2300,7 @@ def run():
     elif action == 'history_list':
         show_history(force_list=True)
     elif action == 'history_menu':
-        history_menu(params.get('query'))
+        history_menu(params.get('query'), source=params.get('source'))
     elif action == 'history_tmdb_identify_search':
         history_tmdb_identify_search(params.get('original_query', ''), params.get('custom_query'))
     elif action == 'tmdb_menu':
