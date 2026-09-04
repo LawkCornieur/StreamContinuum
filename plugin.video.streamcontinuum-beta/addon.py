@@ -1112,7 +1112,7 @@ def show_trakt_playback(offset=0):
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
-        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
+        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None))
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
@@ -2097,13 +2097,13 @@ def run():
                 msg = (
                     f"[B]{ADDON.getLocalizedString(30160)}[/B]\n\n"
                     f"• {ADDON.getLocalizedString(30060)}: [COLOR green]{res['avg_mbps']:.2f} Mbps[/COLOR] ({res['avg_mbs']:.2f} MB/s)\n"
-                    f"• Špičková rychlost: {res['peak_mbps']:.2f} Mbps\n"
-                    f"• Odezva (Ping): {res['ping_ms']:.0f} ms\n"
-                    f"• Přeneseno: {res['total_bytes'] / (1024*1024):.1f} MB za {res['duration']:.1f} s\n\n"
-                    f"[B]Odhad přehratelné velikosti:[/B]\n"
-                    f"• Seriál (45m): do [COLOR yellow]{s_45:.1f} GB[/COLOR]\n"
-                    f"• Film (1h 30m): do [COLOR yellow]{m_90:.1f} GB[/COLOR]\n"
-                    f"• Celovečerní (2h 30m): do [COLOR yellow]{m_150:.1f} GB[/COLOR]"
+                    f"• {ADDON.getLocalizedString(30161)}: {res['peak_mbps']:.2f} Mbps\n"
+                    f"• {ADDON.getLocalizedString(30162)}: {res['ping_ms']:.0f} ms\n"
+                    f"• {ADDON.getLocalizedString(30163)}: {res['total_bytes'] / (1024*1024):.1f} MB ({res['duration']:.1f} s)\n\n"
+                    f"[B]{ADDON.getLocalizedString(30164)}:[/B]\n"
+                    f"• {ADDON.getLocalizedString(30165)}: {ADDON.getLocalizedString(30168)} [COLOR yellow]{s_45:.1f} GB[/COLOR]\n"
+                    f"• {ADDON.getLocalizedString(30166)}: {ADDON.getLocalizedString(30168)} [COLOR yellow]{m_90:.1f} GB[/COLOR]\n"
+                    f"• {ADDON.getLocalizedString(30167)}: {ADDON.getLocalizedString(30168)} [COLOR yellow]{m_150:.1f} GB[/COLOR]"
                 )
                 xbmcgui.Dialog().ok("Webshare Speedtest", msg)
             else:
