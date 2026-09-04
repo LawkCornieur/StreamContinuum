@@ -530,3 +530,35 @@ msgstr "Měření rychlosti stahování z Webshare..."
 msgctxt "#30160"
 msgid "Speed test results"
 msgstr "Výsledky testu rychlosti"
+
+msgctxt "#30161"
+msgid "Peak speed"
+msgstr "Špičková rychlost"
+
+msgctxt "#30162"
+msgid "Latency (Ping)"
+msgstr "Odezva (Ping)"
+
+msgctxt "#30163"
+msgid "Transferred"
+msgstr "Přeneseno"
+
+msgctxt "#30164"
+msgid "Playable file size estimate"
+msgstr "Odhad přehratelné velikosti"
+
+msgctxt "#30165"
+msgid "TV Show (~45m)"
+msgstr "Seriál (~45 min)"
+
+msgctxt "#30166"
+msgid "Movie (~1h 30m)"
+msgstr "Film (~1h 30m)"
+
+msgctxt "#30167"
+msgid "Feature Film (~2h 30m)"
+msgstr "Celovečerní film (~2h 30m)"
+
+msgctxt "#30168"
+msgid "up to"
+msgstr "do"
