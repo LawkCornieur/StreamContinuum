@@ -530,3 +530,35 @@ msgstr "Download-Geschwindigkeit von Webshare wird gemessen..."
 msgctxt "#30160"
 msgid "Speed test results"
 msgstr "Ergebnisse des Geschwindigkeitstests"
+
+msgctxt "#30161"
+msgid "Peak speed"
+msgstr "Spitzengeschwindigkeit"
+
+msgctxt "#30162"
+msgid "Latency (Ping)"
+msgstr "Latenz (Ping)"
+
+msgctxt "#30163"
+msgid "Transferred"
+msgstr "Übertragen"
+
+msgctxt "#30164"
+msgid "Playable file size estimate"
+msgstr "Schätzung der abspielbaren Dateigröße"
+
+msgctxt "#30165"
+msgid "TV Show (~45m)"
+msgstr "Serie (~45 min)"
+
+msgctxt "#30166"
+msgid "Movie (~1h 30m)"
+msgstr "Film (~1h 30m)"
+
+msgctxt "#30167"
+msgid "Feature Film (~2h 30m)"
+msgstr "Spielfilm (~2h 30m)"
+
+msgctxt "#30168"
+msgid "up to"
+msgstr "bis zu"
