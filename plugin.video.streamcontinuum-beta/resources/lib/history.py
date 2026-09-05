@@ -7,6 +7,11 @@ import time
 import xbmc
 import datetime
 
+try:
+    import tmdb
+except Exception:
+    tmdb = None
+
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
 HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
@@ -498,6 +503,139 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
     if updated:
         _save_history(history)
     return updated
+
+def check_and_update_next_episodes():
+    if tmdb is None:
+        return False
+    try:
+        all_items = get_history(deduplicate=False)
+        if not all_items:
+            return False
+        
+        watched_series = {}
+        for item in all_items:
+            q = item.get('query', '')
+            is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
+            if not is_tv:
+                continue
+                
+            ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', q, re.IGNORECASE)
+            if not ep_match:
+                continue
+                
+            raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
+            cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
+            season = int(ep_match.group(2) or ep_match.group(4))
+            episode = int(ep_match.group(3) or ep_match.group(5))
+            ws_base = cleaned_base if cleaned_base else get_base_name(q)
+            
+            key = str(item.get('tmdb_id')) if item.get('tmdb_id') else ws_base.lower()
+            is_watched = bool(item.get('is_watched', True))
+            
+            if key not in watched_series:
+                watched_series[key] = {
+                    'item': item,
+                    'ws_base': ws_base,
+                    'max_season': season,
+                    'max_episode': episode,
+                    'is_watched': is_watched,
+                    'tmdb_id': item.get('tmdb_id')
+                }
+            else:
+                curr = watched_series[key]
+                if (season > curr['max_season']) or (season == curr['max_season'] and episode > curr['max_episode']):
+                    curr['max_season'] = season
+                    curr['max_episode'] = episode
+                    curr['item'] = item
+                    curr['is_watched'] = is_watched
+                if item.get('tmdb_id') and not curr.get('tmdb_id'):
+                    curr['tmdb_id'] = item.get('tmdb_id')
+
+        today = datetime.date.today()
+        updated_any = False
+        
+        for key, s_info in watched_series.items():
+            if not s_info['is_watched']:
+                continue
+                
+            tmdb_id = s_info.get('tmdb_id')
+            ws_base = s_info['ws_base']
+            last_s = s_info['max_season']
+            last_e = s_info['max_episode']
+            
+            if not tmdb_id:
+                search_title = s_info['item'].get('title') or ws_base
+                try:
+                    res = tmdb.search_tmdb(search_title)
+                    for r in res:
+                        if r.get('type') == 'show' and r.get('id'):
+                            tmdb_id = r.get('id')
+                            break
+                except Exception:
+                    pass
+                    
+            if not tmdb_id:
+                continue
+                
+            try:
+                show_details = tmdb.get_show_seasons(tmdb_id)
+                if not show_details or 'seasons' not in show_details:
+                    continue
+                    
+                curr_season_eps = tmdb.get_season_episodes(tmdb_id, last_s) or []
+                next_ep_obj = next((e for e in curr_season_eps if e.get('episode_number') == last_e + 1), None)
+                target_season = last_s
+                target_episode = last_e + 1
+                
+                if not next_ep_obj:
+                    next_season_obj = next((s for s in show_details.get('seasons', []) if s.get('season_number') == last_s + 1), None)
+                    if next_season_obj:
+                        next_season_eps = tmdb.get_season_episodes(tmdb_id, last_s + 1) or []
+                        next_ep_obj = next((e for e in next_season_eps if e.get('episode_number') == 1), None)
+                        target_season = last_s + 1
+                        target_episode = 1
+                        
+                if next_ep_obj:
+                    air_date_str = next_ep_obj.get('air_date')
+                    is_aired = True
+                    if air_date_str:
+                        try:
+                            air_dt = datetime.datetime.strptime(str(air_date_str)[:10], '%Y-%m-%d').date()
+                            if air_dt > today:
+                                is_aired = False
+                        except Exception:
+                            pass
+                            
+                    if is_aired:
+                        next_query = f"{ws_base} S{target_season:02d}E{target_episode:02d}"
+                        already_in_hist = any(
+                            (it.get('query') == next_query or str(it.get('query', '')).strip().lower() == next_query.lower())
+                            for it in all_items
+                        )
+                        if not already_in_hist:
+                            ep_title = next_ep_obj.get('name') or f"Epizoda {target_episode}"
+                            full_show_title = show_details.get('title') or s_info['item'].get('title') or ws_base
+                            plot_text = next_ep_obj.get('overview') or show_details.get('overview') or ''
+                            tmdb_data = {
+                                'tmdb_id': tmdb_id,
+                                'media_type': 'tvshow',
+                                'title': full_show_title,
+                                'year': int(str(air_date_str)[:4]) if (air_date_str and len(str(air_date_str)) >= 4) else show_details.get('year'),
+                                'plot': plot_text,
+                                'poster': next_ep_obj.get('still') or show_details.get('poster'),
+                                'fanart': show_details.get('fanart'),
+                                'rating': next_ep_obj.get('rating') or show_details.get('rating')
+                            }
+                            add_to_watchlist_local(next_query, tmdb_data)
+                            all_items = get_history(deduplicate=False)
+                            updated_any = True
+            except Exception as check_e:
+                xbmc.log(f"StreamContinuum History: Error checking next episode for {ws_base}: {check_e}", xbmc.LOGWARNING)
+                
+        return updated_any
+    except Exception as e:
+        xbmc.log(f"StreamContinuum History: check_and_update_next_episodes failed: {e}", xbmc.LOGERROR)
+        return False
 
 def clear_history():
     if os.path.exists(HISTORY_FILE):
