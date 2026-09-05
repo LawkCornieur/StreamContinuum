@@ -574,12 +574,12 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     if show_full_history_link and source != 'watchlist':
         items.append({
             'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
-            'action': 'history_list',
+            'action': 'history_list_replace',
             'icon': 'DefaultFolder.png',
             'poster': poster,
             'fanart': fanart,
             'plot': '',
-            'is_folder': True
+            'is_folder': False
         })
 
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
@@ -719,7 +719,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'fanart': fanart,
                 'plot': p_plot,
                 'year': p_yr,
-                'rating': p_rt,
+                'rating': n_rt,
                 'is_folder': True
             })
 
@@ -1798,7 +1798,7 @@ def show_trakt_discover(list_type, media_type, offset=0):
     page_items = items[offset:offset + PAGE_SIZE]
     item_type_single = 'movie' if media_type == 'movies' else 'show'
     kodi_content = 'movies' if media_type == 'movies' else 'tvshows'
-    kodi_media_type = 'movie' if media_type == 'movies' else 'tvshow'
+    kodi_media_type = 'movie' if media_type == 'movie' else 'tvshow'
 
     for item in page_items:
         trakt_id = item.get('ids', {}).get('trakt')
@@ -2307,6 +2307,13 @@ def run():
         show_history()
     elif action == 'history_list':
         show_history(force_list=True)
+    elif action == 'history_list_replace':
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_list,replace)')
     elif action == 'history_menu':
         history_menu(params.get('query'), source=params.get('source'))
     elif action == 'history_tmdb_identify_search':
