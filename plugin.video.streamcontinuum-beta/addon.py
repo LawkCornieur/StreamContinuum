@@ -476,7 +476,13 @@ def show_history(force_list=False):
         return
 
     if not force_list and ADDON.getSettingBool('open_last_history'):
-        history_menu(items[0].get('query', ''), show_full_history_link=True)
+        q = urllib.parse.quote_plus(items[0].get('query', ''))
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={q}&from_open_last=1,replace)')
         return
 
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
@@ -2315,7 +2321,11 @@ def run():
                 pass
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_list,replace)')
     elif action == 'history_menu':
-        history_menu(params.get('query'), source=params.get('source'))
+        history_menu(
+            params.get('query'),
+            show_full_history_link=(params.get('from_open_last') == '1' or params.get('show_full') == '1'),
+            source=params.get('source')
+        )
     elif action == 'history_tmdb_identify_search':
         history_tmdb_identify_search(params.get('original_query', ''), params.get('custom_query'))
     elif action == 'tmdb_menu':
