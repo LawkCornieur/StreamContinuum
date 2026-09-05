@@ -403,6 +403,11 @@ def play(ident, query=None, title=None, is_autoplay=False):
 
 def show_watchlist():
     import history
+    try:
+        history.check_and_update_next_episodes()
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Watchlist auto-sync next episodes error: {e}", xbmc.LOGWARNING)
+
     all_items = history.get_history(deduplicate=True)
     items = [item for item in all_items if not item.get('is_watched', True)]
     
@@ -585,7 +590,8 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             'poster': poster,
             'fanart': fanart,
             'plot': '',
-            'is_folder': False
+            'is_folder': False,
+            'run_plugin': True
         })
 
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
@@ -725,7 +731,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'fanart': fanart,
                 'plot': p_plot,
                 'year': p_yr,
-                'rating': n_rt,
+                'rating': p_rt,
                 'is_folder': True
             })
 
@@ -833,7 +839,10 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         rt = it.get('rating') or rating
         is_fld = it.get('is_folder', True)
         
-        url = f"{sys.argv[0]}?action={act}"
+        if it.get('run_plugin'):
+            url = f"RunPlugin({sys.argv[0]}?action={act})"
+        else:
+            url = f"{sys.argv[0]}?action={act}"
         list_item = xbmcgui.ListItem(label=lbl)
         art = {'icon': icn, 'thumb': pos or icn, 'fanart': fan}
         if pos:
@@ -1118,7 +1127,7 @@ def show_trakt_playback(offset=0):
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
-        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
+        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None))
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
