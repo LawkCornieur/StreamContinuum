@@ -585,13 +585,13 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     if show_full_history_link and source != 'watchlist':
         items.append({
             'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
-            'action': 'history_list_replace',
+            'action': 'history_list',
             'icon': 'DefaultFolder.png',
             'poster': poster,
             'fanart': fanart,
             'plot': '',
             'is_folder': False,
-            'run_plugin': True
+            'container_update_replace': True
         })
 
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
@@ -841,6 +841,8 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         
         if it.get('run_plugin'):
             url = f"RunPlugin({sys.argv[0]}?action={act})"
+        elif it.get('container_update_replace'):
+            url = f"Container.Update({sys.argv[0]}?action={act},replace)"
         else:
             url = f"{sys.argv[0]}?action={act}"
         list_item = xbmcgui.ListItem(label=lbl)
@@ -1127,7 +1129,7 @@ def show_trakt_playback(offset=0):
         url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
-        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None))
+        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
