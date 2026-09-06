@@ -289,40 +289,28 @@ def move_to_sync(filename):
     if not token:
         return False
         
+    create_folder('StreamContinuum_Sync')
+    time.sleep(0.5)
+
     url = BASE_URL + 'move_file/'
-    data = {
-        'wst': token,
-        'src': f'/{filename}',
-        'dest': '/StreamContinuum_Sync/',
-        'src_private': 1,
-        'dest_private': 1
-    }
-    try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-        if response.status_code == 200:
-            try:
-                root = ElementTree.fromstring(response.content)
-                status = root.find('status')
-                if status is not None and status.text == 'OK':
+    candidates = [
+        {'wst': token, 'src': f'/{filename}', 'dest': '/StreamContinuum_Sync/', 'src_private': 1, 'dest_private': 1},
+        {'wst': token, 'src': filename, 'dest': '/StreamContinuum_Sync/', 'src_private': 1, 'dest_private': 1},
+        {'wst': token, 'name': filename, 'dest': '/StreamContinuum_Sync/', 'private': 1}
+    ]
+    for data in candidates:
+        try:
+            response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            if response.status_code == 200:
+                if 'OK' in response.text or 'ident' in response.text:
                     xbmc.log(f"Webshare: move_to_sync '{filename}' OK", xbmc.LOGINFO)
                     return True
-            except Exception:
-                try:
-                    js = response.json()
-                    if js.get('status') == 'OK' or js.get('result') == 'OK':
-                        return True
-                except Exception:
-                    pass
-                    
-        xbmc.log(f"Webshare: move_to_sync '{filename}' first attempt failed. Ensuring /StreamContinuum_Sync/ folder exists and retrying...", xbmc.LOGINFO)
-        create_folder('StreamContinuum_Sync')
-        time.sleep(1)
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-        if response.status_code == 200 and ('OK' in response.text or 'ident' in response.text):
-            xbmc.log(f"Webshare: move_to_sync '{filename}' retry OK", xbmc.LOGINFO)
-            return True
-    except Exception as e:
-        xbmc.log(f"Webshare move_to_sync error: {e}", xbmc.LOGERROR)
+        except Exception as e:
+            xbmc.log(f"Webshare move_to_sync attempt error: {e}", xbmc.LOGWARNING)
+
+    sync_files = get_sync_files()
+    if any(f.get('name') == filename for f in sync_files):
+        return True
     return False
 
 def run_speedtest(dialog=None):
