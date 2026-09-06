@@ -96,14 +96,12 @@ def export_settings(pin):
                 webshare.delete_file(f['ident'])
                 time.sleep(0.5)
                 
-        time.sleep(3)
+        time.sleep(1.5)
         
         success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
         if success:
-            time.sleep(2)
-            moved = webshare.move_to_sync('streamcontinuum_settings.enc')
-            if not moved:
-                return False, "Chyba při přesunu nastavení do složky StreamContinuum_Sync."
+            time.sleep(1)
+            webshare.move_to_sync('streamcontinuum_settings.enc')
         else:
             return False, "Nahrávání nastavení na Webshare selhalo. Zkontrolujte přihlášení."
             
@@ -131,6 +129,15 @@ def import_settings(pin):
                 
         if not ident:
             for f in files:
+                name = f['name']
+                if name.startswith('streamcontinuum_settings') and name.endswith('.enc'):
+                    ident = f['ident']
+                    matched_name = name
+                    break
+                    
+        if not ident:
+            public_files = webshare.get_user_files()
+            for f in public_files:
                 name = f['name']
                 if name.startswith('streamcontinuum_settings') and name.endswith('.enc'):
                     ident = f['ident']
@@ -196,11 +203,16 @@ def sync_history():
                     xbmc.log(f"StreamContinuum: Error loading local history: {e}", xbmc.LOGWARNING)
                     
         files = webshare.get_sync_files()
-        
         remote_history_files = []
         for f in files:
             name = f['name']
             if name.startswith('streamcontinuum_history') and name.endswith('.json'):
+                remote_history_files.append(f)
+                
+        public_files = webshare.get_user_files()
+        for f in public_files:
+            name = f['name']
+            if name.startswith('streamcontinuum_history') and name.endswith('.json') and f['ident'] not in [rf['ident'] for rf in remote_history_files]:
                 remote_history_files.append(f)
                 
         remote_history = []
@@ -268,23 +280,12 @@ def sync_history():
             webshare.delete_file(f['ident'])
             time.sleep(0.5)
             
-        public_files = webshare.get_user_files()
-        for f in public_files:
-            name = f['name']
-            if name.startswith('streamcontinuum_history') and name.endswith('.json'):
-                xbmc.log(f"StreamContinuum: Deleting old remote history in root {name} ({f['ident']})", xbmc.LOGINFO)
-                webshare.delete_file(f['ident'])
-                time.sleep(0.5)
-                
-        time.sleep(3)
+        time.sleep(1.5)
         
         success = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
         if success:
-            time.sleep(2)
-            moved = webshare.move_to_sync('streamcontinuum_history.json')
-            if not moved:
-                xbmc.log("StreamContinuum: Failed to move history file to StreamContinuum_Sync", xbmc.LOGERROR)
-                return False
+            time.sleep(1)
+            webshare.move_to_sync('streamcontinuum_history.json')
         else:
             xbmc.log("StreamContinuum: Failed to upload history file to Webshare", xbmc.LOGERROR)
             return False
