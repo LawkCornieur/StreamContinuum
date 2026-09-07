@@ -127,12 +127,17 @@ def list_categories():
 
     for label, action, icon, fanart, color in items:
         try:
-            url = f"{sys.argv[0]}?action={action}"
             display_label = f"[COLOR {color}]{label}[/COLOR]" if color else label
             list_item = xbmcgui.ListItem(label=display_label)
             list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
             
-            is_folder = False if action == 'settings' else True
+            if action == 'settings':
+                url = f"RunPlugin({sys.argv[0]}?action=settings)"
+                is_folder = False
+            else:
+                url = f"{sys.argv[0]}?action={action}"
+                is_folder = True
+                
             success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
             if success:
                 item_count += 1
@@ -2356,6 +2361,12 @@ def run():
     elif action == 'settings':
         ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
         ADDON.openSettings()
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            except Exception:
+                pass
+        return
     elif action == 'search':
         search(params.get('query'))
     elif action == 'search_prefill':
