@@ -132,7 +132,8 @@ def list_categories():
             list_item = xbmcgui.ListItem(label=display_label)
             list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
             
-            success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+            is_folder = False if action == 'settings' else True
+            success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
             if success:
                 item_count += 1
             else:
@@ -1535,12 +1536,15 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         li = xbmcgui.ListItem(label=label)
         art = {}
         if still:
-            art['poster'] = still
             art['thumb'] = still
             art['icon'] = still
         else:
             art['icon'] = 'DefaultTVShows.png'
             art['thumb'] = 'DefaultTVShows.png'
+        if poster:
+            art['poster'] = poster
+            art['season.poster'] = poster
+            art['tvshow.poster'] = poster
         art['fanart'] = fanart if fanart else get_asset('fa.png')
         li.setArt(art)
 
@@ -1755,9 +1759,19 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
         art = {}
         if poster:
             art['poster'] = poster
+            art['season.poster'] = poster
+            art['tvshow.poster'] = poster
+        art['fanart'] = fanart if fanart else get_asset('fa.png')
+        ep_still = episode_meta.get('still') or episode_meta.get('thumb') or episode_meta.get('screenshot')
+        if ep_still:
+            art['thumb'] = ep_still
+            art['icon'] = ep_still
+        elif poster:
             art['thumb'] = poster
             art['icon'] = poster
-        art['fanart'] = fanart if fanart else get_asset('fa.png')
+        else:
+            art['icon'] = 'DefaultTVShows.png'
+            art['thumb'] = 'DefaultTVShows.png'
         li.setArt(art)
 
         info_tag = li.getVideoInfoTag()
@@ -2340,11 +2354,6 @@ def run():
     elif action == 'trakt_search_menu':
         trakt_search()
     elif action == 'settings':
-        if HANDLE >= 0:
-            try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            except Exception:
-                pass
         ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
         ADDON.openSettings()
     elif action == 'search':
