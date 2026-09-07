@@ -292,12 +292,33 @@ def move_to_sync(filename):
     create_folder('StreamContinuum_Sync')
     time.sleep(0.5)
 
+    sync_files = get_sync_files()
+    if any(f.get('name') == filename for f in sync_files):
+        return True
+
+    file_ident = None
+    user_files = get_user_files()
+    for f in user_files:
+        if f.get('name') == filename:
+            file_ident = f.get('ident')
+            break
+
     url = BASE_URL + 'move_file/'
-    candidates = [
+    candidates = []
+    if file_ident:
+        candidates.extend([
+            {'wst': token, 'ident': file_ident, 'dest': '/StreamContinuum_Sync/', 'private': 1},
+            {'wst': token, 'ident': file_ident, 'target_dir': '/StreamContinuum_Sync/', 'private': 1},
+            {'wst': token, 'ident': file_ident, 'path': '/StreamContinuum_Sync/', 'private': 1},
+            {'wst': token, 'ident': file_ident, 'folder': '/StreamContinuum_Sync/', 'private': 1},
+            {'wst': token, 'src': file_ident, 'dest': '/StreamContinuum_Sync/', 'src_private': 1, 'dest_private': 1},
+        ])
+    candidates.extend([
         {'wst': token, 'src': f'/{filename}', 'dest': '/StreamContinuum_Sync/', 'src_private': 1, 'dest_private': 1},
-        {'wst': token, 'src': filename, 'dest': '/StreamContinuum_Sync/', 'src_private': 1, 'dest_private': 1},
+        {'wst': token, 'src': filename, 'dest': '/StreamContinuum_Sync/', 'private': 1},
         {'wst': token, 'name': filename, 'dest': '/StreamContinuum_Sync/', 'private': 1}
-    ]
+    ])
+
     for data in candidates:
         try:
             response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
