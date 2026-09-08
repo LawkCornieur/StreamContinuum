@@ -622,7 +622,7 @@ def check_and_update_next_episodes():
                                 'title': full_show_title,
                                 'year': int(str(air_date_str)[:4]) if (air_date_str and len(str(air_date_str)) >= 4) else show_details.get('year'),
                                 'plot': plot_text,
-                                'poster': next_ep_obj.get('still') or show_details.get('poster'),
+                                'poster': show_details.get('poster') or s_info['item'].get('poster'),
                                 'fanart': show_details.get('fanart'),
                                 'rating': next_ep_obj.get('rating') or show_details.get('rating')
                             }
