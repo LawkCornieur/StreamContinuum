@@ -614,6 +614,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     plot = (hist_item.get('plot') if hist_item else '') or ''
     genres = hist_item.get('genres', []) if hist_item else []
     rating = hist_item.get('rating') if hist_item else None
+    runtime = hist_item.get('runtime') if hist_item else None
     poster = hist_item.get('poster') if hist_item and hist_item.get('poster') else None
     fanart = hist_item.get('fanart') if hist_item and hist_item.get('fanart') else get_asset('fa-history.png')
     is_watched = bool(hist_item.get('is_watched', True)) if hist_item else True
@@ -677,6 +678,8 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             show_details = tmdb_module.get_show_seasons(clean_tmdb_id)
             if show_details and 'seasons' in show_details:
                 seasons_meta = show_details.get('seasons', [])
+                if not runtime and show_details.get('runtime'):
+                    runtime = show_details.get('runtime')
             if season is not None:
                 cached_episodes_curr = tmdb_module.get_season_episodes(clean_tmdb_id, season) or []
         except Exception as e:
@@ -685,13 +688,14 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     def _format_ep_info(ep_obj, default_label, prefix=""):
         if not ep_obj:
             help_text = "" if clean_tmdb_id else f"\n\n[COLOR #01b4e4]{ADDON.getLocalizedString(30120)}[/COLOR]"
-            return default_label, None, plot + help_text, year, rating
+            return default_label, None, plot + help_text, year, rating, runtime
         ep_n = ep_obj.get('episode_number', 0)
         ep_s = ep_obj.get('season_number', season)
         ep_t = ep_obj.get('name') or ADDON.getLocalizedString(30108).format(ep_n)
         ep_o = ep_obj.get('overview') or plot
         ep_still = ep_obj.get('still') or None
         ep_r = ep_obj.get('rating') or rating
+        ep_rt = ep_obj.get('runtime') or runtime
         air_date = ep_obj.get('air_date', '')
         date_label = ""
         if air_date:
@@ -702,11 +706,11 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             except Exception:
                 date_label = f" [COLOR gray]({str(air_date)[:10]})[/COLOR]"
         full_label = f"{prefix} (S{ep_s:02d}E{ep_n:02d} - {ep_t}){date_label}" if prefix else f"S{ep_s:02d}E{ep_n:02d} - {ep_t}{date_label}"
-        return full_label, ep_still, ep_o, str(air_date)[:4] if air_date else year, ep_r
+        return full_label, ep_still, ep_o, str(air_date)[:4] if air_date else year, ep_r, ep_rt
 
     if ep_match:
         curr_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode), None)
-        search_lbl, s_still, s_plot, s_year, s_rating = _format_ep_info(curr_ep_obj, f"{ADDON.getLocalizedString(30057)} (S{season:02d}E{episode:02d})", ADDON.getLocalizedString(30057))
+        search_lbl, s_still, s_plot, s_year, s_rating, s_runtime = _format_ep_info(curr_ep_obj, f"{ADDON.getLocalizedString(30057)} (S{season:02d}E{episode:02d})", ADDON.getLocalizedString(30057))
         items.append({
             'label': search_lbl,
             'action': f'search&query={urllib.parse.quote_plus(query)}',
@@ -717,6 +721,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             'plot': s_plot,
             'year': s_year,
             'rating': s_rating,
+            'runtime': s_runtime,
             'is_folder': True
         })
     else:
@@ -730,6 +735,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             'plot': plot if clean_tmdb_id else (plot + f"\n\n[COLOR #01b4e4]{ADDON.getLocalizedString(30120)}[/COLOR]"),
             'year': year,
             'rating': rating,
+            'runtime': runtime,
             'is_folder': True
         })
 
@@ -757,7 +763,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
 
         if has_next_ep:
             next_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode + 1), None)
-            n_lbl, n_still, n_plot, n_yr, n_rt = _format_ep_info(next_ep_obj, f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', ADDON.getLocalizedString(30068))
+            n_lbl, n_still, n_plot, n_yr, n_rt, n_dur = _format_ep_info(next_ep_obj, f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', ADDON.getLocalizedString(30068))
             items.append({
                 'label': n_lbl,
                 'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season:02d}E{episode+1:02d}")}',
@@ -768,12 +774,13 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'plot': n_plot,
                 'year': n_yr,
                 'rating': n_rt,
+                'runtime': n_dur,
                 'is_folder': True
             })
 
         if episode > 1:
             prev_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode - 1), None)
-            p_lbl, p_still, p_plot, p_yr, p_rt = _format_ep_info(prev_ep_obj, f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', ADDON.getLocalizedString(30069))
+            p_lbl, p_still, p_plot, p_yr, p_rt, p_dur = _format_ep_info(prev_ep_obj, f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', ADDON.getLocalizedString(30069))
             items.append({
                 'label': p_lbl,
                 'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season:02d}E{episode-1:02d}")}',
@@ -784,6 +791,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'plot': p_plot,
                 'year': p_yr,
                 'rating': p_rt,
+                'runtime': p_dur,
                 'is_folder': True
             })
 
@@ -795,7 +803,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                     next_s_first_ep = next((e for e in cached_episodes_next if e.get('episode_number') == 1), None)
                 except Exception:
                     pass
-            ns_lbl, ns_still, ns_plot, ns_yr, ns_rt = _format_ep_info(next_s_first_ep, f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', ADDON.getLocalizedString(30070))
+            ns_lbl, ns_still, ns_plot, ns_yr, ns_rt, ns_dur = _format_ep_info(next_s_first_ep, f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', ADDON.getLocalizedString(30070))
             items.append({
                 'label': ns_lbl,
                 'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season+1:02d}E01")}',
@@ -806,6 +814,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'plot': ns_plot,
                 'year': ns_yr,
                 'rating': ns_rt,
+                'runtime': ns_dur,
                 'is_folder': True
             })
 
@@ -817,7 +826,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                     prev_s_first_ep = next((e for e in cached_episodes_prev if e.get('episode_number') == 1), None)
                 except Exception:
                     pass
-            ps_lbl, ps_still, ps_plot, ps_yr, ps_rt = _format_ep_info(prev_s_first_ep, f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', ADDON.getLocalizedString(30071))
+            ps_lbl, ps_still, ps_plot, ps_yr, ps_rt, ps_dur = _format_ep_info(prev_s_first_ep, f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', ADDON.getLocalizedString(30071))
             items.append({
                 'label': ps_lbl,
                 'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season-1:02d}E01")}',
@@ -828,6 +837,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'plot': ps_plot,
                 'year': ps_yr,
                 'rating': ps_rt,
+                'runtime': ps_dur,
                 'is_folder': True
             })
 
@@ -896,6 +906,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         plt = it.get('plot') if it.get('plot') is not None else plot
         yr = it.get('year') or year
         rt = it.get('rating') or rating
+        dur = it.get('runtime') or runtime
         is_fld = it.get('is_folder', True)
         thm = it.get('thumb') or pos or icn
         
@@ -924,6 +935,11 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         if rt:
             try:
                 info_tag.setRating(float(rt))
+            except (ValueError, TypeError):
+                pass
+        if dur:
+            try:
+                info_tag.setDuration(int(dur) * 60)
             except (ValueError, TypeError):
                 pass
         if genres:
@@ -1425,6 +1441,7 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None, ws_base=None):
             poster = seasons_data.get('poster') or ''
             fanart = seasons_data.get('fanart') or ''
             seasons = seasons_data.get('seasons', [])
+            show_runtime = seasons_data.get('runtime', 0)
             
             for season in seasons:
                 season_num = season.get('season_number', 0)
@@ -1453,6 +1470,11 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None, ws_base=None):
                 if rating:
                     try:
                         info_tag.setRating(float(rating))
+                    except (ValueError, TypeError):
+                        pass
+                if show_runtime:
+                    try:
+                        info_tag.setDuration(int(show_runtime) * 60)
                     except (ValueError, TypeError):
                         pass
                 if ep_count:
@@ -2073,6 +2095,10 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
                     meta['poster'] = show_data.get('poster')
                 if not meta.get('fanart'):
                     meta['fanart'] = show_data.get('fanart')
+                if not meta.get('runtime') and show_data.get('runtime'):
+                    meta['runtime'] = show_data.get('runtime')
+                if not meta.get('genres') and show_data.get('genres'):
+                    meta['genres'] = show_data.get('genres')
 
     raw_title = meta.get('title')
     title = history.sanitize_title(raw_title)
@@ -2274,6 +2300,8 @@ def run():
                         tmdb_data['plot'] = show_details.get('overview')
                         tmdb_data['poster'] = show_details.get('poster')
                         tmdb_data['fanart'] = show_details.get('fanart')
+                        tmdb_data['runtime'] = show_details.get('runtime')
+                        tmdb_data['genres'] = show_details.get('genres', [])
             history.add_to_watchlist_local(target_query, tmdb_data)
             
         if ADDON.getSetting('trakt_token'):
