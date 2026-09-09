@@ -409,14 +409,33 @@ def set_watched_status(query, is_watched):
     history = get_history(deduplicate=False)
     norm_q = str(query).strip().lower()
     q_base = get_base_name(query).strip().lower()
+    q_is_tv = is_series(query)
+    
+    target_tmdb_id = None
+    for it in history:
+        it_q = str(it.get('query', '')).strip().lower()
+        if it_q == norm_q:
+            target_tmdb_id = it.get('tmdb_id')
+            break
+            
     updated = False
     for item in history:
         item_query = str(item.get('query', '')).strip().lower()
         item_base = get_base_name(item.get('query', '')).strip().lower()
-        if item_query == norm_q or (q_base and item_base == q_base):
+        item_is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(item.get('query', ''))
+        item_tmdb_id = item.get('tmdb_id')
+        
+        matches = (item_query == norm_q)
+        if not matches and (q_is_tv or item_is_tv):
+            if target_tmdb_id and item_tmdb_id and target_tmdb_id == item_tmdb_id:
+                matches = True
+            elif q_base and item_base and q_base == item_base:
+                matches = True
+                
+        if matches:
             item['is_watched'] = bool(is_watched)
             updated = True
-            break
+            
     if updated:
         _save_history(history)
     return updated
@@ -616,6 +635,7 @@ def check_and_update_next_episodes():
                             ep_title = next_ep_obj.get('name') or f"Epizoda {target_episode}"
                             full_show_title = show_details.get('title') or s_info['item'].get('title') or ws_base
                             plot_text = next_ep_obj.get('overview') or show_details.get('overview') or ''
+                            ep_runtime = next_ep_obj.get('runtime') or show_details.get('runtime') or s_info['item'].get('runtime')
                             tmdb_data = {
                                 'tmdb_id': tmdb_id,
                                 'media_type': 'tvshow',
@@ -624,7 +644,9 @@ def check_and_update_next_episodes():
                                 'plot': plot_text,
                                 'poster': show_details.get('poster') or s_info['item'].get('poster'),
                                 'fanart': show_details.get('fanart'),
-                                'rating': next_ep_obj.get('rating') or show_details.get('rating')
+                                'rating': next_ep_obj.get('rating') or show_details.get('rating'),
+                                'runtime': ep_runtime,
+                                'genres': show_details.get('genres', [])
                             }
                             add_to_watchlist_local(next_query, tmdb_data)
                             all_items = get_history(deduplicate=False)
