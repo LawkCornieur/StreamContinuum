@@ -354,6 +354,12 @@ def get_show_seasons(tmdb_id):
             poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
             fanart = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
             
+            ep_runtimes = data.get('episode_run_time', [])
+            runtime = ep_runtimes[0] if (ep_runtimes and isinstance(ep_runtimes, list)) else 0
+            genres = [g.get('name') for g in data.get('genres', []) if g.get('name')]
+            rating = data.get('vote_average', 0)
+            year = _extract_year(data, 'first_air_date')
+            
             raw_seasons = data.get('seasons', [])
             seasons = []
             for s in raw_seasons:
@@ -370,7 +376,11 @@ def get_show_seasons(tmdb_id):
             return {
                 'id': data.get('id'),
                 'title': title,
+                'year': year,
                 'overview': overview,
+                'runtime': runtime,
+                'genres': genres,
+                'rating': rating,
                 'poster': poster,
                 'fanart': fanart,
                 'seasons': seasons
