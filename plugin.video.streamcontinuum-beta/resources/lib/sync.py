@@ -248,17 +248,19 @@ def sync_history():
             t_title = item.get('title', '')
             tmdb_id = item.get('tmdb_id')
             is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(q)
+            is_watched_flag = bool(item.get('is_watched', True))
+            status_suffix = "_w" if is_watched_flag else "_uw"
             
             if is_tv:
                 base = history.get_base_name(t_title if (t_title and not history.has_non_latin(t_title)) else q).lower().strip()
                 if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                    key = f"tv_tmdb_{tmdb_id}"
+                    key = f"tv_tmdb_{tmdb_id}{status_suffix}"
                 elif base:
-                    key = f"tv_base_{base}"
+                    key = f"tv_base_{base}{status_suffix}"
                 else:
-                    key = q or t_title
+                    key = f"{q or t_title}{status_suffix}"
             else:
-                key = q or t_title
+                key = f"{q or t_title}{status_suffix}"
                 
             if not key:
                 continue
@@ -280,7 +282,7 @@ def sync_history():
                 
         final_history = list(merged_map.values())
         final_history.sort(key=lambda x: (history._safe_timestamp(x.get('last_played_at')) or history._safe_timestamp(x.get('added_at')) or 0), reverse=True)
-        final_history = final_history[:50]
+        final_history = final_history[:60]
         
         if not os.path.exists(PROFILE_DIR):
             os.makedirs(PROFILE_DIR)
