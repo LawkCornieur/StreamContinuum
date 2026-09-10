@@ -101,122 +101,129 @@ def get_history(deduplicate=True):
             if not deduplicate:
                 return items
 
-            series_map = {}
-            movie_map = {}
-            for item in items:
-                q = item.get('query', '')
-                tmdb_id = item.get('tmdb_id')
-                t_title = item.get('title', '')
-                t_base = get_base_name(t_title).lower().strip() if (t_title and not has_non_latin(t_title)) else ''
-                q_base = get_base_name(q).lower().strip()
-                is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
+            def _dedup_list(sub_items):
+                series_map = {}
+                movie_map = {}
+                for item in sub_items:
+                    q = item.get('query', '')
+                    tmdb_id = item.get('tmdb_id')
+                    t_title = item.get('title', '')
+                    t_base = get_base_name(t_title).lower().strip() if (t_title and not has_non_latin(t_title)) else ''
+                    q_base = get_base_name(q).lower().strip()
+                    is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
 
-                if is_tv:
-                    if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                        key = f"tmdb_{tmdb_id}"
-                        if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
-                            series_map[key] = item
-                    if t_base:
-                        key = f"title_{t_base}"
-                        if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
-                            series_map[key] = item
-                    if q_base:
-                        key = f"query_{q_base}"
-                        if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
-                            series_map[key] = item
-                else:
-                    if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                        key = f"movie_tmdb_{tmdb_id}"
-                        if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
-                            movie_map[key] = item
-                    if t_base:
-                        key = f"movie_title_{t_base}"
-                        if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
-                            movie_map[key] = item
-                    if q_base:
-                        key = f"movie_query_{q_base}"
-                        if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
-                            movie_map[key] = item
+                    if is_tv:
+                        if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+                            key = f"tmdb_{tmdb_id}"
+                            if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
+                                series_map[key] = item
+                        if t_base:
+                            key = f"title_{t_base}"
+                            if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
+                                series_map[key] = item
+                        if q_base:
+                            key = f"query_{q_base}"
+                            if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
+                                series_map[key] = item
+                    else:
+                        if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+                            key = f"movie_tmdb_{tmdb_id}"
+                            if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
+                                movie_map[key] = item
+                        if t_base:
+                            key = f"movie_title_{t_base}"
+                            if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
+                                movie_map[key] = item
+                        if q_base:
+                            key = f"movie_query_{q_base}"
+                            if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
+                                movie_map[key] = item
 
-            seen_keys = set()
-            unique_items = []
-            for item in items:
-                q = item.get('query', '')
-                tmdb_id = item.get('tmdb_id')
-                title = item.get('title')
-                is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
-                
-                q_base = get_base_name(q).lower().strip()
-                t_base = get_base_name(title).lower().strip() if (title and not has_non_latin(title)) else ''
+                seen_keys = set()
+                unique_items = []
+                for item in sub_items:
+                    q = item.get('query', '')
+                    tmdb_id = item.get('tmdb_id')
+                    title = item.get('title')
+                    is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
+                    
+                    q_base = get_base_name(q).lower().strip()
+                    t_base = get_base_name(title).lower().strip() if (title and not has_non_latin(title)) else ''
 
-                if is_tv:
-                    matched_source = None
-                    if tmdb_id and f"tmdb_{tmdb_id}" in series_map:
-                        matched_source = series_map[f"tmdb_{tmdb_id}"]
-                    elif t_base and f"title_{t_base}" in series_map:
-                        matched_source = series_map[f"title_{t_base}"]
-                    elif q_base and f"query_{q_base}" in series_map:
-                        matched_source = series_map[f"query_{q_base}"]
+                    if is_tv:
+                        matched_source = None
+                        if tmdb_id and f"tmdb_{tmdb_id}" in series_map:
+                            matched_source = series_map[f"tmdb_{tmdb_id}"]
+                        elif t_base and f"title_{t_base}" in series_map:
+                            matched_source = series_map[f"title_{t_base}"]
+                        elif q_base and f"query_{q_base}" in series_map:
+                            matched_source = series_map[f"query_{q_base}"]
 
-                    if matched_source and matched_source is not item:
-                        for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
-                            if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
-                                item[meta_k] = matched_source[meta_k]
-                        tmdb_id = item.get('tmdb_id')
-                        title = item.get('title')
-                        if title:
-                            t_base = get_base_name(title).lower().strip() if not has_non_latin(title) else t_base
+                        if matched_source and matched_source is not item:
+                            for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
+                                if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
+                                    item[meta_k] = matched_source[meta_k]
+                            tmdb_id = item.get('tmdb_id')
+                            title = item.get('title')
+                            if title:
+                                t_base = get_base_name(title).lower().strip() if not has_non_latin(title) else t_base
 
-                    keys = []
-                    if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                        keys.append(f"tmdb_{tmdb_id}")
-                    if title and not has_non_latin(title):
-                        tb = get_base_name(title).lower().strip()
-                        if tb:
-                            keys.append(f"title_{tb}")
-                    if q_base:
-                        keys.append(f"query_{q_base}")
+                        keys = []
+                        if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+                            keys.append(f"tmdb_{tmdb_id}")
+                        if title and not has_non_latin(title):
+                            tb = get_base_name(title).lower().strip()
+                            if tb:
+                                keys.append(f"title_{tb}")
+                        if q_base:
+                            keys.append(f"query_{q_base}")
 
-                    if keys and any(k in seen_keys for k in keys):
-                        continue
-                    for k in keys:
-                        seen_keys.add(k)
-                else:
-                    matched_source = None
-                    if tmdb_id and f"movie_tmdb_{tmdb_id}" in movie_map:
-                        matched_source = movie_map[f"movie_tmdb_{tmdb_id}"]
-                    elif t_base and f"movie_title_{t_base}" in movie_map:
-                        matched_source = movie_map[f"movie_title_{t_base}"]
-                    elif q_base and f"movie_query_{q_base}" in movie_map:
-                        matched_source = movie_map[f"movie_query_{q_base}"]
+                        if keys and any(k in seen_keys for k in keys):
+                            continue
+                        for k in keys:
+                            seen_keys.add(k)
+                    else:
+                        matched_source = None
+                        if tmdb_id and f"movie_tmdb_{tmdb_id}" in movie_map:
+                            matched_source = movie_map[f"movie_tmdb_{tmdb_id}"]
+                        elif t_base and f"movie_title_{t_base}" in movie_map:
+                            matched_source = movie_map[f"movie_title_{t_base}"]
+                        elif q_base and f"movie_query_{q_base}" in movie_map:
+                            matched_source = movie_map[f"movie_query_{q_base}"]
 
-                    if matched_source and matched_source is not item:
-                        for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
-                            if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
-                                item[meta_k] = matched_source[meta_k]
-                        tmdb_id = item.get('tmdb_id')
-                        title = item.get('title')
+                        if matched_source and matched_source is not item:
+                            for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
+                                if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
+                                    item[meta_k] = matched_source[meta_k]
+                            tmdb_id = item.get('tmdb_id')
+                            title = item.get('title')
 
-                    m_keys = []
-                    if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                        m_keys.append(f"movie_tmdb_{tmdb_id}")
-                    if title and not has_non_latin(title):
-                        tb = get_base_name(title).lower().strip()
-                        if tb:
-                            m_keys.append(f"movie_title_{tb}")
-                    q_norm = str(q).strip().lower()
-                    if q_norm:
-                        m_keys.append(f"movie_q_{q_norm}")
-                    if q_base:
-                        m_keys.append(f"movie_query_{q_base}")
+                        m_keys = []
+                        if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+                            m_keys.append(f"movie_tmdb_{tmdb_id}")
+                        if title and not has_non_latin(title):
+                            tb = get_base_name(title).lower().strip()
+                            if tb:
+                                m_keys.append(f"movie_title_{tb}")
+                        q_norm = str(q).strip().lower()
+                        if q_norm:
+                            m_keys.append(f"movie_q_{q_norm}")
+                        if q_base:
+                            m_keys.append(f"movie_query_{q_base}")
 
-                    if m_keys and any(k in seen_keys for k in m_keys):
-                        continue
-                    for k in m_keys:
-                        seen_keys.add(k)
+                        if m_keys and any(k in seen_keys for k in m_keys):
+                            continue
+                        for k in m_keys:
+                            seen_keys.add(k)
 
-                unique_items.append(item)
-            return unique_items
+                    unique_items.append(item)
+                return unique_items
+
+            watched_items = _dedup_list([it for it in items if it.get('is_watched', True)])
+            unwatched_items = _dedup_list([it for it in items if not it.get('is_watched', True)])
+            combined = watched_items + unwatched_items
+            combined.sort(key=lambda x: max(_safe_timestamp(x.get('last_played_at')), _safe_timestamp(x.get('added_at'))), reverse=True)
+            return combined
     except json.JSONDecodeError as jde:
         xbmc.log(f"StreamContinuum History: Corrupted history.json detected: {jde}", xbmc.LOGERROR)
         try:
@@ -296,12 +303,12 @@ def add_to_history(query):
         item_base = get_base_name(item_q).lower().strip()
         
         is_same_exact = (item_q == query_str)
-        is_same_series = (query_is_series or item.get('media_type') in ('tvshow', 'tv', 'show')) and item_is_series and (
+        is_same_series_watched = (query_is_series or item.get('media_type') in ('tvshow', 'tv', 'show')) and item_is_series and item.get('is_watched', True) and (
             (query_base and item_base and query_base == item_base) or
             (item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base)
         )
         
-        if is_same_exact or is_same_series:
+        if is_same_exact or is_same_series_watched:
             if not existing_item:
                 existing_item = item
         else:
@@ -334,7 +341,7 @@ def add_to_history(query):
                     item_to_add[k] = matching_tmdb_item[k]
         
     history.insert(0, item_to_add)
-    history = history[:50]
+    history = history[:60]
     _save_history(history)
 
 def add_to_watchlist_local(query, tmdb_data=None):
@@ -353,14 +360,15 @@ def add_to_watchlist_local(query, tmdb_data=None):
         item_q = item.get('query', '')
         item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')
         item_base = get_base_name(item_q).lower().strip()
+        item_watched = item.get('is_watched', True)
         
-        is_same_exact = (item_q == query_str)
-        is_same_series = query_is_series and item_is_series and (
+        is_same_exact_unwatched = (item_q == query_str and not item_watched)
+        is_same_series_unwatched = query_is_series and item_is_series and (not item_watched) and (
             (query_base and item_base and query_base == item_base) or
             (item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base)
         )
         
-        if is_same_exact or is_same_series:
+        if is_same_exact_unwatched or is_same_series_unwatched:
             if not existing_item:
                 existing_item = item
         else:
@@ -400,7 +408,7 @@ def add_to_watchlist_local(query, tmdb_data=None):
         }
         
     history.insert(0, item_to_add)
-    history = history[:50]
+    history = history[:60]
     _save_history(history)
 
 def set_watched_status(query, is_watched):
@@ -517,7 +525,7 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
             'added_at': now
         }
         history.insert(0, new_item)
-        history = history[:50]
+        history = history[:60]
         updated = True
     if updated:
         _save_history(history)
