@@ -2256,7 +2256,7 @@ def run():
             if success:
                 xbmcgui.Dialog().notification("StreamContinuum", "Nastavení exportováno", xbmcgui.NOTIFICATION_INFO)
             else:
-                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba exportu", xbmc.NOTIFICATION_ERROR)
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba exportu", xbmcgui.NOTIFICATION_ERROR)
         return
     elif action == 'import_settings':
         keyboard = xbmc.Keyboard('', 'Zadejte PIN pro dešifrování')
@@ -2267,7 +2267,7 @@ def run():
             if success:
                 xbmcgui.Dialog().notification("StreamContinuum", "Nastavení importováno", xbmcgui.NOTIFICATION_INFO)
             else:
-                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba importu", xbmc.NOTIFICATION_ERROR)
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba importu", xbmcgui.NOTIFICATION_ERROR)
         return
     elif action == 'watchlist_add':
         media_type = params.get('type')
@@ -2413,10 +2413,11 @@ def run():
         ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
         if HANDLE >= 0:
             try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             except Exception:
                 pass
         ADDON.openSettings()
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]},replace)')
         return
     elif action == 'search':
         search(params.get('query'))
