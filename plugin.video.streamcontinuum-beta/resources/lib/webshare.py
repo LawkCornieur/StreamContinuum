@@ -179,7 +179,9 @@ def upload_file(filepath, filename):
                             files = {'file': (filename, f)}
                             upload_data = {
                                 'wst': token,
-                                'private': 1
+                                'private': 1,
+                                'folder': 'StreamContinuum_Sync',
+                                'target_dir': '/StreamContinuum_Sync/'
                             }
                             up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60, verify=get_ssl_verify())
                             if up_resp.status_code == 200:
@@ -217,7 +219,7 @@ def get_user_files():
         return []
         
     url = BASE_URL + 'user_files/'
-    data = {'wst': token, 'limit': 100, 'offset': 0}
+    data = {'wst': token, 'limit': 200, 'offset': 0}
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
@@ -303,10 +305,12 @@ def move_to_sync(filename):
             file_ident = f.get('ident')
             break
 
-    url = BASE_URL + 'move_file/'
+    endpoints = ['file_move/', 'move_file/', 'file_update/']
     candidates = []
     if file_ident:
         candidates.extend([
+            {'wst': token, 'ident': file_ident, 'folder': 'StreamContinuum_Sync', 'private': 1},
+            {'wst': token, 'ident': file_ident, 'target_folder': 'StreamContinuum_Sync', 'private': 1},
             {'wst': token, 'ident': file_ident, 'dest': '/StreamContinuum_Sync/', 'private': 1},
             {'wst': token, 'ident': file_ident, 'target_dir': '/StreamContinuum_Sync/', 'private': 1},
             {'wst': token, 'ident': file_ident, 'path': '/StreamContinuum_Sync/', 'private': 1},
@@ -319,15 +323,17 @@ def move_to_sync(filename):
         {'wst': token, 'name': filename, 'dest': '/StreamContinuum_Sync/', 'private': 1}
     ])
 
-    for data in candidates:
-        try:
-            response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-            if response.status_code == 200:
-                if 'OK' in response.text or 'ident' in response.text:
-                    xbmc.log(f"Webshare: move_to_sync '{filename}' OK", xbmc.LOGINFO)
-                    return True
-        except Exception as e:
-            xbmc.log(f"Webshare move_to_sync attempt error: {e}", xbmc.LOGWARNING)
+    for ep in endpoints:
+        ep_url = BASE_URL + ep
+        for data in candidates:
+            try:
+                response = requests.post(ep_url, data=data, headers=HEADERS, timeout=8, verify=get_ssl_verify())
+                if response.status_code == 200:
+                    if 'OK' in response.text or 'ident' in response.text:
+                        xbmc.log(f"Webshare: move_to_sync '{filename}' via {ep} OK", xbmc.LOGINFO)
+                        return True
+            except Exception as e:
+                xbmc.log(f"Webshare move_to_sync attempt ({ep}) error: {e}", xbmc.LOGWARNING)
 
     sync_files = get_sync_files()
     if any(f.get('name') == filename for f in sync_files):
