@@ -209,13 +209,16 @@ def sync_history():
                     
         files = webshare.get_sync_files()
         remote_history_files = []
+        seen_idents = set()
         for f in files:
-            if _is_history_sync_filename(f.get('name')):
+            if _is_history_sync_filename(f.get('name')) and f.get('ident') not in seen_idents:
+                seen_idents.add(f['ident'])
                 remote_history_files.append(f)
                 
         public_files = webshare.get_user_files()
         for f in public_files:
-            if _is_history_sync_filename(f.get('name')) and f['ident'] not in [rf['ident'] for rf in remote_history_files]:
+            if _is_history_sync_filename(f.get('name')) and f.get('ident') not in seen_idents:
+                seen_idents.add(f['ident'])
                 remote_history_files.append(f)
                 
         remote_history = []
