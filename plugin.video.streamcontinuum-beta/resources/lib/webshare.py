@@ -167,22 +167,42 @@ def get_sync_folder_ident():
     if not token:
         return None
         
-    for ep in ['user_folders/', 'folders/']:
+    for ep in ['user_folders/', 'folders/', 'user_files/']:
         try:
-            res = requests.post(BASE_URL + ep, data={'wst': token}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            res = requests.post(BASE_URL + ep, data={'wst': token, 'limit': 200, 'offset': 0}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
             if res.status_code == 200:
                 root = ElementTree.fromstring(res.content)
                 for f_elem in root.findall('.//folder'):
                     name = f_elem.find('name')
                     ident = f_elem.find('ident')
-                    if name is not None and name.text == 'StreamContinuum_Sync' and ident is not None:
+                    if name is not None and name.text == 'StreamContinuum_Sync' and ident is not None and ident.text:
                         return ident.text
-        except Exception:
-            pass
+                for file_elem in root.findall('.//file'):
+                    name = file_elem.find('name')
+                    ident = file_elem.find('ident')
+                    type_elem = file_elem.find('type')
+                    if name is not None and name.text == 'StreamContinuum_Sync' and ident is not None and ident.text:
+                        if type_elem is None or type_elem.text == 'folder':
+                            return ident.text
+        except Exception as e:
+            xbmc.log(f"Webshare get_sync_folder_ident error ({ep}): {e}", xbmc.LOGWARNING)
             
     created = create_folder('StreamContinuum_Sync')
     if isinstance(created, str) and created:
         return created
+        
+    try:
+        res = requests.post(BASE_URL + 'user_folders/', data={'wst': token}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+        if res.status_code == 200:
+            root = ElementTree.fromstring(res.content)
+            for f_elem in root.findall('.//folder'):
+                name = f_elem.find('name')
+                ident = f_elem.find('ident')
+                if name is not None and name.text == 'StreamContinuum_Sync' and ident is not None and ident.text:
+                    return ident.text
+    except Exception:
+        pass
+
     return None
 
 def upload_file(filepath, filename):
@@ -208,15 +228,16 @@ def upload_file(filepath, filename):
                             files = {'file': (filename, f)}
                             upload_data = {
                                 'wst': token,
-                                'private': 1,
-                                'folder': folder_ident if folder_ident else 'StreamContinuum_Sync',
-                                'target_dir': '/StreamContinuum_Sync/'
+                                'private': 1
                             }
+                            if folder_ident:
+                                upload_data['folder'] = folder_ident
+                                
                             up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60, verify=get_ssl_verify())
                             if up_resp.status_code == 200:
                                 try:
-                                    root = ElementTree.fromstring(up_resp.content)
-                                    status = root.find('status')
+                                    up_root = ElementTree.fromstring(up_resp.content)
+                                    status = up_root.find('status')
                                     if status is not None and status.text == 'OK':
                                         xbmc.log(f"StreamContinuum: Upload of {filename} successful on attempt {attempt + 1}", xbmc.LOGINFO)
                                         return True
@@ -299,11 +320,10 @@ def get_sync_files():
     
     endpoints = []
     if folder_ident:
-        endpoints.append((BASE_URL + 'files/', {'wst': token, 'folder': folder_ident, 'private': 1}))
         endpoints.append((BASE_URL + 'folder_files/', {'wst': token, 'folder': folder_ident, 'private': 1}))
         endpoints.append((BASE_URL + 'folder_files/', {'wst': token, 'ident': folder_ident, 'private': 1}))
-    endpoints.append((BASE_URL + 'files/', {'wst': token, 'path': '/StreamContinuum_Sync/', 'private': 1}))
-    endpoints.append((BASE_URL + 'files/', {'wst': token, 'folder': 'StreamContinuum_Sync', 'private': 1}))
+        endpoints.append((BASE_URL + 'files/', {'wst': token, 'folder': folder_ident, 'private': 1}))
+        endpoints.append((BASE_URL + 'user_files/', {'wst': token, 'folder': folder_ident, 'private': 1}))
     
     for url, data in endpoints:
         try:
@@ -334,6 +354,9 @@ def move_to_sync(filename):
         return False
         
     folder_ident = get_sync_folder_ident()
+    if not folder_ident:
+        return False
+        
     time.sleep(0.5)
 
     sync_files = get_sync_files()
@@ -347,20 +370,12 @@ def move_to_sync(filename):
             break
 
     if not found_in_sync and root_ident:
-        candidates = []
-        if folder_ident:
-            candidates.extend([
-                ('file_update/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
-                ('file_move/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
-                ('file_move/', {'wst': token, 'ident': root_ident, 'target_folder': folder_ident, 'private': 1}),
-                ('move_file/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
-            ])
-        candidates.extend([
-            ('file_update/', {'wst': token, 'ident': root_ident, 'folder': 'StreamContinuum_Sync', 'private': 1}),
-            ('file_move/', {'wst': token, 'ident': root_ident, 'folder': 'StreamContinuum_Sync', 'private': 1}),
-            ('file_move/', {'wst': token, 'ident': root_ident, 'dest': '/StreamContinuum_Sync/', 'private': 1}),
-            ('move_file/', {'wst': token, 'ident': root_ident, 'dest': '/StreamContinuum_Sync/', 'private': 1}),
-        ])
+        candidates = [
+            ('file_update/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
+            ('file_move/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
+            ('file_move/', {'wst': token, 'ident': root_ident, 'target_folder': folder_ident, 'private': 1}),
+            ('move_file/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
+        ]
 
         for ep, data in candidates:
             try:
