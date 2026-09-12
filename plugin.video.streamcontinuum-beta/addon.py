@@ -131,8 +131,12 @@ def list_categories():
             list_item = xbmcgui.ListItem(label=display_label)
             list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
             
-            url = f"{sys.argv[0]}?action={action}"
-            is_folder = False if action == 'settings' else True
+            if action == 'settings':
+                url = f"RunPlugin({sys.argv[0]}?action=settings)"
+                is_folder = False
+            else:
+                url = f"{sys.argv[0]}?action={action}"
+                is_folder = True
                 
             success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
             if success:
@@ -2179,6 +2183,11 @@ def run():
     if action == 'show_changelog':
         show_changelog()
         return
+    elif action == 'settings':
+        ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
+        ADDON.openSettings()
+        xbmc.executebuiltin('Container.Refresh')
+        return
     elif action == 'trakt_auth':
         trakt.authenticate()
         return
@@ -2409,15 +2418,6 @@ def run():
         trakt_menu()
     elif action == 'trakt_search_menu':
         trakt_search()
-    elif action == 'settings':
-        ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
-        if HANDLE >= 0:
-            try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            except Exception:
-                pass
-        ADDON.openSettings()
-        return
     elif action == 'search':
         search(params.get('query'))
     elif action == 'search_prefill':
