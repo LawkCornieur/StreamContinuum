@@ -232,6 +232,7 @@ def upload_file(filepath, filename):
                             }
                             if folder_ident:
                                 upload_data['folder'] = folder_ident
+                                upload_data['folder_ident'] = folder_ident
                                 
                             up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60, verify=get_ssl_verify())
                             if up_resp.status_code == 200:
@@ -372,6 +373,7 @@ def move_to_sync(filename):
     if not found_in_sync and root_ident:
         candidates = [
             ('file_update/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
+            ('file_update/', {'wst': token, 'ident': root_ident, 'folder_ident': folder_ident, 'private': 1}),
             ('file_move/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
             ('file_move/', {'wst': token, 'ident': root_ident, 'target_folder': folder_ident, 'private': 1}),
             ('move_file/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
