@@ -2362,7 +2362,18 @@ def run():
             if new_query and new_query != old_query:
                 import history
                 history.update_history_item(old_query, new_query)
+                if HANDLE >= 0:
+                    try:
+                        xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+                    except Exception:
+                        pass
                 xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(new_query)},replace)')
+                return
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
         return
     elif action == 'history_tmdb_custom_search':
         orig_q = params.get('original_query', '')
