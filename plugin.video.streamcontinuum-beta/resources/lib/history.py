@@ -270,7 +270,7 @@ def add_to_history(query):
     if not query:
         return
     query_str = str(query).strip()
-    history = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=False)
     now = int(time.time())
     
     new_item_template = {
@@ -297,7 +297,7 @@ def add_to_history(query):
     existing_item = None
     matching_tmdb_item = None
     remaining_history = []
-    for item in history:
+    for item in history_items:
         item_q = item.get('query', '')
         item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')
         item_base = get_base_name(item_q).lower().strip()
@@ -320,7 +320,7 @@ def add_to_history(query):
             elif item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base:
                 matching_tmdb_item = item
     
-    history = remaining_history
+    history_items = remaining_history
     
     if existing_item:
         existing_item['query'] = query_str
@@ -340,15 +340,15 @@ def add_to_history(query):
                 if matching_tmdb_item.get(k) is not None:
                     item_to_add[k] = matching_tmdb_item[k]
         
-    history.insert(0, item_to_add)
-    history = history[:60]
-    _save_history(history)
+    history_items.insert(0, item_to_add)
+    history_items = history_items[:60]
+    _save_history(history_items)
 
 def add_to_watchlist_local(query, tmdb_data=None):
     if not query:
         return
     query_str = str(query).strip()
-    history = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=False)
     now = int(time.time())
     
     query_is_series = is_series(query_str) or (tmdb_data and tmdb_data.get('media_type') in ('tvshow', 'tv', 'show'))
@@ -356,7 +356,7 @@ def add_to_watchlist_local(query, tmdb_data=None):
     
     existing_item = None
     remaining_history = []
-    for item in history:
+    for item in history_items:
         item_q = item.get('query', '')
         item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')
         item_base = get_base_name(item_q).lower().strip()
@@ -374,7 +374,7 @@ def add_to_watchlist_local(query, tmdb_data=None):
         else:
             remaining_history.append(item)
             
-    history = remaining_history
+    history_items = remaining_history
     
     if existing_item:
         existing_item['query'] = query_str
@@ -407,27 +407,27 @@ def add_to_watchlist_local(query, tmdb_data=None):
             'added_at': now
         }
         
-    history.insert(0, item_to_add)
-    history = history[:60]
-    _save_history(history)
+    history_items.insert(0, item_to_add)
+    history_items = history_items[:60]
+    _save_history(history_items)
 
 def set_watched_status(query, is_watched):
     if not query:
         return False
-    history = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=False)
     norm_q = str(query).strip().lower()
     q_base = get_base_name(query).strip().lower()
     q_is_tv = is_series(query)
     
     target_tmdb_id = None
-    for it in history:
+    for it in history_items:
         it_q = str(it.get('query', '')).strip().lower()
         if it_q == norm_q:
             target_tmdb_id = it.get('tmdb_id')
             break
             
     updated = False
-    for item in history:
+    for item in history_items:
         item_query = str(item.get('query', '')).strip().lower()
         item_base = get_base_name(item.get('query', '')).strip().lower()
         item_is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(item.get('query', ''))
@@ -445,26 +445,26 @@ def set_watched_status(query, is_watched):
             updated = True
             
     if updated:
-        _save_history(history)
+        _save_history(history_items)
     return updated
 
 def delete_from_history(query):
     if not query:
         return
-    history = get_history(deduplicate=False)
-    history = [item for item in history if item.get('query') != query]
-    _save_history(history)
+    history_items = get_history(deduplicate=False)
+    history_items = [item for item in history_items if item.get('query') != query]
+    _save_history(history_items)
 
 def update_history_item(old_query, new_query):
     if not old_query or not new_query:
         return
-    history = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=False)
     now = int(time.time())
     norm_old = str(old_query).strip().lower()
     old_base = get_base_name(old_query).strip().lower()
     
     updated = False
-    for item in history:
+    for item in history_items:
         item_q = str(item.get('query', '')).strip()
         item_q_lower = item_q.lower()
         item_base = get_base_name(item_q).strip().lower()
@@ -474,12 +474,12 @@ def update_history_item(old_query, new_query):
             updated = True
             break
     if updated:
-        _save_history(history)
+        _save_history(history_items)
     
 def update_history_with_tmdb_data(original_query, tmdb_data):
     if not original_query:
         return False
-    history = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=False)
     updated = False
     now = int(time.time())
     norm_orig = str(original_query).strip().lower()
@@ -489,7 +489,7 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
     if has_non_latin(clean_title) or not clean_title:
         clean_title = orig_base or original_query
 
-    for i, item in enumerate(history):
+    for i, item in enumerate(history_items):
         item_query = str(item.get('query', '')).strip().lower()
         item_base = get_base_name(item.get('query', '')).strip().lower()
         if item_query == norm_orig or str(item.get('query', '')).strip() == str(original_query).strip() or (orig_base and item_base == orig_base):
@@ -524,11 +524,11 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
             'last_played_at': now,
             'added_at': now
         }
-        history.insert(0, new_item)
-        history = history[:60]
+        history_items.insert(0, new_item)
+        history_items = history_items[:60]
         updated = True
     if updated:
-        _save_history(history)
+        _save_history(history_items)
     return updated
 
 def check_and_update_next_episodes():
