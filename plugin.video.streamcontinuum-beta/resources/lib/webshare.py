@@ -17,6 +17,9 @@ ADDON = xbmcaddon.Addon()
 BASE_URL = "https://webshare.cz/api/"
 HEADERS = {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'}
 
+# Vymazatelná keš pro ID složky synchronizace
+_sync_folder_cache = None
+
 def get_ssl_verify():
     try:
         return ADDON.getSettingBool('ssl_verify')
@@ -140,6 +143,9 @@ def get_link(ident):
     return None
 
 def create_folder(foldername):
+    """
+    Vytvoří soukromou složku na Webshare a vrátí její identifikátor (ident).
+    """
     token = get_token()
     if not token:
         return None
@@ -153,59 +159,74 @@ def create_folder(foldername):
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             root = ElementTree.fromstring(response.content)
-            ident_elem = root.find('ident')
-            if ident_elem is not None and ident_elem.text:
-                return ident_elem.text
+            for tag in ['.//ident', './/folder_ident', 'ident', 'folder_ident']:
+                node = root.find(tag)
+                if node is not None and node.text:
+                    return node.text
             if root.find('status') is not None and root.find('status').text == 'OK':
                 return True
     except Exception as e:
         xbmc.log(f"Webshare create_folder error: {e}", xbmc.LOGERROR)
     return None
 
-def get_sync_folder_ident():
+def get_sync_folder_ident(force_refresh=False):
+    """
+    Získá nebo vytvoří identifikátor podsložky 'StreamContinuum_Sync' na Webshare.
+    Využívá kešování pro zrychlení operací.
+    """
+    global _sync_folder_cache
+    if _sync_folder_cache and not force_refresh:
+        return _sync_folder_cache
+
     token = get_token()
     if not token:
         return None
         
+    # 1. Prohledání existujících složek u uživatele
     for ep in ['user_folders/', 'folders/', 'user_files/']:
         try:
             res = requests.post(BASE_URL + ep, data={'wst': token, 'limit': 200, 'offset': 0}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
             if res.status_code == 200:
                 root = ElementTree.fromstring(res.content)
-                for f_elem in root.findall('.//folder'):
-                    name = f_elem.find('name')
-                    ident = f_elem.find('ident')
-                    if name is not None and name.text == 'StreamContinuum_Sync' and ident is not None and ident.text:
-                        return ident.text
-                for file_elem in root.findall('.//file'):
-                    name = file_elem.find('name')
-                    ident = file_elem.find('ident')
-                    type_elem = file_elem.find('type')
-                    if name is not None and name.text == 'StreamContinuum_Sync' and ident is not None and ident.text:
-                        if type_elem is None or type_elem.text == 'folder':
-                            return ident.text
+                for elem in root.iter():
+                    name_node = elem.find('name')
+                    ident_node = elem.find('ident')
+                    if name_node is not None and name_node.text == 'StreamContinuum_Sync':
+                        if ident_node is not None and ident_node.text:
+                            _sync_folder_cache = ident_node.text
+                            return _sync_folder_cache
         except Exception as e:
             xbmc.log(f"Webshare get_sync_folder_ident error ({ep}): {e}", xbmc.LOGWARNING)
             
+    # 2. Složka nenalezena -> pokus o její vytvoření
     created = create_folder('StreamContinuum_Sync')
     if isinstance(created, str) and created:
-        return created
+        _sync_folder_cache = created
+        return _sync_folder_cache
         
-    try:
-        res = requests.post(BASE_URL + 'user_folders/', data={'wst': token}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-        if res.status_code == 200:
-            root = ElementTree.fromstring(res.content)
-            for f_elem in root.findall('.//folder'):
-                name = f_elem.find('name')
-                ident = f_elem.find('ident')
-                if name is not None and name.text == 'StreamContinuum_Sync' and ident is not None and ident.text:
-                    return ident.text
-    except Exception:
-        pass
+    # 3. Kontrolní dotaz po vytvoření složky
+    time.sleep(1.0)
+    for ep in ['user_folders/', 'folders/']:
+        try:
+            res = requests.post(BASE_URL + ep, data={'wst': token}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            if res.status_code == 200:
+                root = ElementTree.fromstring(res.content)
+                for elem in root.iter():
+                    name_node = elem.find('name')
+                    ident_node = elem.find('ident')
+                    if name_node is not None and name_node.text == 'StreamContinuum_Sync':
+                        if ident_node is not None and ident_node.text:
+                            _sync_folder_cache = ident_node.text
+                            return _sync_folder_cache
+        except Exception:
+            pass
 
     return None
 
 def upload_file(filepath, filename):
+    """
+    Nahrává soubor z lokálního disku do podsložky 'StreamContinuum_Sync' na Webshare.
+    """
     token = get_token()
     if not token:
         return False
@@ -223,7 +244,7 @@ def upload_file(filepath, filename):
                 
                 for attempt in range(3):
                     try:
-                        xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (attempt {attempt + 1}/3)...", xbmc.LOGINFO)
+                        xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (attempt {attempt + 1}/3, folder: {folder_ident})...", xbmc.LOGINFO)
                         with open(filepath, 'rb') as f:
                             files = {'file': (filename, f)}
                             upload_data = {
@@ -233,6 +254,7 @@ def upload_file(filepath, filename):
                             if folder_ident:
                                 upload_data['folder'] = folder_ident
                                 upload_data['folder_ident'] = folder_ident
+                                upload_data['target_folder'] = folder_ident
                                 
                             up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60, verify=get_ssl_verify())
                             if up_resp.status_code == 200:
@@ -265,6 +287,9 @@ def upload_file(filepath, filename):
     return False
 
 def get_user_files():
+    """
+    Získá seznam souborů uživatele z kořenového adresáře Webshare.
+    """
     token = get_token()
     if not token:
         return []
@@ -290,6 +315,9 @@ def get_user_files():
     return []
 
 def delete_file(ident):
+    """
+    Smaže soubor z Webshare podle jeho identifikátoru (ident).
+    """
     if not ident:
         return False
     token = get_token()
@@ -311,6 +339,9 @@ def delete_file(ident):
     return False
 
 def get_sync_files():
+    """
+    Vrátí seznam všech souborů nacházejících se v podsložce 'StreamContinuum_Sync'.
+    """
     token = get_token()
     if not token:
         return []
@@ -348,6 +379,10 @@ def get_sync_files():
     return files
 
 def move_to_sync(filename):
+    """
+    Zajistí, že soubor 'filename' bude umístěn v podsložce 'StreamContinuum_Sync' na Webshare.
+    Pokud se soubor nachází v kořenové složce (root), přesune ho do podsložky a smaže duplikát z rootu.
+    """
     if not filename:
         return False
     token = get_token()
@@ -364,39 +399,38 @@ def move_to_sync(filename):
     found_in_sync = any(f.get('name') == filename for f in sync_files)
 
     user_files = get_user_files()
-    root_ident = None
-    for f in user_files:
-        if f.get('name') == filename:
-            root_ident = f.get('ident')
-            break
+    root_idents = [f.get('ident') for f in user_files if f.get('name') == filename]
 
-    if not found_in_sync and root_ident:
-        candidates = [
-            ('file_update/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
-            ('file_update/', {'wst': token, 'ident': root_ident, 'folder_ident': folder_ident, 'private': 1}),
-            ('file_move/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
-            ('file_move/', {'wst': token, 'ident': root_ident, 'target_folder': folder_ident, 'private': 1}),
-            ('move_file/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
-        ]
+    if not found_in_sync and root_idents:
+        for root_ident in root_idents:
+            candidates = [
+                ('file_update/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
+                ('file_update/', {'wst': token, 'ident': root_ident, 'folder_ident': folder_ident, 'private': 1}),
+                ('file_move/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
+                ('file_move/', {'wst': token, 'ident': root_ident, 'target_folder': folder_ident, 'private': 1}),
+                ('move_file/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
+            ]
 
-        for ep, data in candidates:
-            try:
-                response = requests.post(BASE_URL + ep, data=data, headers=HEADERS, timeout=8, verify=get_ssl_verify())
-                if response.status_code == 200 and ('OK' in response.text or 'status' in response.text):
-                    xbmc.log(f"Webshare: move_to_sync '{filename}' via {ep} OK", xbmc.LOGINFO)
-                    break
-            except Exception as e:
-                xbmc.log(f"Webshare move_to_sync attempt ({ep}) error: {e}", xbmc.LOGWARNING)
+            for ep, data in candidates:
+                try:
+                    response = requests.post(BASE_URL + ep, data=data, headers=HEADERS, timeout=8, verify=get_ssl_verify())
+                    if response.status_code == 200 and ('OK' in response.text or 'status' in response.text):
+                        xbmc.log(f"Webshare: move_to_sync '{filename}' via {ep} OK", xbmc.LOGINFO)
+                        break
+                except Exception as e:
+                    xbmc.log(f"Webshare move_to_sync attempt ({ep}) error: {e}", xbmc.LOGWARNING)
 
     time.sleep(0.5)
     sync_files_after = get_sync_files()
     is_in_sync = any(f.get('name') == filename for f in sync_files_after)
 
-    if is_in_sync and root_ident:
+    # Odstranění starých nebo duplicitních souborů v rootu, pokud je soubor již v podsložce
+    if root_idents:
         sync_idents = [f.get('ident') for f in sync_files_after if f.get('name') == filename]
-        if root_ident not in sync_idents:
-            xbmc.log(f"Webshare: Removing duplicate root file {filename} ({root_ident})", xbmc.LOGINFO)
-            delete_file(root_ident)
+        for r_ident in root_idents:
+            if r_ident not in sync_idents:
+                xbmc.log(f"Webshare: Removing duplicate/old root file {filename} ({r_ident})", xbmc.LOGINFO)
+                delete_file(r_ident)
 
     return is_in_sync
 
