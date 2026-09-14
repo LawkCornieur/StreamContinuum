@@ -61,6 +61,9 @@ def _is_settings_sync_filename(name):
     return n.startswith('streamcontinuum_settings')
 
 def export_settings(pin):
+    """
+    Exportuje nastavení doplňku, zašifruje je zadávaným PINem a uloží do Webshare podadresáře StreamContinuum_Sync.
+    """
     try:
         xbmc.log("StreamContinuum: Starting export_settings", xbmc.LOGINFO)
         
@@ -91,6 +94,7 @@ def export_settings(pin):
             
         xbmc.log(f"StreamContinuum: Settings encrypted and saved to {filepath}", xbmc.LOGINFO)
             
+        # Odstranění starých verzí nastavení z podsložky i rootu
         files = webshare.get_sync_files()
         for f in files:
             if _is_settings_sync_filename(f.get('name')):
@@ -121,6 +125,9 @@ def export_settings(pin):
         return False, f"Chyba při exportu: {str(e)}"
 
 def import_settings(pin):
+    """
+    Stáhne zašifrovaný soubor nastavení z Webshare, dešifruje jej PINem a aplikuje do doplňku.
+    """
     try:
         if not ADDON.getSetting('ws_username') or not ADDON.getSetting('ws_password'):
             return False, "Není vyplněno uživatelské jméno nebo heslo pro Webshare."
@@ -192,6 +199,18 @@ def import_settings(pin):
         return False, f"Chyba importu nastavení: {str(e)}"
 
 def sync_history():
+    """
+    Provede kompletní obousměrnou synchronizaci historie sledování mezi lokálním Zařízením a Webshare.
+    
+    Postup funkce:
+    1. Načte lokální soubor history.json.
+    2. Prohledá jak podadresář StreamContinuum_Sync, tak kořenovou složku (root) uložení na Webshare.
+       Tím zajistí, že se nesmažou ani neztratí žádná data ze starších verzí doplňku, které ukladaly v rootu.
+    3. Stáhne všechny nalezené soubory historie a sloučí je s lokální historií podle timestampů a ID titulů.
+    4. Uloží kompletní sloučený výsledek lokálně do history.json.
+    5. Bezpečně smazá VŠECHNY staré soubory historie z Webshare (v podsložce i rootu), čímž zamezí duplikaci.
+    6. Nahraje aktuální sloučenou historii přímo do podsložky StreamContinuum_Sync a zkontroluje správnost uložení.
+    """
     try:
         xbmc.log("StreamContinuum: Starting sync_history", xbmc.LOGINFO)
         
@@ -199,6 +218,7 @@ def sync_history():
             xbmc.log("StreamContinuum: Missing Webshare credentials for history sync", xbmc.LOGERROR)
             return False
 
+        # Krok 1: Načtení lokální historie sledování
         local_history = []
         if os.path.exists(HISTORY_FILE):
             with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
@@ -207,6 +227,7 @@ def sync_history():
                 except Exception as e:
                     xbmc.log(f"StreamContinuum: Error loading local history: {e}", xbmc.LOGWARNING)
                     
+        # Krok 2: Vyhledání souborů historie v podadresáři StreamContinuum_Sync i v rootu Webshare
         files = webshare.get_sync_files()
         remote_history_files = []
         seen_idents = set()
@@ -221,6 +242,7 @@ def sync_history():
                 seen_idents.add(f['ident'])
                 remote_history_files.append(f)
                 
+        # Krok 3: Stažení a sloučení všech nalezených vzdálených historií
         remote_history = []
         for f in remote_history_files:
             xbmc.log(f"StreamContinuum: Loading remote history from {f.get('name')} ({f['ident']})", xbmc.LOGINFO)
@@ -287,22 +309,25 @@ def sync_history():
         final_history.sort(key=lambda x: (history._safe_timestamp(x.get('last_played_at')) or history._safe_timestamp(x.get('added_at')) or 0), reverse=True)
         final_history = final_history[:60]
         
+        # Krok 4: Uložení sloučené historie lokálně
         if not os.path.exists(PROFILE_DIR):
             os.makedirs(PROFILE_DIR)
             
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(final_history, f, ensure_ascii=False, indent=4)
             
+        # Krok 5: Odstranění všech starých/duplicitních vzdálených souborů
         for f in remote_history_files:
             xbmc.log(f"StreamContinuum: Deleting old remote history file {f.get('name')} ({f['ident']})", xbmc.LOGINFO)
             webshare.delete_file(f['ident'])
-            time.sleep(0.3)
+            time.sleep(0.2)
             
-        time.sleep(1.0)
+        time.sleep(0.5)
         
+        # Krok 6: Nahrání aktuální ucelené historie přímo do podsložky StreamContinuum_Sync na Webshare
         success = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
         if success:
-            time.sleep(1)
+            time.sleep(0.5)
             webshare.move_to_sync('streamcontinuum_history.json')
         else:
             xbmc.log("StreamContinuum: Failed to upload history file to Webshare", xbmc.LOGERROR)
