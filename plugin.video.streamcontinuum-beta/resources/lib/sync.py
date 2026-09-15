@@ -113,7 +113,7 @@ def export_settings(pin):
         
         success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
         if success:
-            time.sleep(1)
+            time.sleep(0.5)
             webshare.move_to_sync('streamcontinuum_settings.enc')
         else:
             return False, "Nahrávání nastavení na Webshare selhalo. Zkontrolujte přihlášení."
@@ -200,16 +200,15 @@ def import_settings(pin):
 
 def sync_history():
     """
-    Provede kompletní obousměrnou synchronizaci historie sledování mezi lokálním Zařízením a Webshare.
+    Provede kompletní obousměrnou synchronizaci historie sledování mezi lokálním zařízením a Webshare.
     
-    Postup funkce:
+    Zajišťuje správné ukládání do podsložky 'StreamContinuum_Sync' a odstraňuje duplicity na Webshare:
     1. Načte lokální soubor history.json.
-    2. Prohledá jak podadresář StreamContinuum_Sync, tak kořenovou složku (root) uložení na Webshare.
-       Tím zajistí, že se nesmažou ani neztratí žádná data ze starších verzí doplňku, které ukladaly v rootu.
-    3. Stáhne všechny nalezené soubory historie a sloučí je s lokální historií podle timestampů a ID titulů.
-    4. Uloží kompletní sloučený výsledek lokálně do history.json.
-    5. Bezpečně smazá VŠECHNY staré soubory historie z Webshare (v podsložce i rootu), čímž zamezí duplikaci.
-    6. Nahraje aktuální sloučenou historii přímo do podsložky StreamContinuum_Sync a zkontroluje správnost uložení.
+    2. Vyhledá a stáhne soubory historie jak z podsložky StreamContinuum_Sync, tak z rootu uživatele.
+    3. Sloučí položky podle časových razítek a TMDb/názvu.
+    4. Uloží aktualizovanou historii lokálně.
+    5. Smaže všechny předchozí vzdálené soubory (zamezení duplicit na Webshare).
+    6. Nahraje novou historii s garantovaným identem složky StreamContinuum_Sync a potvrdí přesun.
     """
     try:
         xbmc.log("StreamContinuum: Starting sync_history", xbmc.LOGINFO)
@@ -328,7 +327,8 @@ def sync_history():
         success = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
         if success:
             time.sleep(0.5)
-            webshare.move_to_sync('streamcontinuum_history.json')
+            in_sync = webshare.move_to_sync('streamcontinuum_history.json')
+            xbmc.log(f"StreamContinuum: History file move_to_sync result: {in_sync}", xbmc.LOGINFO)
         else:
             xbmc.log("StreamContinuum: Failed to upload history file to Webshare", xbmc.LOGERROR)
             return False
