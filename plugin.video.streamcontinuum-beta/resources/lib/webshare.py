@@ -26,6 +26,29 @@ def get_ssl_verify():
     except Exception:
         return True
 
+def _is_response_ok(response):
+    if not response or response.status_code not in (200, 201):
+        return False
+    try:
+        root = ElementTree.fromstring(response.content)
+        status = root.findtext('status')
+        if status and status.upper() == 'OK':
+            return True
+        if root.attrib.get('status', '').upper() == 'OK':
+            return True
+    except Exception:
+        pass
+    try:
+        js = response.json()
+        if js.get('status', '').upper() == 'OK':
+            return True
+    except Exception:
+        pass
+    txt = response.text.upper()
+    if '<STATUS>OK</STATUS>' in txt or '"STATUS":"OK"' in txt or '"STATUS": "OK"' in txt:
+        return True
+    return False
+
 def _get_node_text_or_attr(elem, keys):
     for k in keys:
         txt = elem.findtext(k)
@@ -107,37 +130,50 @@ def _parse_folder_from_content(content, target_folder_name='StreamContinuum_Sync
     target_clean = target_folder_name.strip().lower()
 
     try:
-        root = ElementTree.fromstring(content)
+        raw_bytes = content if isinstance(content, bytes) else str(content).encode('utf-8', errors='ignore')
+        root = ElementTree.fromstring(raw_bytes)
+
+        status = root.findtext('status')
+        direct_ident = root.findtext('ident') or root.attrib.get('ident')
+        if direct_ident and status and status.upper() == 'OK':
+            name_node = root.findtext('name') or root.findtext('folder_name')
+            if not name_node or name_node.strip().lower() == target_clean:
+                return direct_ident.strip()
+
         for elem in root.iter():
-            name_candidates = []
+            candidates = []
             if elem.text and elem.text.strip():
-                name_candidates.append(elem.text.strip())
-            for k in ['name', 'folder_name', 'title', 'dirname', 'label', 'dir']:
-                v = elem.attrib.get(k) or elem.findtext(k)
-                if v and str(v).strip():
-                    name_candidates.append(str(v).strip())
+                candidates.append(elem.text.strip())
+            for k in ['name', 'folder_name', 'title', 'dirname', 'label', 'dir', 'folder']:
+                val = elem.attrib.get(k) or elem.findtext(k)
+                if val and str(val).strip():
+                    candidates.append(str(val).strip())
             for attr_k, attr_v in elem.attrib.items():
                 if attr_k.lower() in ('name', 'folder_name', 'title', 'dirname') and attr_v:
-                    name_candidates.append(str(attr_v).strip())
+                    candidates.append(str(attr_v).strip())
 
-            matches = any(cand.lower() == target_clean for cand in name_candidates)
-            if matches:
+            if any(c.lower() == target_clean for c in candidates):
                 for k in ['ident', 'folder_ident', 'id', 'folder_id', 'dir_id']:
-                    v = elem.attrib.get(k) or elem.findtext(k)
-                    if v and str(v).strip():
-                        return str(v).strip()
-                for attr_k, attr_v in elem.attrib.items():
-                    if attr_k.lower() in ('ident', 'folder_ident', 'id', 'folder_id') and attr_v:
-                        return str(attr_v).strip()
-                if elem.text and elem.text.strip() and elem.text.strip().lower() != target_clean:
-                    return elem.text.strip()
+                    val = elem.attrib.get(k) or elem.findtext(k)
+                    if val and str(val).strip():
+                        return str(val).strip()
+                for child in list(elem):
+                    for k in ['ident', 'folder_ident', 'id', 'folder_id']:
+                        val = child.attrib.get(k) or child.findtext(k)
+                        if val and str(val).strip():
+                            return str(val).strip()
 
         for parent in root.iter():
             for child in list(parent):
-                child_text = (child.text or "").strip().lower()
-                child_name = (child.attrib.get('name') or "").strip().lower()
-                if child_text == target_clean or child_name == target_clean:
-                    for k in ['ident', 'folder_ident', 'id', 'folder_id']:
+                c_candidates = []
+                if child.text and child.text.strip():
+                    c_candidates.append(child.text.strip())
+                for k in ['name', 'folder_name', 'title', 'dirname']:
+                    v = child.attrib.get(k) or child.findtext(k)
+                    if v and str(v).strip():
+                        c_candidates.append(str(v).strip())
+                if any(c.lower() == target_clean for c in c_candidates):
+                    for k in ['ident', 'folder_ident', 'id', 'folder_id', 'dir_id']:
                         v = parent.attrib.get(k) or parent.findtext(k) or child.attrib.get(k) or child.findtext(k)
                         if v and str(v).strip():
                             return str(v).strip()
@@ -146,12 +182,18 @@ def _parse_folder_from_content(content, target_folder_name='StreamContinuum_Sync
 
     try:
         data = json.loads(content) if isinstance(content, (str, bytes)) else content
+        if isinstance(data, dict):
+            if data.get('status', '').upper() == 'OK' and data.get('ident'):
+                d_name = data.get('name') or data.get('folder_name')
+                if not d_name or str(d_name).strip().lower() == target_clean:
+                    return str(data['ident']).strip()
+
         def _find_folder_json(obj):
             if isinstance(obj, dict):
                 name = obj.get('name') or obj.get('folder_name') or obj.get('title') or obj.get('label')
                 ident = obj.get('ident') or obj.get('folder_ident') or obj.get('id') or obj.get('folder_id')
                 if name and ident and str(name).strip().lower() == target_clean:
-                    return str(ident)
+                    return str(ident).strip()
                 for v in obj.values():
                     res = _find_folder_json(v)
                     if res:
@@ -162,6 +204,7 @@ def _parse_folder_from_content(content, target_folder_name='StreamContinuum_Sync
                     if res:
                         return res
             return None
+
         found = _find_folder_json(data)
         if found:
             return found
@@ -274,45 +317,27 @@ def create_folder(foldername):
     token = get_token()
     if not token:
         return None
-    url = BASE_URL + 'mkdir/'
-    data = {
-        'wst': token,
-        'name': foldername,
-        'folder_name': foldername,
-        'private': 1
-    }
-    try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-        if response.status_code == 200:
-            ident = _parse_folder_from_content(response.content, foldername)
-            if ident:
-                xbmc.log(f"Webshare: create_folder '{foldername}' ident: {ident}", xbmc.LOGINFO)
-                return str(ident)
-            try:
-                root = ElementTree.fromstring(response.content)
-                for k in ['ident', 'folder_ident', 'id', 'folder_id']:
-                    id_node = root.find(k)
-                    if id_node is not None and id_node.text and id_node.text.strip():
-                        return id_node.text.strip()
-                    id_attr = root.attrib.get(k)
-                    if id_attr and id_attr.strip():
-                        return id_attr.strip()
-                status = _get_node_text_or_attr(root, ['status'])
-                if status == 'OK':
+        
+    candidates = [
+        ('folder_create/', {'wst': token, 'name': foldername, 'private': 1}),
+        ('folder_create/', {'wst': token, 'name': foldername}),
+        ('create_folder/', {'wst': token, 'name': foldername, 'folder_name': foldername, 'private': 1}),
+        ('mkdir/', {'wst': token, 'name': foldername, 'folder_name': foldername, 'private': 1}),
+        ('folder_add/', {'wst': token, 'name': foldername, 'private': 1}),
+    ]
+    for ep, data in candidates:
+        try:
+            response = requests.post(BASE_URL + ep, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            xbmc.log(f"Webshare: create_folder ({ep}) status={response.status_code}, text={response.text[:150]}", xbmc.LOGINFO)
+            if response.status_code in (200, 201):
+                ident = _parse_folder_from_content(response.content, foldername)
+                if ident:
+                    xbmc.log(f"Webshare: create_folder '{foldername}' resolved ident: {ident}", xbmc.LOGINFO)
+                    return str(ident)
+                if _is_response_ok(response):
                     return True
-            except Exception:
-                pass
-            try:
-                js = response.json()
-                found_id = js.get('ident') or js.get('folder_ident') or js.get('id')
-                if found_id:
-                    return str(found_id)
-            except Exception:
-                pass
-            if 'OK' in response.text:
-                return True
-    except Exception as e:
-        xbmc.log(f"Webshare create_folder error: {e}", xbmc.LOGERROR)
+        except Exception as e:
+            xbmc.log(f"Webshare create_folder error ({ep}): {e}", xbmc.LOGWARNING)
     return None
 
 def get_sync_folder_ident(force_refresh=False):
@@ -327,10 +352,15 @@ def get_sync_folder_ident(force_refresh=False):
         
     sync_folder_name = 'StreamContinuum_Sync'
     endpoints = [
-        ('user_data/', {'wst': token}),
+        ('folder_list/', {'wst': token, 'private': 1}),
+        ('folder_list/', {'wst': token}),
+        ('user_folders/', {'wst': token, 'limit': 200, 'offset': 0, 'private': 1}),
         ('user_folders/', {'wst': token, 'limit': 200, 'offset': 0}),
-        ('folders/', {'wst': token, 'limit': 200, 'offset': 0}),
-        ('user_files/', {'wst': token, 'limit': 200, 'offset': 0})
+        ('user_data/', {'wst': token}),
+        ('user_files/', {'wst': token, 'limit': 200, 'offset': 0, 'private': 1}),
+        ('user_files/', {'wst': token, 'limit': 200, 'offset': 0}),
+        ('folders/', {'wst': token, 'limit': 200, 'offset': 0, 'private': 1}),
+        ('folders/', {'wst': token, 'limit': 200, 'offset': 0})
     ]
 
     for ep, data in endpoints:
@@ -402,7 +432,7 @@ def upload_file(filepath, filename):
                             
                         up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60, verify=get_ssl_verify())
                         if up_resp.status_code in (200, 201):
-                            if 'OK' in up_resp.text or '<status>OK</status>' in up_resp.text or 'ident' in up_resp.text or '"status":"OK"' in up_resp.text:
+                            if _is_response_ok(up_resp) or 'ident' in up_resp.text:
                                 xbmc.log(f"StreamContinuum: Upload of {filename} successful on attempt {attempt + 1}", xbmc.LOGINFO)
                                 return True
                             else:
@@ -423,15 +453,28 @@ def get_user_files():
     if not token:
         return []
         
-    url = BASE_URL + 'user_files/'
-    data = {'wst': token, 'limit': 200, 'offset': 0}
-    try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-        if response.status_code == 200:
-            return _parse_files_from_content(response.content)
-    except Exception as e:
-        xbmc.log(f"Webshare get_user_files error: {e}", xbmc.LOGERROR)
-    return []
+    files = []
+    seen_idents = set()
+    endpoints = [
+        ('user_files/', {'wst': token, 'limit': 500, 'offset': 0, 'private': 1}),
+        ('user_files/', {'wst': token, 'limit': 500, 'offset': 0}),
+        ('folder_files/', {'wst': token, 'limit': 500, 'offset': 0, 'private': 1}),
+        ('folder_files/', {'wst': token, 'limit': 500, 'offset': 0}),
+    ]
+    for ep, data in endpoints:
+        try:
+            response = requests.post(BASE_URL + ep, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            if response.status_code == 200:
+                parsed = _parse_files_from_content(response.content)
+                for f in parsed:
+                    if f['ident'] not in seen_idents:
+                        seen_idents.add(f['ident'])
+                        files.append(f)
+        except Exception as e:
+            xbmc.log(f"Webshare get_user_files error ({ep}): {e}", xbmc.LOGWARNING)
+            
+    xbmc.log(f"Webshare get_user_files: found {len(files)} total files", xbmc.LOGINFO)
+    return files
 
 def delete_file(ident):
     if not ident:
@@ -446,10 +489,11 @@ def delete_file(ident):
         data = {'wst': token, 'ident': ident}
         try:
             response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-            if response.status_code == 200:
-                if 'OK' in response.text or 'status' in response.text:
-                    xbmc.log(f"Webshare: delete_file {ident} via {ep} OK", xbmc.LOGINFO)
-                    return True
+            if _is_response_ok(response):
+                xbmc.log(f"Webshare: delete_file {ident} via {ep} OK", xbmc.LOGINFO)
+                return True
+            else:
+                xbmc.log(f"Webshare: delete_file {ident} via {ep} failed: {response.text[:100]}", xbmc.LOGWARNING)
         except Exception as e:
             xbmc.log(f"Webshare delete_file error ({ep}): {e}", xbmc.LOGWARNING)
     return False
@@ -469,8 +513,12 @@ def get_sync_files():
     
     endpoints = [
         ('folder_files/', {'wst': token, 'folder': folder_ident, 'private': 1}),
+        ('folder_files/', {'wst': token, 'folder': folder_ident}),
         ('folder_files/', {'wst': token, 'ident': folder_ident, 'private': 1}),
+        ('folder_files/', {'wst': token, 'folder_ident': folder_ident, 'private': 1}),
         ('user_files/', {'wst': token, 'folder': folder_ident, 'private': 1}),
+        ('user_files/', {'wst': token, 'folder': folder_ident}),
+        ('user_files/', {'wst': token, 'folder_ident': folder_ident, 'private': 1}),
         ('files/', {'wst': token, 'folder': folder_ident, 'private': 1}),
     ]
     
@@ -515,6 +563,7 @@ def move_to_sync(filename):
         for root_ident in root_idents:
             candidates = [
                 ('file_update/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
+                ('file_update/', {'wst': token, 'ident': root_ident, 'folder': folder_ident}),
                 ('file_update/', {'wst': token, 'ident': root_ident, 'folder_ident': folder_ident, 'private': 1}),
                 ('file_move/', {'wst': token, 'ident': root_ident, 'folder': folder_ident, 'private': 1}),
                 ('file_move/', {'wst': token, 'ident': root_ident, 'target_folder': folder_ident, 'private': 1}),
@@ -525,7 +574,7 @@ def move_to_sync(filename):
             for ep, data in candidates:
                 try:
                     response = requests.post(BASE_URL + ep, data=data, headers=HEADERS, timeout=8, verify=get_ssl_verify())
-                    if response.status_code == 200 and ('OK' in response.text or 'status' in response.text):
+                    if _is_response_ok(response):
                         xbmc.log(f"Webshare: move_to_sync '{filename}' via {ep} OK", xbmc.LOGINFO)
                         break
                 except Exception as e:
