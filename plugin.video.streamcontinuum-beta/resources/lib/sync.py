@@ -52,7 +52,7 @@ def _is_history_sync_filename(name):
     if not name:
         return False
     n = name.lower()
-    return n.startswith('streamcontinuum_history')
+    return n.startswith('streamcontinuum_history') or n == 'history.json'
 
 def _is_settings_sync_filename(name):
     if not name:
@@ -61,9 +61,6 @@ def _is_settings_sync_filename(name):
     return n.startswith('streamcontinuum_settings')
 
 def export_settings(pin):
-    """
-    Exportuje nastavení doplňku, zašifruje je zadávaným PINem a uloží do Webshare podadresáře StreamContinuum_Sync.
-    """
     try:
         xbmc.log("StreamContinuum: Starting export_settings", xbmc.LOGINFO)
         
@@ -94,22 +91,22 @@ def export_settings(pin):
             
         xbmc.log(f"StreamContinuum: Settings encrypted and saved to {filepath}", xbmc.LOGINFO)
             
-        # Odstranění starých verzí nastavení z podsložky i rootu
+        # Odstranění starých verzí nastavení ze sync složky i rootu
         files = webshare.get_sync_files()
         for f in files:
             if _is_settings_sync_filename(f.get('name')):
                 xbmc.log(f"StreamContinuum: Found old settings file in sync {f.get('name')} ({f['ident']}), deleting...", xbmc.LOGINFO)
                 webshare.delete_file(f['ident'])
-                time.sleep(0.3)
+                time.sleep(0.2)
                 
         public_files = webshare.get_user_files()
         for f in public_files:
             if _is_settings_sync_filename(f.get('name')):
                 xbmc.log(f"StreamContinuum: Found old settings in root {f.get('name')} ({f['ident']}), deleting...", xbmc.LOGINFO)
                 webshare.delete_file(f['ident'])
-                time.sleep(0.3)
+                time.sleep(0.2)
                 
-        time.sleep(1.0)
+        time.sleep(0.5)
         
         success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
         if success:
@@ -125,9 +122,6 @@ def export_settings(pin):
         return False, f"Chyba při exportu: {str(e)}"
 
 def import_settings(pin):
-    """
-    Stáhne zašifrovaný soubor nastavení z Webshare, dešifruje jej PINem a aplikuje do doplňku.
-    """
     try:
         if not ADDON.getSetting('ws_username') or not ADDON.getSetting('ws_password'):
             return False, "Není vyplněno uživatelské jméno nebo heslo pro Webshare."
@@ -199,17 +193,6 @@ def import_settings(pin):
         return False, f"Chyba importu nastavení: {str(e)}"
 
 def sync_history():
-    """
-    Provede kompletní obousměrnou synchronizaci historie sledování mezi lokálním zařízením a Webshare.
-    
-    Zajišťuje správné ukládání do podsložky 'StreamContinuum_Sync' a odstraňuje duplicity na Webshare:
-    1. Načte lokální soubor history.json.
-    2. Vyhledá a stáhne soubory historie jak z podsložky StreamContinuum_Sync, tak z rootu uživatele.
-    3. Sloučí položky podle časových razítek a TMDb/názvu.
-    4. Uloží aktualizovanou historii lokálně.
-    5. Smaže všechny předchozí vzdálené soubory (zamezení duplicit na Webshare).
-    6. Nahraje novou historii s garantovaným identem složky StreamContinuum_Sync a potvrdí přesun.
-    """
     try:
         xbmc.log("StreamContinuum: Starting sync_history", xbmc.LOGINFO)
         
@@ -241,6 +224,8 @@ def sync_history():
                 seen_idents.add(f['ident'])
                 remote_history_files.append(f)
                 
+        xbmc.log(f"StreamContinuum: Found {len(remote_history_files)} remote history files across Webshare", xbmc.LOGINFO)
+
         # Krok 3: Stažení a sloučení všech nalezených vzdálených historií
         remote_history = []
         for f in remote_history_files:
