@@ -125,6 +125,12 @@ def get_history(deduplicate=True):
                             key = f"query_{q_base}"
                             if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
                                 series_map[key] = item
+                            # Pokud název obsahuje složené části oddělené lomítkem/pomlčkou, indexovat i první část
+                            parts = re.split(r'\s*[/\-–—_]\s*', q_base)
+                            if len(parts) > 1 and len(parts[0].strip()) >= 3:
+                                p_key = f"query_{parts[0].strip()}"
+                                if p_key not in series_map:
+                                    series_map[p_key] = item
                     else:
                         if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
                             key = f"movie_tmdb_{tmdb_id}"
@@ -158,6 +164,10 @@ def get_history(deduplicate=True):
                             matched_source = series_map[f"title_{t_base}"]
                         elif q_base and f"query_{q_base}" in series_map:
                             matched_source = series_map[f"query_{q_base}"]
+                        else:
+                            parts = re.split(r'\s*[/\-–—_]\s*', q_base)
+                            if len(parts) > 1 and len(parts[0].strip()) >= 3 and f"query_{parts[0].strip()}" in series_map:
+                                matched_source = series_map[f"query_{parts[0].strip()}"]
 
                         if matched_source and matched_source is not item:
                             for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
@@ -177,6 +187,9 @@ def get_history(deduplicate=True):
                                 keys.append(f"title_{tb}")
                         if q_base:
                             keys.append(f"query_{q_base}")
+                            parts = re.split(r'\s*[/\-–—_]\s*', q_base)
+                            if len(parts) > 1 and len(parts[0].strip()) >= 3:
+                                keys.append(f"query_{parts[0].strip()}")
 
                         if keys and any(k in seen_keys for k in keys):
                             continue
