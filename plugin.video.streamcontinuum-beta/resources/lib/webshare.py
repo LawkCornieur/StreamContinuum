@@ -496,6 +496,17 @@ def get_all_user_files():
     xbmc.log(f"Webshare get_all_user_files: found {len(all_files)} total files across all folders", xbmc.LOGINFO)
     return all_files
 
+def get_sync_files(filename_pattern=None):
+    try:
+        all_files = get_all_user_files()
+        if not filename_pattern:
+            return all_files
+        pattern = str(filename_pattern).lower()
+        return [f for f in all_files if pattern in str(f.get('name', '')).lower()]
+    except Exception as e:
+        xbmc.log(f"Webshare get_sync_files error: {e}", xbmc.LOGWARNING)
+        return []
+
 def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
     token = get_token()
     if not token:
@@ -523,7 +534,12 @@ def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
                             'private': '1'
                         }
                         if target_folder_name:
-                            upload_data['folder'] = str(target_folder_name)
+                            sync_ident = get_sync_folder_ident() if target_folder_name == 'StreamContinuum_Sync' else None
+                            if sync_ident:
+                                upload_data['folder'] = str(sync_ident)
+                                upload_data['folder_ident'] = str(sync_ident)
+                            else:
+                                upload_data['folder'] = str(target_folder_name)
                             
                         up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60, verify=get_ssl_verify())
                         if up_resp.status_code in (200, 201):
