@@ -288,16 +288,23 @@ def sync_history():
             time.sleep(0.1)
             
         # 6. Vyčištění nežádoucích / osiřelých složek vytvořených předchozími chybami
+        cleanup_candidates = ['34RTXrFvDe', '78t7k7Pd37', 'New Folder']
         folders = webshare.get_user_folders()
         for fld in folders:
             fld_name = fld.get('name', '').strip()
             fld_ident = fld.get('ident')
             if fld_name.lower() in ('new folder', 'nová složka') or (len(fld_name) == 10 and fld_name.isalnum() and fld_name != 'StreamContinuum_Sync'):
-                sub_f = webshare.get_user_files(folder_ident=fld_ident)
-                if not sub_f:
-                    xbmc.log(f"StreamContinuum: Cleaning empty orphaned folder '{fld_name}' ({fld_ident})", xbmc.LOGINFO)
-                    webshare.delete_folder(fld_ident)
-                    time.sleep(0.1)
+                if fld_ident:
+                    cleanup_candidates.append(fld_ident)
+                if fld_name:
+                    cleanup_candidates.append(fld_name)
+
+        for fld_ref in set(cleanup_candidates):
+            sub_f = webshare.get_user_files(folder_ident=fld_ref)
+            if not sub_f:
+                xbmc.log(f"StreamContinuum: Cleaning empty orphaned folder '{fld_ref}'", xbmc.LOGINFO)
+                webshare.delete_folder(fld_ref)
+                time.sleep(0.1)
 
         time.sleep(0.4)
         
