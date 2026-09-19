@@ -52,7 +52,7 @@ def _is_history_sync_filename(name):
     if not name:
         return False
     n = str(name).lower().strip()
-    return 'streamcontinuum_history' in n or n == 'history.json'
+    return 'streamcontinuum_history' in n or n.startswith('history') or 'history.json' in n
 
 def _is_settings_sync_filename(name):
     if not name:
@@ -91,7 +91,7 @@ def export_settings(pin):
             
         xbmc.log(f"StreamContinuum: Settings encrypted and saved to {filepath}", xbmc.LOGINFO)
             
-        all_files = webshare.get_all_user_files()
+        all_files = webshare.get_sync_files('streamcontinuum_settings')
         for f in all_files:
             if _is_settings_sync_filename(f.get('name')):
                 xbmc.log(f"StreamContinuum: Found old settings file {f.get('name')} ({f['ident']}), deleting...", xbmc.LOGINFO)
@@ -115,7 +115,7 @@ def import_settings(pin):
         if not ADDON.getSetting('ws_username') or not ADDON.getSetting('ws_password'):
             return False, "Není vyplněno uživatelské jméno nebo heslo pro Webshare."
 
-        all_files = webshare.get_all_user_files()
+        all_files = webshare.get_sync_files('streamcontinuum_settings')
         ident = None
         matched_name = None
         
@@ -190,20 +190,22 @@ def sync_history():
                 except Exception as e:
                     xbmc.log(f"StreamContinuum: Error loading local history: {e}", xbmc.LOGWARNING)
                     
-        # 2. Rekurzivní vyhledání všech souborů historie napříč celým Webshare účtem (root i podsložky)
-        all_files = webshare.get_all_user_files()
-        if not all_files and hasattr(webshare, 'get_sync_files'):
-            try:
-                all_files = webshare.get_sync_files()
-            except Exception:
-                pass
-
+        # 2. Rekurzivní a autentizované vyhledání všech souborů historie napříč celým Webshare
         remote_history_files = []
         seen_idents = set()
-        for f in all_files:
+        
+        search_candidates = webshare.get_sync_files('streamcontinuum_history')
+        for f in search_candidates:
             if _is_history_sync_filename(f.get('name')) and f.get('ident') not in seen_idents:
                 seen_idents.add(f['ident'])
                 remote_history_files.append(f)
+                
+        if not remote_history_files:
+            fallback_files = webshare.get_all_user_files()
+            for f in fallback_files:
+                if _is_history_sync_filename(f.get('name')) and f.get('ident') not in seen_idents:
+                    seen_idents.add(f['ident'])
+                    remote_history_files.append(f)
                 
         xbmc.log(f"StreamContinuum: Found {len(remote_history_files)} remote history files across Webshare", xbmc.LOGINFO)
 
@@ -287,7 +289,7 @@ def sync_history():
             webshare.delete_file(f['ident'])
             time.sleep(0.1)
             
-        # 6. Vyčištění nežádoucích / osiřelých složek vytvořených předchozími chybami
+        # 6. Vyčištění nežádoucích / osiřelých podsložek vytvořených předchozími verzemi
         cleanup_candidates = ['34RTXrFvDe', '78t7k7Pd37', 'New Folder']
         folders = webshare.get_user_folders()
         for fld in folders:
