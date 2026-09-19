@@ -192,6 +192,12 @@ def sync_history():
                     
         # 2. Rekurzivní vyhledání všech souborů historie napříč celým Webshare účtem (root i podsložky)
         all_files = webshare.get_all_user_files()
+        if not all_files and hasattr(webshare, 'get_sync_files'):
+            try:
+                all_files = webshare.get_sync_files()
+            except Exception:
+                pass
+
         remote_history_files = []
         seen_idents = set()
         for f in all_files:
@@ -287,7 +293,6 @@ def sync_history():
             fld_name = fld.get('name', '').strip()
             fld_ident = fld.get('ident')
             if fld_name.lower() in ('new folder', 'nová složka') or (len(fld_name) == 10 and fld_name.isalnum() and fld_name != 'StreamContinuum_Sync'):
-                # Zkontrolovat, zda složka neobsahuje soubory uživatele
                 sub_f = webshare.get_user_files(folder_ident=fld_ident)
                 if not sub_f:
                     xbmc.log(f"StreamContinuum: Cleaning empty orphaned folder '{fld_name}' ({fld_ident})", xbmc.LOGINFO)
