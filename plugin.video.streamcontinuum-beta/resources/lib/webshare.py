@@ -243,6 +243,26 @@ def search(query):
         xbmc.log(f"Webshare search error: {e}", xbmc.LOGERROR)
     return []
 
+def search_user_files(query):
+    token = get_token()
+    if not token or not query:
+        return []
+    url = BASE_URL + 'search/'
+    data = {
+        'what': str(query).strip(),
+        'sort': 'recent',
+        'limit': 100,
+        'offset': 0,
+        'wst': token
+    }
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+        if response.status_code == 200:
+            return _parse_files_from_content(response.content)
+    except Exception as e:
+        xbmc.log(f"Webshare search_user_files error: {e}", xbmc.LOGWARNING)
+    return []
+
 def get_link(ident):
     if not ident:
         return None
@@ -274,9 +294,9 @@ def get_user_folders():
         return []
         
     endpoints = [
-        ('user_files/', {'wst': token, 'limit': 500, 'offset': 0}),
-        ('user_folders/', {'wst': token, 'limit': 100, 'offset': 0}),
         ('folder_list/', {'wst': token}),
+        ('user_folders/', {'wst': token, 'limit': 100, 'offset': 0}),
+        ('user_files/', {'wst': token, 'limit': 500, 'offset': 0}),
     ]
     
     all_folders = []
@@ -350,13 +370,17 @@ def get_user_files(folder_ident=None):
     seen_idents = set()
     if folder_ident:
         endpoints = [
+            ('folder_files/', {'wst': token, 'folder': folder_ident, 'limit': 500, 'offset': 0}),
+            ('folder_files/', {'wst': token, 'ident': folder_ident, 'limit': 500, 'offset': 0}),
             ('user_files/', {'wst': token, 'folder': folder_ident, 'limit': 500, 'offset': 0}),
             ('user_files/', {'wst': token, 'folder_ident': folder_ident, 'limit': 500, 'offset': 0}),
-            ('user_files/', {'wst': token, 'ident': folder_ident, 'limit': 500, 'offset': 0}),
+            ('file_list/', {'wst': token, 'folder': folder_ident, 'limit': 500, 'offset': 0}),
         ]
     else:
         endpoints = [
             ('user_files/', {'wst': token, 'limit': 500, 'offset': 0}),
+            ('folder_files/', {'wst': token, 'limit': 500, 'offset': 0}),
+            ('file_list/', {'wst': token, 'limit': 500, 'offset': 0}),
         ]
         
     for ep, data in endpoints:
@@ -383,12 +407,22 @@ def get_all_user_files():
     all_files = []
     seen_idents = set()
     
+    # 1. Hledání pomocí search s wst tokenem pro specifické streamcontinuum soubory
+    for keyword in ['streamcontinuum', 'history', 'settings']:
+        s_files = search_user_files(keyword)
+        for f in s_files:
+            if f['ident'] not in seen_idents:
+                seen_idents.add(f['ident'])
+                all_files.append(f)
+    
+    # 2. Načtení souborů z rootu uživatelského úložiště
     root_files = get_user_files(folder_ident=None)
     for f in root_files:
         if f['ident'] not in seen_idents:
             seen_idents.add(f['ident'])
             all_files.append(f)
             
+    # 3. Procházení všech uživatelských složek (včetně známých kandidátů)
     folders = get_user_folders()
     candidate_targets = ['StreamContinuum_Sync', '34RTXrFvDe', '78t7k7Pd37', 'New Folder']
     scan_targets = list(candidate_targets)
@@ -413,11 +447,33 @@ def get_all_user_files():
 
 def get_sync_files(filename_pattern=None):
     try:
-        all_files = get_all_user_files()
+        found_files = []
+        seen_idents = set()
+        
+        search_terms = ['streamcontinuum']
+        if filename_pattern:
+            clean_pat = str(filename_pattern).replace('.json', '').replace('.enc', '').strip()
+            if clean_pat and clean_pat not in search_terms:
+                search_terms.append(clean_pat)
+                
+        for term in search_terms:
+            s_res = search_user_files(term)
+            for f in s_res:
+                if f.get('ident') and f['ident'] not in seen_idents:
+                    seen_idents.add(f['ident'])
+                    found_files.append(f)
+                    
+        all_user = get_all_user_files()
+        for f in all_user:
+            if f.get('ident') and f['ident'] not in seen_idents:
+                seen_idents.add(f['ident'])
+                found_files.append(f)
+                
         if not filename_pattern:
-            return all_files
-        pattern = str(filename_pattern).lower()
-        return [f for f in all_files if pattern in str(f.get('name', '')).lower()]
+            return found_files
+            
+        pattern = str(filename_pattern).lower().strip()
+        return [f for f in found_files if pattern in str(f.get('name', '')).lower()]
     except Exception as e:
         xbmc.log(f"Webshare get_sync_files error: {e}", xbmc.LOGWARNING)
         return []
