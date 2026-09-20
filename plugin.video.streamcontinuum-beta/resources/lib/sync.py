@@ -199,12 +199,11 @@ def sync_history():
                 seen_idents.add(f['ident'])
                 remote_history_files.append(f)
                 
-        if not remote_history_files:
-            fallback_files = webshare.get_all_user_files()
-            for f in fallback_files:
-                if _is_history_sync_filename(f.get('name')) and f.get('ident') not in seen_idents:
-                    seen_idents.add(f['ident'])
-                    remote_history_files.append(f)
+        all_user_files = webshare.get_all_user_files()
+        for f in all_user_files:
+            if _is_history_sync_filename(f.get('name')) and f.get('ident') not in seen_idents:
+                seen_idents.add(f['ident'])
+                remote_history_files.append(f)
                 
         xbmc.log(f"StreamContinuum: Found {len(remote_history_files)} remote history files across Webshare", xbmc.LOGINFO)
 
