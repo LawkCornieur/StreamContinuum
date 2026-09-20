@@ -348,10 +348,20 @@ def delete_file(ident):
     if not token:
         return False
         
-    endpoints = ['file_delete/', 'remove_file/', 'delete_file/']
-    for ep in endpoints:
+    endpoints = [
+        ('file_delete/', {'wst': token, 'ident': ident}),
+        ('file_delete/', {'wst': token, 'file_ident': ident}),
+        ('file_delete/', {'wst': token, 'id': ident}),
+        ('delete_file/', {'wst': token, 'ident': ident}),
+        ('delete_file/', {'wst': token, 'file_ident': ident}),
+        ('user_file_delete/', {'wst': token, 'ident': ident}),
+        ('user_files_delete/', {'wst': token, 'idents': ident}),
+        ('user_files_delete/', {'wst': token, 'ident': ident}),
+        ('file_remove/', {'wst': token, 'ident': ident}),
+        ('remove_file/', {'wst': token, 'ident': ident}),
+    ]
+    for ep, data in endpoints:
         url = BASE_URL + ep
-        data = {'wst': token, 'ident': ident}
         try:
             response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
             if _is_response_ok(response):
@@ -407,7 +417,6 @@ def get_all_user_files():
     all_files = []
     seen_idents = set()
     
-    # 1. Hledání pomocí search s wst tokenem pro specifické streamcontinuum soubory
     for keyword in ['streamcontinuum', 'history', 'settings']:
         s_files = search_user_files(keyword)
         for f in s_files:
@@ -415,14 +424,12 @@ def get_all_user_files():
                 seen_idents.add(f['ident'])
                 all_files.append(f)
     
-    # 2. Načtení souborů z rootu uživatelského úložiště
     root_files = get_user_files(folder_ident=None)
     for f in root_files:
         if f['ident'] not in seen_idents:
             seen_idents.add(f['ident'])
             all_files.append(f)
             
-    # 3. Procházení všech uživatelských složek (včetně známých kandidátů)
     folders = get_user_folders()
     candidate_targets = ['StreamContinuum_Sync', '34RTXrFvDe', '78t7k7Pd37', 'New Folder']
     scan_targets = list(candidate_targets)
