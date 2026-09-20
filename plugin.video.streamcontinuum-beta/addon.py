@@ -184,7 +184,7 @@ def search(query=None):
             return
         
         edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} ({query})...[/COLOR]"
-        edit_url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
+        edit_url = f"RunPlugin({sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)})"
         edit_item = xbmcgui.ListItem(label=edit_label)
         edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa-ws.png')})
         xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=False)
@@ -323,7 +323,6 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     pass
                 xbmc.sleep(500)
 
-            # Stabilize after playback stops
             for _ in range(10):
                 if not player.isPlayingVideo():
                     break
@@ -747,6 +746,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         'poster': poster,
         'fanart': fanart,
         'plot': plot,
+        'run_plugin': True,
         'is_folder': False
     })
 
@@ -871,6 +871,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         'poster': poster,
         'fanart': fanart,
         'plot': plot,
+        'run_plugin': True,
         'is_folder': False
     })
 
@@ -894,6 +895,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         'poster': poster,
         'fanart': fanart,
         'plot': plot,
+        'run_plugin': True,
         'is_folder': False
     })
     
@@ -1031,7 +1033,6 @@ def show_changelog():
     try:
         with open(changelog_path, 'r', encoding='utf-8') as f:
             changelog = f.read()
-    
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error reading changelog: {e}", xbmc.LOGWARNING)
         changelog = "Changelog momentálně není k dispozici."
@@ -1109,7 +1110,7 @@ def show_trakt_watchlist():
         else:
             continue
             
-        url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
+        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
         trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('show', {}).get('ids', {}).get('trakt') if media_type == 'show' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None))
@@ -1202,7 +1203,7 @@ def show_trakt_playback(offset=0):
         else:
             continue
             
-        url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
+        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
         trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
@@ -1229,18 +1230,8 @@ def search_prefill(query):
     if keyboard.isConfirmed():
         new_query = keyboard.getText()
         if new_query:
-            if HANDLE >= 0:
-                try:
-                    xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-                except Exception:
-                    pass
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(new_query)})')
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(new_query)},replace)')
             return
-    if HANDLE >= 0:
-        try:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-        except Exception:
-            pass
 
 def show_tmdb_menu():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30099))
@@ -2362,18 +2353,8 @@ def run():
             if new_query and new_query != old_query:
                 import history
                 history.update_history_item(old_query, new_query)
-                if HANDLE >= 0:
-                    try:
-                        xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-                    except Exception:
-                        pass
                 xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(new_query)},replace)')
                 return
-        if HANDLE >= 0:
-            try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-            except Exception:
-                pass
         return
     elif action == 'history_tmdb_custom_search':
         orig_q = params.get('original_query', '')
@@ -2383,18 +2364,8 @@ def run():
         if keyboard.isConfirmed():
             new_search_term = keyboard.getText()
             if new_search_term:
-                if HANDLE >= 0:
-                    try:
-                        xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-                    except Exception:
-                        pass
                 xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote_plus(orig_q)}&custom_query={urllib.parse.quote_plus(new_search_term)},replace)')
                 return
-        if HANDLE >= 0:
-            try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-            except Exception:
-                pass
         return
     elif action == 'assign_tmdb_data_to_history':
         assign_tmdb_data_to_history(
