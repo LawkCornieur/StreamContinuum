@@ -34,11 +34,17 @@ def _is_response_ok(response):
             return True
         if root.attrib.get('status', '').upper() == 'OK':
             return True
+        for st in root.findall('.//status'):
+            if st.text and st.text.upper() == 'OK':
+                return True
+        for st in root.findall('.//result'):
+            if st.text and st.text.upper() == 'OK':
+                return True
     except Exception:
         pass
     try:
         js = response.json()
-        if js.get('status', '').upper() == 'OK':
+        if js.get('status', '').upper() == 'OK' or js.get('result', '').upper() == 'OK':
             return True
     except Exception:
         pass
@@ -296,6 +302,7 @@ def get_user_folders():
     endpoints = [
         ('folder_list/', {'wst': token}),
         ('user_folders/', {'wst': token, 'limit': 100, 'offset': 0}),
+        ('user_folder_list/', {'wst': token}),
         ('user_files/', {'wst': token, 'limit': 500, 'offset': 0}),
     ]
     
@@ -317,6 +324,54 @@ def get_user_folders():
             
     return all_folders
 
+def create_folder(folder_name):
+    if not folder_name:
+        return None
+    token = get_token()
+    if not token:
+        return None
+    endpoints = [
+        ('folder_create/', {'wst': token, 'name': folder_name}),
+        ('user_folder_create/', {'wst': token, 'name': folder_name}),
+        ('create_folder/', {'wst': token, 'name': folder_name}),
+        ('mkdir/', {'wst': token, 'name': folder_name}),
+    ]
+    for ep, data in endpoints:
+        try:
+            res = requests.post(BASE_URL + ep, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            if _is_response_ok(res):
+                ident = None
+                try:
+                    root = ElementTree.fromstring(res.content)
+                    ident = _get_node_text_or_attr(root, ['folder_ident', 'ident', 'id', 'folder_id'])
+                except Exception:
+                    pass
+                if not ident:
+                    try:
+                        js = res.json()
+                        ident = js.get('folder_ident') or js.get('ident') or js.get('id')
+                    except Exception:
+                        pass
+                xbmc.log(f"Webshare: create_folder '{folder_name}' via {ep} OK (ident: {ident})", xbmc.LOGINFO)
+                return ident if ident else folder_name
+        except Exception as e:
+            xbmc.log(f"Webshare create_folder error ({ep}): {e}", xbmc.LOGWARNING)
+    return None
+
+def get_or_create_sync_folder(folder_name='StreamContinuum_Sync'):
+    folders = get_user_folders()
+    for f in folders:
+        if str(f.get('name', '')).strip().lower() == str(folder_name).strip().lower():
+            return f.get('ident')
+    created_ident = create_folder(folder_name)
+    if created_ident:
+        return created_ident
+    folders = get_user_folders()
+    for f in folders:
+        if str(f.get('name', '')).strip().lower() == str(folder_name).strip().lower():
+            return f.get('ident')
+    return None
+
 def delete_folder(ident):
     if not ident:
         return False
@@ -326,6 +381,8 @@ def delete_folder(ident):
     endpoints = [
         ('folder_delete/', {'wst': token, 'ident': ident}),
         ('folder_delete/', {'wst': token, 'folder': ident}),
+        ('folder_delete/', {'wst': token, 'folder_ident': ident}),
+        ('user_folder_delete/', {'wst': token, 'ident': ident}),
         ('delete_folder/', {'wst': token, 'ident': ident}),
         ('delete_folder/', {'wst': token, 'folder': ident}),
         ('folder_remove/', {'wst': token, 'ident': ident}),
@@ -337,6 +394,8 @@ def delete_folder(ident):
             if _is_response_ok(res):
                 xbmc.log(f"Webshare: delete_folder {ident} via {ep} OK", xbmc.LOGINFO)
                 return True
+            else:
+                xbmc.log(f"Webshare: delete_folder {ident} via {ep} resp: {res.text.strip()[:100]}", xbmc.LOGDEBUG)
         except Exception as e:
             xbmc.log(f"Webshare delete_folder error ({ep}): {e}", xbmc.LOGWARNING)
     return False
@@ -352,13 +411,13 @@ def delete_file(ident):
         ('file_delete/', {'wst': token, 'ident': ident}),
         ('file_delete/', {'wst': token, 'file_ident': ident}),
         ('file_delete/', {'wst': token, 'id': ident}),
-        ('delete_file/', {'wst': token, 'ident': ident}),
-        ('delete_file/', {'wst': token, 'file_ident': ident}),
-        ('user_file_delete/', {'wst': token, 'ident': ident}),
         ('user_files_delete/', {'wst': token, 'idents': ident}),
         ('user_files_delete/', {'wst': token, 'ident': ident}),
+        ('user_file_delete/', {'wst': token, 'ident': ident}),
+        ('delete_file/', {'wst': token, 'ident': ident}),
+        ('delete_file/', {'wst': token, 'file_ident': ident}),
         ('file_remove/', {'wst': token, 'ident': ident}),
-        ('remove_file/', {'wst': token, 'ident': ident}),
+        ('file_unlink/', {'wst': token, 'ident': ident}),
     ]
     for ep, data in endpoints:
         url = BASE_URL + ep
@@ -367,6 +426,8 @@ def delete_file(ident):
             if _is_response_ok(response):
                 xbmc.log(f"Webshare: delete_file {ident} via {ep} OK", xbmc.LOGINFO)
                 return True
+            else:
+                xbmc.log(f"Webshare: delete_file {ident} via {ep} resp: {response.text.strip()[:100]}", xbmc.LOGDEBUG)
         except Exception as e:
             xbmc.log(f"Webshare delete_file error ({ep}): {e}", xbmc.LOGWARNING)
     return False
@@ -384,6 +445,7 @@ def get_user_files(folder_ident=None):
             ('folder_files/', {'wst': token, 'ident': folder_ident, 'limit': 500, 'offset': 0}),
             ('user_files/', {'wst': token, 'folder': folder_ident, 'limit': 500, 'offset': 0}),
             ('user_files/', {'wst': token, 'folder_ident': folder_ident, 'limit': 500, 'offset': 0}),
+            ('user_folder_files/', {'wst': token, 'folder': folder_ident, 'limit': 500, 'offset': 0}),
             ('file_list/', {'wst': token, 'folder': folder_ident, 'limit': 500, 'offset': 0}),
         ]
     else:
@@ -417,7 +479,7 @@ def get_all_user_files():
     all_files = []
     seen_idents = set()
     
-    for keyword in ['streamcontinuum', 'history', 'settings']:
+    for keyword in ['streamcontinuum', 'history', 'settings', 'json', 'enc']:
         s_files = search_user_files(keyword)
         for f in s_files:
             if f['ident'] not in seen_idents:
@@ -490,6 +552,10 @@ def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
     if not token:
         return False
         
+    target_folder_ident = None
+    if target_folder_name:
+        target_folder_ident = get_or_create_sync_folder(target_folder_name)
+        
     url = BASE_URL + 'upload_url/'
     data = {'wst': token}
     try:
@@ -502,7 +568,7 @@ def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
                 
                 for attempt in range(3):
                     try:
-                        xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (attempt {attempt + 1}/3, target_folder: {target_folder_name})...", xbmc.LOGINFO)
+                        xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (attempt {attempt + 1}/3, target_folder: {target_folder_name} ident: {target_folder_ident})...", xbmc.LOGINFO)
                         with open(filepath, 'rb') as f:
                             file_content = f.read()
                             
@@ -511,7 +577,10 @@ def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
                             'wst': token,
                             'private': '1'
                         }
-                        if target_folder_name:
+                        if target_folder_ident:
+                            upload_data['folder'] = str(target_folder_ident)
+                            upload_data['folder_ident'] = str(target_folder_ident)
+                        elif target_folder_name:
                             upload_data['folder'] = str(target_folder_name)
                             
                         up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=60, verify=get_ssl_verify())
