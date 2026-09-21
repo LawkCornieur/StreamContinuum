@@ -441,7 +441,7 @@ def play(ident, query=None, title=None, is_autoplay=False):
                 elif after == '3':
                     xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
                 elif after == '4' and current_query:
-                    xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query},replace)')
+                    xbmc.executebuiltin(f'RunPlugin({sys.argv[0]}?action=search_prefill&query={safe_query})')
                 break
         else:
             xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
@@ -632,7 +632,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     if show_full_history_link and source != 'watchlist':
         items.append({
             'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
-            'action': 'history_list_replace',
+            'custom_url': f"Container.Update({sys.argv[0]}?action=history_list,replace)",
             'icon': 'DefaultFolder.png',
             'thumb': 'DefaultFolder.png',
             'poster': poster,
@@ -684,7 +684,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         except Exception as e:
             xbmc.log(f"StreamContinuum: TMDb fetch error for history_menu: {e}", xbmc.LOGWARNING)
 
-    def _format_ep_info(ep_obj, default_label, prefix=""):
+def _format_ep_info(ep_obj, default_label, prefix=""):
         if not ep_obj:
             help_text = "" if clean_tmdb_id else f"\n\n[COLOR #01b4e4]{ADDON.getLocalizedString(30120)}[/COLOR]"
             return default_label, None, plot + help_text, year, rating, runtime
@@ -807,7 +807,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             items.append({
                 'label': ns_lbl,
                 'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season+1:02d}E01")}',
-                'icon': ns_still or 'DefaultVideoEpisodes.png',
+                'icon': n_still or 'DefaultVideoEpisodes.png',
                 'thumb': ns_still or poster or 'DefaultVideoEpisodes.png',
                 'poster': poster,
                 'fanart': fanart,
@@ -901,7 +901,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     
     for it in items:
         lbl = it['label']
-        act = it['action']
+        act = it.get('action', '')
         icn = it['icon']
         pos = it.get('poster') or poster
         fan = it.get('fanart') or fanart
@@ -912,7 +912,9 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         is_fld = it.get('is_folder', True)
         thm = it.get('thumb') or pos or icn
         
-        if it.get('run_plugin'):
+        if it.get('custom_url'):
+            url = it['custom_url']
+        elif it.get('run_plugin'):
             url = f"RunPlugin({sys.argv[0]}?action={act})"
         else:
             url = f"{sys.argv[0]}?action={act}"
@@ -1986,7 +1988,7 @@ def history_tmdb_identify_search(original_query, custom_query=None):
         all_items = tmdb_module.search_tmdb(original_query)
 
     edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} TMDb ({search_term})...[/COLOR]"
-    edit_url = f"{sys.argv[0]}?action=history_tmdb_custom_search&original_query={urllib.parse.quote_plus(original_query)}&prefill={urllib.parse.quote_plus(search_term)}"
+    edit_url = f"RunPlugin({sys.argv[0]}?action=history_tmdb_custom_search&original_query={urllib.parse.quote_plus(original_query)}&prefill={urllib.parse.quote_plus(search_term)})"
     edit_item = xbmcgui.ListItem(label=edit_label)
     edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa.png')})
     xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=False)
