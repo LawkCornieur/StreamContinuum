@@ -684,7 +684,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         except Exception as e:
             xbmc.log(f"StreamContinuum: TMDb fetch error for history_menu: {e}", xbmc.LOGWARNING)
 
-def _format_ep_info(ep_obj, default_label, prefix=""):
+    def _format_ep_info(ep_obj, default_label, prefix=""):
         if not ep_obj:
             help_text = "" if clean_tmdb_id else f"\n\n[COLOR #01b4e4]{ADDON.getLocalizedString(30120)}[/COLOR]"
             return default_label, None, plot + help_text, year, rating, runtime
