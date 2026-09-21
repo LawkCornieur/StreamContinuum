@@ -173,6 +173,7 @@ def search(query=None):
         else:
             if HANDLE >= 0:
                 xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                xbmc.executebuiltin('Action(Back)')
             return
 
     if query:
@@ -180,7 +181,7 @@ def search(query=None):
         results = webshare.search(query)
         if not results:
             xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
         
         edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} ({query})...[/COLOR]"
@@ -523,17 +524,12 @@ def show_history(force_list=False):
     
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        if HANDLE >= 0:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
         return
 
     if not force_list and ADDON.getSettingBool('open_last_history'):
-        q = urllib.parse.quote_plus(items[0].get('query', ''))
-        if HANDLE >= 0:
-            try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-            except Exception:
-                pass
-        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={q}&from_open_last=1,replace)')
+        history_menu(items[0].get('query', ''), show_full_history_link=True, source='history')
         return
 
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
@@ -632,12 +628,13 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     if show_full_history_link and source != 'watchlist':
         items.append({
             'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
-            'custom_url': f"Container.Update({sys.argv[0]}?action=history_list,replace)",
+            'action': 'history_list_replace',
             'icon': 'DefaultFolder.png',
             'thumb': 'DefaultFolder.png',
             'poster': poster,
             'fanart': fanart,
             'plot': '',
+            'run_plugin': True,
             'is_folder': False
         })
 
@@ -962,6 +959,7 @@ def trakt_search(query=None):
         else:
             if HANDLE >= 0:
                 xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                xbmc.executebuiltin('Action(Back)')
             return
 
     if query:
@@ -969,7 +967,7 @@ def trakt_search(query=None):
         results = trakt.search_trakt(query)
         if not results:
             xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
         for item in results:
@@ -1642,6 +1640,7 @@ def show_tmdb_search(query=None):
         else:
             if HANDLE >= 0:
                 xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                xbmc.executebuiltin('Action(Back)')
             return
 
     if query:
@@ -1649,7 +1648,7 @@ def show_tmdb_search(query=None):
         all_items = tmdb_module.search_tmdb(query)
         if not all_items:
             xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_WARNING, 3000)
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
         for item in all_items:
@@ -2376,6 +2375,12 @@ def run():
             media_type=params.get('media_type')
         )
         return
+    elif action == 'search_prefill':
+        search_prefill(params.get('query', ''))
+        return
+    elif action == 'history_list_replace':
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_list,replace)')
+        return
 
     if HANDLE < 0:
         addon_id = ADDON.getAddonInfo('id')
@@ -2404,8 +2409,6 @@ def run():
         trakt_search()
     elif action == 'search':
         search(params.get('query'))
-    elif action == 'search_prefill':
-        search_prefill(params.get('query', ''))
     elif action == 'play':
         play(params.get('ident'), params.get('query'), params.get('title'))
     elif action == 'trending_movies':
@@ -2424,13 +2427,6 @@ def run():
         show_history()
     elif action == 'history_list':
         show_history(force_list=True)
-    elif action == 'history_list_replace':
-        if HANDLE >= 0:
-            try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-            except Exception:
-                pass
-        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_list,replace)')
     elif action == 'history_menu':
         history_menu(
             params.get('query'),
