@@ -169,11 +169,10 @@ def search(query=None):
         keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30057))
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
-            query = keyboard.getText()
+            query = keyboard.getText().strip()
         else:
             if HANDLE >= 0:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-                xbmc.executebuiltin('Action(Back)')
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
     if query:
@@ -185,7 +184,7 @@ def search(query=None):
             return
         
         edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} ({query})...[/COLOR]"
-        edit_url = f"RunPlugin({sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)})"
+        edit_url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
         edit_item = xbmcgui.ListItem(label=edit_label)
         edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa-ws.png')})
         xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=False)
@@ -628,14 +627,14 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     if show_full_history_link and source != 'watchlist':
         items.append({
             'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
-            'action': 'history_list_replace',
+            'action': 'history_list',
             'icon': 'DefaultFolder.png',
             'thumb': 'DefaultFolder.png',
-            'poster': poster,
+            'poster': None,
             'fanart': fanart,
             'plot': '',
-            'run_plugin': True,
-            'is_folder': False
+            'is_utility': True,
+            'is_folder': True
         })
 
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
@@ -740,10 +739,10 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         'action': f'history_edit&query={urllib.parse.quote_plus(query)}',
         'icon': 'DefaultEdit.png',
         'thumb': 'DefaultEdit.png',
-        'poster': poster,
+        'poster': None,
         'fanart': fanart,
-        'plot': plot,
-        'run_plugin': True,
+        'plot': '',
+        'is_utility': True,
         'is_folder': False
     })
 
@@ -847,6 +846,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             'poster': poster,
             'fanart': fanart,
             'plot': plot,
+            'is_utility': True,
             'is_folder': True
         })
 
@@ -855,9 +855,10 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         'action': f'history_tmdb_identify_search&original_query={urllib.parse.quote_plus(query)}',
         'icon': 'DefaultAddonVideo.png',
         'thumb': poster or 'DefaultAddonVideo.png',
-        'poster': poster,
+        'poster': None,
         'fanart': fanart,
-        'plot': plot,
+        'plot': '',
+        'is_utility': True,
         'is_folder': True
     })
     items.append({
@@ -865,10 +866,10 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         'action': f'history_mark&query={urllib.parse.quote_plus(query)}&watched={0 if is_watched else 1}',
         'icon': 'DefaultAddonVideo.png',
         'thumb': poster or 'DefaultAddonVideo.png',
-        'poster': poster,
+        'poster': None,
         'fanart': fanart,
-        'plot': plot,
-        'run_plugin': True,
+        'plot': '',
+        'is_utility': True,
         'is_folder': False
     })
 
@@ -889,10 +890,10 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         'action': f'history_delete&query={urllib.parse.quote_plus(query)}',
         'icon': 'DefaultDelete.png',
         'thumb': 'DefaultDelete.png',
-        'poster': poster,
+        'poster': None,
         'fanart': fanart,
-        'plot': plot,
-        'run_plugin': True,
+        'plot': '',
+        'is_utility': True,
         'is_folder': False
     })
     
@@ -900,19 +901,18 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         lbl = it['label']
         act = it.get('action', '')
         icn = it['icon']
-        pos = it.get('poster') or poster
+        is_utility = it.get('is_utility', False)
+        pos = it.get('poster') if not is_utility else None
         fan = it.get('fanart') or fanart
-        plt = it.get('plot') if it.get('plot') is not None else plot
-        yr = it.get('year') or year
-        rt = it.get('rating') or rating
-        dur = it.get('runtime') or runtime
+        plt = it.get('plot') if not is_utility else ''
+        yr = it.get('year') if not is_utility else None
+        rt = it.get('rating') if not is_utility else None
+        dur = it.get('runtime') if not is_utility else None
         is_fld = it.get('is_folder', True)
         thm = it.get('thumb') or pos or icn
         
         if it.get('custom_url'):
             url = it['custom_url']
-        elif it.get('run_plugin'):
-            url = f"RunPlugin({sys.argv[0]}?action={act})"
         else:
             url = f"{sys.argv[0]}?action={act}"
         list_item = xbmcgui.ListItem(label=lbl)
@@ -925,26 +925,27 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         
         info_tag = list_item.getVideoInfoTag()
         info_tag.setTitle(lbl)
-        info_tag.setMediaType('movie' if media_type == 'movie' else 'tvshow')
-        if plt:
-            info_tag.setPlot(str(plt))
-        if yr:
-            try:
-                info_tag.setYear(int(str(yr)[:4]))
-            except (ValueError, TypeError):
-                pass
-        if rt:
-            try:
-                info_tag.setRating(float(rt))
-            except (ValueError, TypeError):
-                pass
-        if dur:
-            try:
-                info_tag.setDuration(int(dur) * 60)
-            except (ValueError, TypeError):
-                pass
-        if genres:
-            info_tag.setGenres(genres if isinstance(genres, list) else [genres])
+        if not is_utility:
+            info_tag.setMediaType('movie' if media_type == 'movie' else 'tvshow')
+            if plt:
+                info_tag.setPlot(str(plt))
+            if yr:
+                try:
+                    info_tag.setYear(int(str(yr)[:4]))
+                except (ValueError, TypeError):
+                    pass
+            if rt:
+                try:
+                    info_tag.setRating(float(rt))
+                except (ValueError, TypeError):
+                    pass
+            if dur:
+                try:
+                    info_tag.setDuration(int(dur) * 60)
+                except (ValueError, TypeError):
+                    pass
+            if genres:
+                info_tag.setGenres(genres if isinstance(genres, list) else [genres])
             
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_fld)
         
@@ -955,11 +956,10 @@ def trakt_search(query=None):
         keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30067))
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
-            query = keyboard.getText()
+            query = keyboard.getText().strip()
         else:
             if HANDLE >= 0:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-                xbmc.executebuiltin('Action(Back)')
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
     if query:
@@ -1228,10 +1228,14 @@ def search_prefill(query):
     keyboard = xbmc.Keyboard(query or '', ADDON.getLocalizedString(30087))
     keyboard.doModal()
     if keyboard.isConfirmed():
-        new_query = keyboard.getText()
+        new_query = keyboard.getText().strip()
         if new_query:
             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(new_query)},replace)')
-            return
+    if HANDLE >= 0:
+        try:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+        except Exception:
+            pass
 
 def show_tmdb_menu():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30099))
@@ -1636,11 +1640,10 @@ def show_tmdb_search(query=None):
         keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30130))
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
-            query = keyboard.getText()
+            query = keyboard.getText().strip()
         else:
             if HANDLE >= 0:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-                xbmc.executebuiltin('Action(Back)')
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
     if query:
@@ -1987,7 +1990,7 @@ def history_tmdb_identify_search(original_query, custom_query=None):
         all_items = tmdb_module.search_tmdb(original_query)
 
     edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} TMDb ({search_term})...[/COLOR]"
-    edit_url = f"RunPlugin({sys.argv[0]}?action=history_tmdb_custom_search&original_query={urllib.parse.quote_plus(original_query)}&prefill={urllib.parse.quote_plus(search_term)})"
+    edit_url = f"{sys.argv[0]}?action=history_tmdb_custom_search&original_query={urllib.parse.quote_plus(original_query)}&prefill={urllib.parse.quote_plus(search_term)}"
     edit_item = xbmcgui.ListItem(label=edit_label)
     edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa.png')})
     xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=False)
@@ -2122,7 +2125,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30126), xbmcgui.NOTIFICATION_INFO, 2000)
         if HANDLE >= 0:
             try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             except Exception:
                 pass
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(original_query)},replace)')
@@ -2339,23 +2342,37 @@ def run():
         return
     elif action == 'history_mark':
         history_mark_watched(params.get('query'), params.get('watched') == '1')
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
         return
     elif action == 'history_delete':
         import history
         history.delete_from_history(params.get('query'))
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
         return
     elif action == 'history_edit':
         old_query = params.get('query')
         keyboard = xbmc.Keyboard(old_query or '', ADDON.getLocalizedString(30087))
         keyboard.doModal()
         if keyboard.isConfirmed():
-            new_query = keyboard.getText()
+            new_query = keyboard.getText().strip()
             if new_query and new_query != old_query:
                 import history
                 history.update_history_item(old_query, new_query)
                 xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(new_query)},replace)')
-                return
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
         return
     elif action == 'history_tmdb_custom_search':
         orig_q = params.get('original_query', '')
@@ -2363,10 +2380,14 @@ def run():
         keyboard = xbmc.Keyboard(prefill, "Hledat na TMDb pro ztotožnění")
         keyboard.doModal()
         if keyboard.isConfirmed():
-            new_search_term = keyboard.getText()
+            new_search_term = keyboard.getText().strip()
             if new_search_term:
                 xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote_plus(orig_q)}&custom_query={urllib.parse.quote_plus(new_search_term)},replace)')
-                return
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
         return
     elif action == 'assign_tmdb_data_to_history':
         assign_tmdb_data_to_history(
@@ -2379,7 +2400,7 @@ def run():
         search_prefill(params.get('query', ''))
         return
     elif action == 'history_list_replace':
-        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_list,replace)')
+        show_history(force_list=True)
         return
 
     if HANDLE < 0:
