@@ -255,26 +255,20 @@ def delete_file(ident):
     if not token:
         return False
         
-    url = BASE_URL + 'file_delete/'
     data = {
         'ident': str(ident).strip(),
         'wst': token
     }
-    try:
-        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-        if _is_response_ok(response):
-            xbmc.log(f"Webshare: delete_file {ident} OK", xbmc.LOGINFO)
-            return True
-        else:
-            err_msg = ""
-            try:
-                root = ElementTree.fromstring(response.content)
-                err_msg = root.findtext('message') or root.findtext('code') or ""
-            except Exception:
-                pass
-            xbmc.log(f"Webshare: delete_file {ident} response: {err_msg or response.text.strip()[:100]}", xbmc.LOGWARNING)
-    except Exception as e:
-        xbmc.log(f"Webshare delete_file error: {e}", xbmc.LOGWARNING)
+    endpoints = ['delete_file/', 'file_delete/', 'user_file_delete/', 'delete/']
+    for ep in endpoints:
+        try:
+            url = BASE_URL + ep
+            response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            if _is_response_ok(response):
+                xbmc.log(f"Webshare: delete_file {ident} OK via {ep}", xbmc.LOGINFO)
+                return True
+        except Exception as e:
+            xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGWARNING)
     return False
 
 def get_sync_files(filename_pattern=None):
