@@ -187,7 +187,7 @@ def sync_history():
         xbmc.log(f"StreamContinuum: Found {len(remote_files)} remote history files across Webshare", xbmc.LOGINFO)
 
         remote_history = []
-        for f in remote_files[:2]:
+        for f in remote_files[:5]:
             ident = f.get('ident')
             name = f.get('name', 'streamcontinuum_history.json')
             if not ident:
