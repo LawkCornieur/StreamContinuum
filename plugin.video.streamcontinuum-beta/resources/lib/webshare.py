@@ -257,9 +257,11 @@ def delete_file(ident):
         
     data = {
         'ident': str(ident).strip(),
+        'file_ident': str(ident).strip(),
+        'id': str(ident).strip(),
         'wst': token
     }
-    endpoints = ['delete_file/', 'file_delete/', 'user_file_delete/', 'delete/']
+    endpoints = ['file_delete/', 'delete_file/', 'user_file_delete/', 'file_remove/', 'user_files_delete/', 'delete/']
     for ep in endpoints:
         try:
             url = BASE_URL + ep
@@ -297,7 +299,7 @@ def get_sync_files(filename_pattern=None):
         xbmc.log(f"Webshare get_sync_files error: {e}", xbmc.LOGWARNING)
         return []
 
-def upload_file(filepath, filename, target_folder_name=None):
+def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
     token = get_token()
     if not token:
         xbmc.log("StreamContinuum: Webshare upload_file failed - missing token", xbmc.LOGERROR)
@@ -314,10 +316,11 @@ def upload_file(filepath, filename, target_folder_name=None):
         xbmc.log(f"StreamContinuum: Failed to read local file {filepath}: {e}", xbmc.LOGERROR)
         return False
 
+    folder_name = target_folder_name or 'StreamContinuum_Sync'
     for attempt in range(2):
         try:
-            xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (attempt {attempt + 1}/2)...", xbmc.LOGINFO)
-            url_res = requests.post(BASE_URL + 'upload_url/', data={'wst': token}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (folder: {folder_name}, attempt {attempt + 1}/2)...", xbmc.LOGINFO)
+            url_res = requests.post(BASE_URL + 'upload_url/', data={'wst': token, 'folder': folder_name, 'dir': folder_name, 'directory': folder_name}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
             if url_res.status_code != 200 or not _is_response_ok(url_res):
                 xbmc.log(f"StreamContinuum: Failed to obtain upload_url from Webshare", xbmc.LOGWARNING)
                 continue
@@ -333,7 +336,10 @@ def upload_file(filepath, filename, target_folder_name=None):
             files = {'file': (filename, file_content, mime)}
             upload_data = {
                 'wst': token,
-                'private': '1'
+                'private': '1',
+                'folder': folder_name,
+                'dir': folder_name,
+                'directory': folder_name
             }
             
             up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=25, verify=get_ssl_verify())
