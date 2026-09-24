@@ -173,7 +173,6 @@ def search(query=None):
         else:
             if HANDLE >= 0:
                 xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            xbmc.executebuiltin('Action(Back)')
             return
 
     if query:
@@ -961,7 +960,6 @@ def trakt_search(query=None):
         else:
             if HANDLE >= 0:
                 xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            xbmc.executebuiltin('Action(Back)')
             return
 
     if query:
@@ -1646,7 +1644,6 @@ def show_tmdb_search(query=None):
         else:
             if HANDLE >= 0:
                 xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            xbmc.executebuiltin('Action(Back)')
             return
 
     if query:
@@ -1922,7 +1919,7 @@ def show_trakt_discover(list_type, media_type, offset=0):
         genres = meta.get('genres', []) or item.get('genres', [])
         rating = meta.get('rating') or item.get('rating', 0)
         runtime = meta.get('runtime') or item.get('runtime', 0)
-        status = meta.get('status') or item.get('status', '')
+        status = meta.get('status') or data.get('status', '')
         poster = meta.get('poster') or ('DefaultMovies.png' if item_type_single == 'movie' else 'DefaultTVShows.png')
         fanart = meta.get('fanart') or ''
         label = f"{title} ({year})" if year else title
