@@ -91,7 +91,11 @@ def export_settings(pin):
             ident = f.get('ident')
             if ident:
                 xbmc.log(f"StreamContinuum: Cleaning old settings file {f.get('name')} ({ident})", xbmc.LOGINFO)
-                webshare.delete_file(ident)
+                deleted = webshare.delete_file(ident)
+                if deleted:
+                    xbmc.log(f"StreamContinuum: Deleted old settings file {ident}", xbmc.LOGINFO)
+                else:
+                    xbmc.log(f"StreamContinuum: Failed to delete old settings file {ident}", xbmc.LOGWARNING)
                 
         upload_res = webshare.upload_file(filepath, 'streamcontinuum_settings.enc', target_folder_name='StreamContinuum_Sync')
         if not upload_res:
@@ -266,7 +270,11 @@ def sync_history():
             ident = f.get('ident')
             if ident:
                 xbmc.log(f"StreamContinuum: Cleaning old remote history file {f.get('name')} ({ident})", xbmc.LOGINFO)
-                webshare.delete_file(ident)
+                deleted = webshare.delete_file(ident)
+                if deleted:
+                    xbmc.log(f"StreamContinuum: Deleted old remote history file {ident}", xbmc.LOGINFO)
+                else:
+                    xbmc.log(f"StreamContinuum: Failed to delete old remote history file {ident}", xbmc.LOGWARNING)
                 
         upload_res = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json', target_folder_name='StreamContinuum_Sync')
         if not upload_res:
