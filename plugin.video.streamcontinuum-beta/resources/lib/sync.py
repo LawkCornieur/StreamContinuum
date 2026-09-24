@@ -93,7 +93,7 @@ def export_settings(pin):
                 xbmc.log(f"StreamContinuum: Cleaning old settings file {f.get('name')} ({ident})", xbmc.LOGINFO)
                 webshare.delete_file(ident)
                 
-        upload_res = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
+        upload_res = webshare.upload_file(filepath, 'streamcontinuum_settings.enc', target_folder_name='StreamContinuum_Sync')
         if not upload_res:
             return False, "Nahrávání nastavení na Webshare selhalo. Zkontrolujte přihlášení."
             
@@ -268,7 +268,7 @@ def sync_history():
                 xbmc.log(f"StreamContinuum: Cleaning old remote history file {f.get('name')} ({ident})", xbmc.LOGINFO)
                 webshare.delete_file(ident)
                 
-        upload_res = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
+        upload_res = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json', target_folder_name='StreamContinuum_Sync')
         if not upload_res:
             xbmc.log("StreamContinuum: Failed to upload history file to Webshare", xbmc.LOGERROR)
             return False
