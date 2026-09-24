@@ -253,24 +253,34 @@ def delete_file(ident):
         return False
     token = get_token()
     if not token:
+        xbmc.log("Webshare delete_file failed: no token available", xbmc.LOGWARNING)
         return False
         
-    data = {
-        'ident': str(ident).strip(),
-        'file_ident': str(ident).strip(),
-        'id': str(ident).strip(),
-        'wst': token
-    }
-    endpoints = ['file_delete/', 'delete_file/', 'user_file_delete/', 'file_remove/', 'user_files_delete/', 'delete/']
+    ident_clean = str(ident).strip()
+    endpoints = ['file_delete/', 'files_delete/', 'delete_file/', 'user_file_delete/', 'file_remove/', 'user_files_delete/', 'delete/']
+    param_variations = [
+        {'ident': ident_clean, 'wst': token},
+        {'idents': ident_clean, 'wst': token},
+        {'file_ident': ident_clean, 'wst': token},
+        {'id': ident_clean, 'wst': token},
+        {'ident': ident_clean, 'file_ident': ident_clean, 'id': ident_clean, 'wst': token}
+    ]
+    
     for ep in endpoints:
-        try:
-            url = BASE_URL + ep
-            response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-            if _is_response_ok(response):
-                xbmc.log(f"Webshare: delete_file {ident} OK via {ep}", xbmc.LOGINFO)
-                return True
-        except Exception as e:
-            xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGWARNING)
+        url = BASE_URL + ep
+        for data in param_variations:
+            try:
+                response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+                is_ok = _is_response_ok(response)
+                resp_preview = response.text.replace('\n', ' ').strip()[:150] if response and response.text else ''
+                if is_ok:
+                    xbmc.log(f"Webshare: delete_file {ident_clean} OK via {ep}", xbmc.LOGINFO)
+                    return True
+                else:
+                    xbmc.log(f"Webshare delete_file {ident_clean} on {ep}: status={response.status_code}, resp={resp_preview}", xbmc.LOGDEBUG)
+            except Exception as e:
+                xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGWARNING)
+    xbmc.log(f"Webshare delete_file failed for ident {ident_clean} across all endpoints", xbmc.LOGWARNING)
     return False
 
 def get_sync_files(filename_pattern=None):
