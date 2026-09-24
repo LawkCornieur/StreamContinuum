@@ -172,7 +172,8 @@ def search(query=None):
             query = keyboard.getText().strip()
         else:
             if HANDLE >= 0:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmc.executebuiltin('Action(Back)')
             return
 
     if query:
@@ -498,7 +499,7 @@ def show_watchlist():
         )
         
         cm = [
-            (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(query)}&watched=1)'),
+            (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(query)}&watched=1&source=watchlist)'),
             (ADDON.getLocalizedString(30134), f'RunPlugin({sys.argv[0]}?action=watchlist_remove&query={urllib.parse.quote_plus(query)})'),
             (ADDON.getLocalizedString(30120), f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote_plus(query)})'),
             (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote_plus(query)})'),
@@ -863,7 +864,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     })
     items.append({
         'label': ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073),
-        'action': f'history_mark&query={urllib.parse.quote_plus(query)}&watched={0 if is_watched else 1}',
+        'action': f'history_mark&query={urllib.parse.quote_plus(query)}&watched={0 if is_watched else 1}&source={source or ""}',
         'icon': 'DefaultAddonVideo.png',
         'thumb': poster or 'DefaultAddonVideo.png',
         'poster': None,
@@ -959,7 +960,8 @@ def trakt_search(query=None):
             query = keyboard.getText().strip()
         else:
             if HANDLE >= 0:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmc.executebuiltin('Action(Back)')
             return
 
     if query:
@@ -1643,7 +1645,8 @@ def show_tmdb_search(query=None):
             query = keyboard.getText().strip()
         else:
             if HANDLE >= 0:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmc.executebuiltin('Action(Back)')
             return
 
     if query:
@@ -2137,7 +2140,7 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
             except Exception:
                 pass
 
-def history_mark_watched(query, watched):
+def history_mark_watched(query, watched, source=None):
     import history
     if not query:
         return
@@ -2165,7 +2168,10 @@ def history_mark_watched(query, watched):
             pass
             
     xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 1500)
-    xbmc.executebuiltin('Container.Refresh')
+    if source == 'watchlist':
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
+    else:
+        xbmc.executebuiltin('Container.Refresh')
 
 def run():
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:])) if len(sys.argv) > 2 else {}
@@ -2324,7 +2330,7 @@ def run():
         if ADDON.getSetting('trakt_token') and item_id:
             trakt.remove_from_watchlist(media_type, item_id, id_type=id_type)
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
-        xbmc.executebuiltin('Container.Refresh')
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
         return
     elif action == 'trakt_mark' or action == 'media_mark':
         media_type = params.get('type')
@@ -2341,7 +2347,7 @@ def run():
             xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30086), xbmcgui.NOTIFICATION_ERROR, 2000)
         return
     elif action == 'history_mark':
-        history_mark_watched(params.get('query'), params.get('watched') == '1')
+        history_mark_watched(params.get('query'), params.get('watched') == '1', source=params.get('source'))
         if HANDLE >= 0:
             try:
                 xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
