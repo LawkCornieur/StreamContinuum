@@ -257,13 +257,12 @@ def delete_file(ident):
         return False
         
     ident_clean = str(ident).strip()
-    endpoints = ['file_delete/', 'files_delete/', 'delete_file/', 'user_file_delete/', 'file_remove/', 'user_files_delete/', 'delete/']
+    endpoints = ['file_delete/', 'delete_file/', 'user_file_delete/', 'files_delete/', 'file_remove/', 'delete/']
     param_variations = [
         {'ident': ident_clean, 'wst': token},
         {'idents': ident_clean, 'wst': token},
         {'file_ident': ident_clean, 'wst': token},
-        {'id': ident_clean, 'wst': token},
-        {'ident': ident_clean, 'file_ident': ident_clean, 'id': ident_clean, 'wst': token}
+        {'id': ident_clean, 'wst': token}
     ]
     
     for ep in endpoints:
@@ -271,16 +270,15 @@ def delete_file(ident):
         for data in param_variations:
             try:
                 response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-                is_ok = _is_response_ok(response)
-                resp_preview = response.text.replace('\n', ' ').strip()[:150] if response and response.text else ''
-                if is_ok:
+                if response and _is_response_ok(response):
                     xbmc.log(f"Webshare: delete_file {ident_clean} OK via {ep}", xbmc.LOGINFO)
                     return True
-                else:
-                    xbmc.log(f"Webshare delete_file {ident_clean} on {ep}: status={response.status_code}, resp={resp_preview}", xbmc.LOGDEBUG)
+                elif response:
+                    resp_preview = response.text.replace('\n', ' ').strip()[:100]
+                    xbmc.log(f"Webshare delete_file {ident_clean} on {ep}: {resp_preview}", xbmc.LOGDEBUG)
             except Exception as e:
-                xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGWARNING)
-    xbmc.log(f"Webshare delete_file failed for ident {ident_clean} across all endpoints", xbmc.LOGWARNING)
+                xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGDEBUG)
+    xbmc.log(f"Webshare delete_file failed for ident {ident_clean}", xbmc.LOGWARNING)
     return False
 
 def get_sync_files(filename_pattern=None):
