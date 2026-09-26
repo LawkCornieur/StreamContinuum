@@ -48,15 +48,76 @@ def decrypt_data(data, pin):
     pt = unpad(cipher.decrypt(ct), AES.block_size)
     return pt.decode('utf-8')
 
-def _is_history_sync_filename(name):
-    if not name:
-        return False
-    return 'streamcontinuum_history' in str(name).lower().strip()
+def validate_history_item(item):
+    if not isinstance(item, dict):
+        return None
+    query = item.get('query')
+    if not query or not str(query).strip():
+        return None
+    
+    clean_query = str(query).strip()
+    is_watched = bool(item.get('is_watched', True))
+    
+    now = int(time.time())
+    added_at = history._safe_timestamp(item.get('added_at')) or now
+    last_played_at = history._safe_timestamp(item.get('last_played_at')) or added_at
+    
+    raw_title = item.get('title')
+    title = history.sanitize_title(raw_title) if raw_title else None
+    if title and history.has_non_latin(title):
+        title = None
+        
+    year = item.get('year')
+    try:
+        year = int(str(year)[:4]) if year else None
+    except (ValueError, TypeError):
+        year = None
 
-def _is_settings_sync_filename(name):
-    if not name:
-        return False
-    return 'streamcontinuum_settings' in str(name).lower().strip()
+    rating = item.get('rating')
+    try:
+        rating = float(rating) if rating is not None else None
+    except (ValueError, TypeError):
+        rating = None
+
+    runtime = item.get('runtime')
+    try:
+        runtime = int(runtime) if runtime is not None else None
+    except (ValueError, TypeError):
+        runtime = None
+
+    tmdb_id = item.get('tmdb_id')
+    try:
+        tmdb_id = int(tmdb_id) if (tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0')) else None
+    except (ValueError, TypeError):
+        tmdb_id = None
+
+    genres = item.get('genres', [])
+    if isinstance(genres, str):
+        genres = [g.strip() for g in genres.split(',') if g.strip()]
+    elif not isinstance(genres, list):
+        genres = []
+
+    media_type = item.get('media_type')
+    if not media_type:
+        media_type = 'tvshow' if history.is_series(clean_query) else 'movie'
+
+    return {
+        'query': clean_query,
+        'title': title,
+        'year': year,
+        'plot': str(item.get('plot') or '') if item.get('plot') else '',
+        'genres': genres,
+        'rating': rating,
+        'runtime': runtime,
+        'poster': item.get('poster') or None,
+        'fanart': item.get('fanart') or None,
+        'tmdb_id': tmdb_id,
+        'media_type': media_type,
+        'identified_at': history._safe_timestamp(item.get('identified_at')) or (now if tmdb_id else None),
+        'is_watched': is_watched,
+        'last_played_at': last_played_at,
+        'added_at': added_at
+    }
 
 def export_settings(pin):
     try:
@@ -176,16 +237,22 @@ def sync_history():
             xbmc.log("StreamContinuum: Missing Webshare credentials for history sync", xbmc.LOGERROR)
             return False
 
-        local_history = []
+        raw_local = []
         if os.path.exists(HISTORY_FILE):
             with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
                 try:
-                    local_history = json.load(f)
-                    if not isinstance(local_history, list):
-                        local_history = []
+                    loaded = json.load(f)
+                    if isinstance(loaded, list):
+                        raw_local = loaded
                 except Exception as e:
                     xbmc.log(f"StreamContinuum: Error loading local history: {e}", xbmc.LOGWARNING)
-                    local_history = []
+                    raw_local = []
+                    
+        local_history = []
+        for it in raw_local:
+            v = validate_history_item(it)
+            if v:
+                local_history.append(v)
                     
         remote_files = webshare.get_sync_files('streamcontinuum_history')
         xbmc.log(f"StreamContinuum: Found {len(remote_files)} remote history files across Webshare", xbmc.LOGINFO)
@@ -204,15 +271,13 @@ def sync_history():
                     if resp.status_code == 200:
                         try:
                             data = resp.json()
-                            if isinstance(data, list):
-                                remote_history.extend(data)
                         except Exception:
-                            try:
-                                data = json.loads(resp.text)
-                                if isinstance(data, list):
-                                    remote_history.extend(data)
-                            except Exception:
-                                pass
+                            data = json.loads(resp.text)
+                        if isinstance(data, list):
+                            for r_it in data:
+                                val_r = validate_history_item(r_it)
+                                if val_r:
+                                    remote_history.append(val_r)
                 except Exception as read_err:
                     xbmc.log(f"StreamContinuum: Error reading remote history from {name}: {read_err}", xbmc.LOGERROR)
                     
