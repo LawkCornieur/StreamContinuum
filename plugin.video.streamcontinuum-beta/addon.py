@@ -1206,7 +1206,7 @@ def show_trakt_playback(offset=0):
         url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
-        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None))
+        trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
         if trakt_item_id:
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_item_id}&watched=0)'))
@@ -1919,7 +1919,7 @@ def show_trakt_discover(list_type, media_type, offset=0):
         genres = meta.get('genres', []) or item.get('genres', [])
         rating = meta.get('rating') or item.get('rating', 0)
         runtime = meta.get('runtime') or item.get('runtime', 0)
-        status = meta.get('status') or data.get('status', '')
+        status = meta.get('status') or item.get('status', '')
         poster = meta.get('poster') or ('DefaultMovies.png' if item_type_single == 'movie' else 'DefaultTVShows.png')
         fanart = meta.get('fanart') or ''
         label = f"{title} ({year})" if year else title
