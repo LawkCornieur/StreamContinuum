@@ -30,24 +30,29 @@ def _is_response_ok(response):
         return False
     try:
         root = ElementTree.fromstring(response.content)
-        status = root.findtext('status')
-        if status and status.upper() == 'OK':
-            return True
-        if root.attrib.get('status', '').upper() == 'OK':
-            return True
-        for st in root.findall('.//status'):
-            if st.text and st.text.upper() == 'OK':
-                return True
+        for elem in root.iter():
+            tag = elem.tag.lower() if elem.tag else ''
+            if tag in ('status', 'result', 'state', 'response'):
+                txt = (elem.text or '').strip().upper()
+                if txt in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1'):
+                    return True
+            for attr_k, attr_v in elem.attrib.items():
+                if attr_k.lower() in ('status', 'result', 'state'):
+                    if str(attr_v).strip().upper() in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1'):
+                        return True
     except Exception:
         pass
     try:
         js = response.json()
-        if js.get('status', '').upper() == 'OK' or js.get('result', '').upper() == 'OK':
-            return True
+        if isinstance(js, dict):
+            for k in ('status', 'result', 'state'):
+                val = str(js.get(k, '')).strip().upper()
+                if val in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1'):
+                    return True
     except Exception:
         pass
     txt = response.text.upper()
-    if '<STATUS>OK</STATUS>' in txt or '"STATUS":"OK"' in txt or '"STATUS": "OK"' in txt:
+    if '<STATUS>OK</STATUS>' in txt or '"STATUS":"OK"' in txt or '"STATUS": "OK"' in txt or '"RESULT":"OK"' in txt or '"RESULT": "OK"' in txt:
         return True
     return False
 
@@ -257,7 +262,17 @@ def delete_file(ident):
         return False
         
     ident_clean = str(ident).strip()
-    endpoints = ['file_delete/', 'delete_file/', 'user_file_delete/', 'files_delete/', 'file_remove/', 'delete/']
+    endpoints = [
+        'file_delete/',
+        'user_file_delete/',
+        'delete_file/',
+        'file_remove/',
+        'user_file_remove/',
+        'files_delete/',
+        'file_erase/',
+        'user_file_erase/',
+        'delete/'
+    ]
     param_variations = [
         {'ident': ident_clean, 'wst': token},
         {'idents': ident_clean, 'wst': token},
@@ -265,6 +280,7 @@ def delete_file(ident):
         {'id': ident_clean, 'wst': token}
     ]
     
+    last_resp_preview = ""
     for ep in endpoints:
         url = BASE_URL + ep
         for data in param_variations:
@@ -273,12 +289,21 @@ def delete_file(ident):
                 if response and _is_response_ok(response):
                     xbmc.log(f"Webshare: delete_file {ident_clean} OK via {ep}", xbmc.LOGINFO)
                     return True
-                elif response:
-                    resp_preview = response.text.replace('\n', ' ').strip()[:100]
-                    xbmc.log(f"Webshare delete_file {ident_clean} on {ep}: {resp_preview}", xbmc.LOGDEBUG)
+                elif response and response.status_code == 200:
+                    last_resp_preview = response.text.replace('\n', ' ').strip()[:150]
             except Exception as e:
                 xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGDEBUG)
-    xbmc.log(f"Webshare delete_file failed for ident {ident_clean}", xbmc.LOGWARNING)
+                
+        try:
+            url_wst = f"{BASE_URL}{ep}?wst={token}"
+            response = requests.post(url_wst, data={'ident': ident_clean}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            if response and _is_response_ok(response):
+                xbmc.log(f"Webshare: delete_file {ident_clean} OK via {ep} (query wst)", xbmc.LOGINFO)
+                return True
+        except Exception:
+            pass
+
+    xbmc.log(f"Webshare delete_file failed for ident {ident_clean}. Last response: {last_resp_preview}", xbmc.LOGWARNING)
     return False
 
 def get_sync_files(filename_pattern=None):
