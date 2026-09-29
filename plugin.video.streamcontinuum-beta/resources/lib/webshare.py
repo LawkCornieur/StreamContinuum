@@ -56,6 +56,18 @@ def _is_response_ok(response):
         return True
     return False
 
+def _is_token_error(response):
+    if not response:
+        return False
+    txt = response.text.upper()
+    return ('INVALID_TOKEN' in txt or 'BAD_TOKEN' in txt or 'NOT_LOGGED_IN' in txt or 'AUTH' in txt and 'FAIL' in txt)
+
+def _is_already_deleted(response):
+    if not response:
+        return False
+    txt = response.text.upper()
+    return ('FILE_NOT_FOUND' in txt or 'DOES_NOT_EXIST' in txt or 'NOT_FOUND' in txt or 'ALREADY_DELETED' in txt)
+
 def _get_node_text_or_attr(elem, keys):
     for k in keys:
         txt = elem.findtext(k)
@@ -148,7 +160,12 @@ def get_salt(username):
         xbmc.log(f"Webshare get_salt error: {e}", xbmc.LOGERROR)
     return None
 
-def login():
+def login(force=False):
+    if not force:
+        cached_token = ADDON.getSetting('ws_token')
+        if cached_token:
+            return cached_token
+
     username = ADDON.getSetting('ws_username')
     password = ADDON.getSetting('ws_password')
     
@@ -182,10 +199,13 @@ def login():
         
     return None
 
-def get_token():
+def get_token(force_refresh=False):
+    if force_refresh:
+        ADDON.setSetting('ws_token', '')
+        return login(force=True)
     token = ADDON.getSetting('ws_token')
     if not token:
-        token = login()
+        token = login(force=True)
     return token
 
 def search(query):
@@ -208,7 +228,7 @@ def search(query):
         xbmc.log(f"Webshare search error: {e}", xbmc.LOGERROR)
     return []
 
-def search_user_files(query):
+def search_user_files(query, retry_auth=True):
     token = get_token()
     if not token or not query:
         return []
@@ -216,13 +236,17 @@ def search_user_files(query):
     data = {
         'what': str(query).strip(),
         'sort': 'recent',
-        'limit': 50,
+        'limit': 100,
         'offset': 0,
         'wst': token
     }
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
+            if _is_token_error(response) and retry_auth:
+                token = get_token(force_refresh=True)
+                if token:
+                    return search_user_files(query, retry_auth=False)
             return _parse_files_from_content(response.content)
     except Exception as e:
         xbmc.log(f"Webshare search_user_files error: {e}", xbmc.LOGWARNING)
@@ -244,6 +268,11 @@ def get_link(ident):
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
+            if _is_token_error(response):
+                token = get_token(force_refresh=True)
+                if token:
+                    data['wst'] = token
+                    response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
             root = ElementTree.fromstring(response.content)
             link = root.find('link')
             if link is not None and link.text:
@@ -253,10 +282,12 @@ def get_link(ident):
         
     return None
 
-def delete_file(ident):
+def delete_file(ident, retry_auth=True):
     if not ident:
         return False
     token = get_token()
+    if not token:
+        token = get_token(force_refresh=True)
     if not token:
         xbmc.log("Webshare delete_file failed: no token available", xbmc.LOGWARNING)
         return False
@@ -267,17 +298,12 @@ def delete_file(ident):
         'user_file_delete/',
         'delete_file/',
         'file_remove/',
-        'user_file_remove/',
-        'files_delete/',
-        'file_erase/',
-        'user_file_erase/',
-        'delete/'
+        'user_file_remove/'
     ]
     param_variations = [
         {'ident': ident_clean, 'wst': token},
-        {'idents': ident_clean, 'wst': token},
         {'file_ident': ident_clean, 'wst': token},
-        {'id': ident_clean, 'wst': token}
+        {'idents': ident_clean, 'wst': token}
     ]
     
     last_resp_preview = ""
@@ -286,18 +312,23 @@ def delete_file(ident):
         for data in param_variations:
             try:
                 response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-                if response and _is_response_ok(response):
-                    xbmc.log(f"Webshare: delete_file {ident_clean} OK via {ep}", xbmc.LOGINFO)
-                    return True
-                elif response and response.status_code == 200:
-                    last_resp_preview = response.text.replace('\n', ' ').strip()[:150]
+                if response:
+                    if _is_response_ok(response) or _is_already_deleted(response):
+                        xbmc.log(f"Webshare: delete_file {ident_clean} OK via {ep}", xbmc.LOGINFO)
+                        return True
+                    if _is_token_error(response) and retry_auth:
+                        new_token = get_token(force_refresh=True)
+                        if new_token:
+                            return delete_file(ident, retry_auth=False)
+                    if response.status_code == 200:
+                        last_resp_preview = response.text.replace('\n', ' ').strip()[:150]
             except Exception as e:
                 xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGDEBUG)
                 
         try:
             url_wst = f"{BASE_URL}{ep}?wst={token}"
             response = requests.post(url_wst, data={'ident': ident_clean}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-            if response and _is_response_ok(response):
+            if response and (_is_response_ok(response) or _is_already_deleted(response)):
                 xbmc.log(f"Webshare: delete_file {ident_clean} OK via {ep} (query wst)", xbmc.LOGINFO)
                 return True
         except Exception:
@@ -309,6 +340,8 @@ def delete_file(ident):
 def get_sync_files(filename_pattern=None):
     try:
         token = get_token()
+        if not token:
+            token = get_token(force_refresh=True)
         if not token:
             return []
             
@@ -335,6 +368,8 @@ def get_sync_files(filename_pattern=None):
 def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
     token = get_token()
     if not token:
+        token = get_token(force_refresh=True)
+    if not token:
         xbmc.log("StreamContinuum: Webshare upload_file failed - missing token", xbmc.LOGERROR)
         return False
         
@@ -354,6 +389,11 @@ def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
         try:
             xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (folder: {folder_name}, attempt {attempt + 1}/2)...", xbmc.LOGINFO)
             url_res = requests.post(BASE_URL + 'upload_url/', data={'wst': token, 'folder': folder_name, 'dir': folder_name, 'directory': folder_name}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            if _is_token_error(url_res):
+                token = get_token(force_refresh=True)
+                if token:
+                    url_res = requests.post(BASE_URL + 'upload_url/', data={'wst': token, 'folder': folder_name, 'dir': folder_name, 'directory': folder_name}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+
             if url_res.status_code != 200 or not _is_response_ok(url_res):
                 xbmc.log(f"StreamContinuum: Failed to obtain upload_url from Webshare", xbmc.LOGWARNING)
                 continue
