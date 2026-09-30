@@ -28,45 +28,46 @@ def get_ssl_verify():
 def _is_response_ok(response):
     if not response or response.status_code not in (200, 201):
         return False
+    txt = response.text.upper()
+    if '<STATUS>OK</STATUS>' in txt or '"STATUS":"OK"' in txt or '"STATUS": "OK"' in txt or '<RESULT>OK</RESULT>' in txt or '"RESULT":"OK"' in txt or '"RESULT": "OK"' in txt:
+        return True
     try:
         root = ElementTree.fromstring(response.content)
         for elem in root.iter():
             tag = elem.tag.lower() if elem.tag else ''
-            if tag in ('status', 'result', 'state', 'response'):
-                txt = (elem.text or '').strip().upper()
-                if txt in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1'):
+            if tag in ('status', 'result', 'state', 'response', 'msg', 'message'):
+                t = (elem.text or '').strip().upper()
+                if t in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1') or 'DELETED' in t or 'SUCCESS' in t:
                     return True
             for attr_k, attr_v in elem.attrib.items():
                 if attr_k.lower() in ('status', 'result', 'state'):
-                    if str(attr_v).strip().upper() in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1'):
+                    val = str(attr_v).strip().upper()
+                    if val in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1') or 'DELETED' in val or 'SUCCESS' in val:
                         return True
     except Exception:
         pass
     try:
         js = response.json()
         if isinstance(js, dict):
-            for k in ('status', 'result', 'state'):
+            for k in ('status', 'result', 'state', 'msg', 'message'):
                 val = str(js.get(k, '')).strip().upper()
-                if val in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1'):
+                if val in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1') or 'DELETED' in val or 'SUCCESS' in val:
                     return True
     except Exception:
         pass
-    txt = response.text.upper()
-    if '<STATUS>OK</STATUS>' in txt or '"STATUS":"OK"' in txt or '"STATUS": "OK"' in txt or '"RESULT":"OK"' in txt or '"RESULT": "OK"' in txt:
-        return True
     return False
 
 def _is_token_error(response):
     if not response:
         return False
     txt = response.text.upper()
-    return ('INVALID_TOKEN' in txt or 'BAD_TOKEN' in txt or 'NOT_LOGGED_IN' in txt or 'AUTH' in txt and 'FAIL' in txt)
+    return ('INVALID_TOKEN' in txt or 'BAD_TOKEN' in txt or 'NOT_LOGGED_IN' in txt or ('AUTH' in txt and 'FAIL' in txt) or ('TOKEN' in txt and ('EXPIRED' in txt or 'INVALID' in txt or 'UNKNOWN' in txt)) or ('SESSION' in txt and 'EXPIRED' in txt))
 
 def _is_already_deleted(response):
     if not response:
         return False
     txt = response.text.upper()
-    return ('FILE_NOT_FOUND' in txt or 'DOES_NOT_EXIST' in txt or 'NOT_FOUND' in txt or 'ALREADY_DELETED' in txt)
+    return ('FILE_NOT_FOUND' in txt or 'DOES_NOT_EXIST' in txt or 'NOT_FOUND' in txt or 'ALREADY_DELETED' in txt or 'FILE DOES NOT EXIST' in txt or 'NOT FOUND' in txt)
 
 def _get_node_text_or_attr(elem, keys):
     for k in keys:
@@ -295,15 +296,20 @@ def delete_file(ident, retry_auth=True):
     ident_clean = str(ident).strip()
     endpoints = [
         'file_delete/',
-        'user_file_delete/',
         'delete_file/',
+        'delete/',
+        'user_file_delete/',
         'file_remove/',
-        'user_file_remove/'
+        'user_file_remove/',
+        'user_files_delete/'
     ]
     param_variations = [
         {'ident': ident_clean, 'wst': token},
         {'file_ident': ident_clean, 'wst': token},
-        {'idents': ident_clean, 'wst': token}
+        {'id': ident_clean, 'wst': token},
+        {'idents': ident_clean, 'wst': token},
+        {'ident[]': ident_clean, 'wst': token},
+        {'idents[]': ident_clean, 'wst': token}
     ]
     
     last_resp_preview = ""
@@ -325,14 +331,15 @@ def delete_file(ident, retry_auth=True):
             except Exception as e:
                 xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGDEBUG)
                 
-        try:
-            url_wst = f"{BASE_URL}{ep}?wst={token}"
-            response = requests.post(url_wst, data={'ident': ident_clean}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
-            if response and (_is_response_ok(response) or _is_already_deleted(response)):
-                xbmc.log(f"Webshare: delete_file {ident_clean} OK via {ep} (query wst)", xbmc.LOGINFO)
-                return True
-        except Exception:
-            pass
+        for data in param_variations:
+            try:
+                url_wst = f"{BASE_URL}{ep}?wst={token}"
+                response = requests.post(url_wst, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+                if response and (_is_response_ok(response) or _is_already_deleted(response)):
+                    xbmc.log(f"Webshare: delete_file {ident_clean} OK via {ep} (query wst)", xbmc.LOGINFO)
+                    return True
+            except Exception:
+                pass
 
     xbmc.log(f"Webshare delete_file failed for ident {ident_clean}. Last response: {last_resp_preview}", xbmc.LOGWARNING)
     return False
