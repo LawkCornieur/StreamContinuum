@@ -229,29 +229,59 @@ def search(query):
         xbmc.log(f"Webshare search error: {e}", xbmc.LOGERROR)
     return []
 
-def search_user_files(query, retry_auth=True):
+def list_user_files(folder=None, retry_auth=True):
     token = get_token()
-    if not token or not query:
+    if not token:
         return []
-    url = BASE_URL + 'search/'
+    url = BASE_URL + 'user_files/'
     data = {
-        'what': str(query).strip(),
-        'sort': 'recent',
+        'wst': token,
         'limit': 100,
-        'offset': 0,
-        'wst': token
+        'offset': 0
     }
+    if folder is not None:
+        data['folder'] = str(folder)
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             if _is_token_error(response) and retry_auth:
                 token = get_token(force_refresh=True)
                 if token:
-                    return search_user_files(query, retry_auth=False)
+                    data['wst'] = token
+                    return list_user_files(folder=folder, retry_auth=False)
             return _parse_files_from_content(response.content)
     except Exception as e:
-        xbmc.log(f"Webshare search_user_files error: {e}", xbmc.LOGWARNING)
+        xbmc.log(f"Webshare list_user_files error: {e}", xbmc.LOGWARNING)
     return []
+
+def get_user_folders(retry_auth=True):
+    token = get_token()
+    if not token:
+        return []
+    url = BASE_URL + 'user_folders/'
+    data = {'wst': token}
+    folders = []
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+        if response.status_code == 200:
+            if _is_token_error(response) and retry_auth:
+                token = get_token(force_refresh=True)
+                if token:
+                    return get_user_folders(retry_auth=False)
+            root = ElementTree.fromstring(response.content)
+            for elem in root.iter():
+                tag = elem.tag.lower() if elem.tag else ''
+                if tag in ('folder', 'dir', 'directory'):
+                    name = elem.findtext('name') or elem.findtext('folder_name') or elem.text
+                    ident = elem.findtext('ident') or elem.findtext('id') or elem.attrib.get('ident')
+                    if name and str(name).strip():
+                        folders.append({'name': str(name).strip(), 'ident': ident})
+    except Exception as e:
+        xbmc.log(f"Webshare get_user_folders error: {e}", xbmc.LOGDEBUG)
+    return folders
+
+def search_user_files(query, retry_auth=True):
+    return get_sync_files(filename_pattern=query)
 
 def get_link(ident):
     if not ident:
@@ -297,19 +327,14 @@ def delete_file(ident, retry_auth=True):
     endpoints = [
         'file_delete/',
         'delete_file/',
-        'delete/',
         'user_file_delete/',
         'file_remove/',
-        'user_file_remove/',
         'user_files_delete/'
     ]
     param_variations = [
         {'ident': ident_clean, 'wst': token},
         {'file_ident': ident_clean, 'wst': token},
-        {'id': ident_clean, 'wst': token},
-        {'idents': ident_clean, 'wst': token},
-        {'ident[]': ident_clean, 'wst': token},
-        {'idents[]': ident_clean, 'wst': token}
+        {'id': ident_clean, 'wst': token}
     ]
     
     last_resp_preview = ""
@@ -353,21 +378,43 @@ def get_sync_files(filename_pattern=None):
             return []
             
         search_term = str(filename_pattern or 'streamcontinuum').lower().strip()
-        results = search_user_files(search_term)
-        if not results:
-            return []
-            
-        found_files = []
+        all_user_files = []
         seen_idents = set()
-        for f in results:
+
+        sync_folder_files = list_user_files(folder='StreamContinuum_Sync')
+        for f in sync_folder_files:
+            ident = f.get('ident')
+            if ident and ident not in seen_idents:
+                seen_idents.add(ident)
+                all_user_files.append(f)
+
+        root_files = list_user_files(folder='')
+        for f in root_files:
+            ident = f.get('ident')
+            if ident and ident not in seen_idents:
+                seen_idents.add(ident)
+                all_user_files.append(f)
+
+        user_folders = get_user_folders()
+        for fld in user_folders:
+            fld_name = fld.get('name')
+            if fld_name and fld_name != 'StreamContinuum_Sync':
+                sub_files = list_user_files(folder=fld_name)
+                for f in sub_files:
+                    ident = f.get('ident')
+                    if ident and ident not in seen_idents:
+                        seen_idents.add(ident)
+                        all_user_files.append(f)
+
+        matched_files = []
+        for f in all_user_files:
             ident = f.get('ident')
             name = str(f.get('name', '')).lower()
-            if ident and ident not in seen_idents:
-                if search_term in name:
-                    seen_idents.add(ident)
-                    found_files.append(f)
-                    
-        return found_files
+            if ident and search_term in name:
+                matched_files.append(f)
+
+        xbmc.log(f"Webshare get_sync_files: found {len(matched_files)} matching user files for pattern '{search_term}'", xbmc.LOGINFO)
+        return matched_files
     except Exception as e:
         xbmc.log(f"Webshare get_sync_files error: {e}", xbmc.LOGWARNING)
         return []
