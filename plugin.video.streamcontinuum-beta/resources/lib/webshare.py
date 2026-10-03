@@ -94,7 +94,17 @@ def _parse_files_from_content(content):
 
     try:
         root = ElementTree.fromstring(content)
-        elements_to_check = root.findall('.//file') or [elem for elem in root.iter() if elem is not root and elem.tag.lower() not in ('status', 'result', 'state', 'response', 'folder', 'dir', 'directory', 'folders', 'dirs')]
+        elements_to_check = root.findall('.//file')
+        if not elements_to_check:
+            elements_to_check = root.findall('.//item')
+        if not elements_to_check:
+            elements_to_check = [
+                elem for elem in root.iter()
+                if elem is not root and elem.tag.lower() not in (
+                    'status', 'result', 'state', 'response', 'folder', 'dir',
+                    'directory', 'folders', 'dirs', 'total', 'count', 'limit', 'offset'
+                )
+            ]
         for elem in elements_to_check:
             ident = _get_node_text_or_attr(elem, ['ident', 'file_ident', 'id'])
             name = _get_node_text_or_attr(elem, ['name', 'file_name', 'filename', 'title'])
@@ -241,8 +251,8 @@ def list_user_files(folder=None, retry_auth=True):
         'limit': 100,
         'offset': 0
     }
-    if folder is not None:
-        data['folder'] = str(folder)
+    if folder is not None and str(folder).strip():
+        data['folder'] = str(folder).strip()
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
@@ -401,43 +411,79 @@ def get_sync_files(filename_pattern=None):
         if not token:
             token = get_token(force_refresh=True)
         if not token:
+            xbmc.log("Webshare get_sync_files: no token available", xbmc.LOGWARNING)
             return []
             
         search_term = str(filename_pattern or 'streamcontinuum').lower().strip()
-        all_user_files = []
+        matched_files = []
         seen_idents = set()
+        ssl_v = get_ssl_verify()
 
-        sync_folder_files = list_user_files(folder='StreamContinuum_Sync')
-        for f in sync_folder_files:
-            ident = f.get('ident')
-            if ident and ident not in seen_idents:
-                seen_idents.add(ident)
-                all_user_files.append(f)
+        search_queries = [search_term]
+        if search_term != 'streamcontinuum' and 'streamcontinuum' not in search_queries:
+            search_queries.append('streamcontinuum')
 
-        root_files = list_user_files(folder='')
-        for f in root_files:
-            ident = f.get('ident')
-            if ident and ident not in seen_idents:
-                seen_idents.add(ident)
-                all_user_files.append(f)
+        for q in search_queries:
+            param_variants = [
+                {'what': q, 'wst': token, 'mine': '1', 'sort': 'recent', 'limit': 100, 'offset': 0},
+                {'what': q, 'wst': token, 'sort': 'recent', 'limit': 100, 'offset': 0},
+                {'what': q, 'wst': token, 'only_mine': '1', 'sort': 'recent', 'limit': 100, 'offset': 0},
+            ]
+            for p in param_variants:
+                try:
+                    resp = requests.post(BASE_URL + 'search/', data=p, headers=HEADERS, timeout=10, verify=ssl_v)
+                    if resp and resp.status_code == 200:
+                        if _is_token_error(resp):
+                            token = get_token(force_refresh=True)
+                            if token:
+                                p['wst'] = token
+                                resp = requests.post(BASE_URL + 'search/', data=p, headers=HEADERS, timeout=10, verify=ssl_v)
+                        parsed = _parse_files_from_content(resp.content)
+                        for item in parsed:
+                            ident = item.get('ident')
+                            name = str(item.get('name', '')).lower()
+                            if ident and ident not in seen_idents:
+                                if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
+                                    seen_idents.add(ident)
+                                    matched_files.append(item)
+                except Exception as e:
+                    xbmc.log(f"Webshare get_sync_files search error for query '{q}': {e}", xbmc.LOGDEBUG)
+
+        fallback_endpoints = ['user_files/', 'user_files', 'files/']
+        for ep in fallback_endpoints:
+            try:
+                for f_param in (None, 'StreamContinuum_Sync'):
+                    p_data = {'wst': token, 'limit': 100, 'offset': 0}
+                    if f_param:
+                        p_data['folder'] = f_param
+                        p_data['dir'] = f_param
+                    r_f = requests.post(BASE_URL + ep, data=p_data, headers=HEADERS, timeout=10, verify=ssl_v)
+                    if r_f and r_f.status_code == 200:
+                        parsed_fallback = _parse_files_from_content(r_f.content)
+                        for item in parsed_fallback:
+                            ident = item.get('ident')
+                            name = str(item.get('name', '')).lower()
+                            if ident and ident not in seen_idents:
+                                if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
+                                    seen_idents.add(ident)
+                                    matched_files.append(item)
+            except Exception:
+                pass
 
         user_folders = get_user_folders()
         for fld in user_folders:
+            fld_ident = fld.get('ident')
             fld_name = fld.get('name')
-            if fld_name and fld_name != 'StreamContinuum_Sync':
-                sub_files = list_user_files(folder=fld_name)
-                for f in sub_files:
-                    ident = f.get('ident')
+            target_ids = [v for v in (fld_ident, fld_name) if v]
+            for tid in target_ids:
+                sub_files = list_user_files(folder=tid)
+                for item in sub_files:
+                    ident = item.get('ident')
+                    name = str(item.get('name', '')).lower()
                     if ident and ident not in seen_idents:
-                        seen_idents.add(ident)
-                        all_user_files.append(f)
-
-        matched_files = []
-        for f in all_user_files:
-            ident = f.get('ident')
-            name = str(f.get('name', '')).lower()
-            if ident and search_term in name:
-                matched_files.append(f)
+                        if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
+                            seen_idents.add(ident)
+                            matched_files.append(item)
 
         xbmc.log(f"Webshare get_sync_files: found {len(matched_files)} matching user files for pattern '{search_term}'", xbmc.LOGINFO)
         return matched_files
