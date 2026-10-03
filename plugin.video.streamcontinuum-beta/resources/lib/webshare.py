@@ -33,10 +33,15 @@ def _is_response_ok(response):
     txt = response.text.upper()
     if not txt.strip():
         return True
+    if 'FATAL_ERROR' in txt or '<STATUS>ERROR</STATUS>' in txt or '"STATUS":"ERROR"' in txt:
+        return False
     if '<STATUS>OK</STATUS>' in txt or '"STATUS":"OK"' in txt or '"STATUS": "OK"' in txt or '<RESULT>OK</RESULT>' in txt or '"RESULT":"OK"' in txt or '"RESULT": "OK"' in txt or txt.strip() == 'OK':
         return True
     try:
         root = ElementTree.fromstring(response.content)
+        st = root.findtext('status')
+        if st and st.strip().upper() in ('FATAL_ERROR', 'ERROR', 'FAILED'):
+            return False
         for elem in root.iter():
             tag = elem.tag.lower() if elem.tag else ''
             if tag in ('status', 'result', 'state', 'response', 'msg', 'message', 'code'):
@@ -53,6 +58,9 @@ def _is_response_ok(response):
     try:
         js = response.json()
         if isinstance(js, dict):
+            st = js.get('status')
+            if st and str(st).strip().upper() in ('FATAL_ERROR', 'ERROR', 'FAILED'):
+                return False
             for k in ('status', 'result', 'state', 'msg', 'message', 'code'):
                 val = str(js.get(k, '')).strip().upper()
                 if val in ('OK', 'TRUE', 'SUCCESS', 'DELETED', '1', 'FILE_DELETED') or 'DELETED' in val or 'SUCCESS' in val:
@@ -241,18 +249,20 @@ def search(query):
         xbmc.log(f"Webshare search error: {e}", xbmc.LOGERROR)
     return []
 
-def list_user_files(folder=None, retry_auth=True):
+def list_user_files(folder=None, offset=0, limit=100, retry_auth=True):
     token = get_token()
     if not token:
         return []
     url = BASE_URL + 'user_files/'
     data = {
         'wst': token,
-        'limit': 100,
-        'offset': 0
+        'limit': limit,
+        'offset': offset
     }
     if folder is not None and str(folder).strip():
-        data['folder'] = str(folder).strip()
+        fld_val = str(folder).strip()
+        data['folder'] = fld_val
+        data['folder_ident'] = fld_val
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
@@ -260,11 +270,32 @@ def list_user_files(folder=None, retry_auth=True):
                 token = get_token(force_refresh=True)
                 if token:
                     data['wst'] = token
-                    return list_user_files(folder=folder, retry_auth=False)
+                    return list_user_files(folder=folder, offset=offset, limit=limit, retry_auth=False)
             return _parse_files_from_content(response.content)
     except Exception as e:
-        xbmc.log(f"Webshare list_user_files error: {e}", xbmc.LOGWARNING)
+        xbmc.log(f"Webshare list_user_files error (folder={folder}, offset={offset}): {e}", xbmc.LOGWARNING)
     return []
+
+def get_all_folder_files(folder=None):
+    all_files = []
+    offset = 0
+    page_size = 100
+    seen = set()
+    while offset < 1000:
+        batch = list_user_files(folder=folder, offset=offset, limit=page_size)
+        if not batch:
+            break
+        new_count = 0
+        for f in batch:
+            ident = f.get('ident')
+            if ident and ident not in seen:
+                seen.add(ident)
+                all_files.append(f)
+                new_count += 1
+        if new_count == 0 or len(batch) < page_size:
+            break
+        offset += page_size
+    return all_files
 
 def get_user_folders(retry_auth=True):
     token = get_token()
@@ -284,8 +315,8 @@ def get_user_folders(retry_auth=True):
             for elem in root.iter():
                 tag = elem.tag.lower() if elem.tag else ''
                 if tag in ('folder', 'dir', 'directory'):
-                    name = elem.findtext('name') or elem.findtext('folder_name') or elem.text
-                    ident = elem.findtext('ident') or elem.findtext('id') or elem.attrib.get('ident')
+                    name = elem.findtext('name') or elem.findtext('folder_name') or elem.findtext('title')
+                    ident = elem.findtext('ident') or elem.findtext('folder_ident') or elem.findtext('id') or elem.attrib.get('ident') or elem.attrib.get('id')
                     if name and str(name).strip():
                         folders.append({'name': str(name).strip(), 'ident': ident})
     except Exception as e:
@@ -336,73 +367,28 @@ def delete_file(ident, retry_auth=True):
         xbmc.log("Webshare delete_file failed: no token available", xbmc.LOGWARNING)
         return False
 
-    endpoints = [
-        'file_delete/',
-        'delete_file/',
-        'file_delete',
-        'delete_file',
-        'user_file_delete/',
-        'user_files_delete/',
-        'files_delete/',
-        'file_remove/',
-        'remove_file/',
-        'delete/'
-    ]
-    param_variations = [
-        {'ident': ident_clean, 'wst': token},
-        {'file_ident': ident_clean, 'wst': token},
-        {'id': ident_clean, 'wst': token},
-        {'idents': ident_clean, 'wst': token},
-        {'ident[]': ident_clean, 'wst': token},
-        {'idents[]': ident_clean, 'wst': token}
-    ]
-    
-    last_resp_preview = ""
     ssl_v = get_ssl_verify()
-
+    endpoints = ['file_delete/', 'delete_file/']
+    
     for ep in endpoints:
         url = BASE_URL + ep
-        for data in param_variations:
+        for p_name in ('ident', 'file_ident', 'id'):
+            data = {'wst': token, p_name: ident_clean}
             try:
-                response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=ssl_v)
+                response = requests.post(url, data=data, headers=HEADERS, timeout=5, verify=ssl_v)
                 if response:
-                    if response.status_code in (200, 201, 204):
-                        if _is_response_ok(response) or _is_already_deleted(response) or response.status_code == 204 or not response.text.strip():
-                            xbmc.log(f"Webshare: delete_file {ident_clean} OK via POST {ep}", xbmc.LOGINFO)
-                            return True
                     if _is_token_error(response) and retry_auth:
                         new_token = get_token(force_refresh=True)
                         if new_token:
                             return delete_file(ident, retry_auth=False)
-                    if response.status_code == 200:
-                        last_resp_preview = response.text.replace('\n', ' ').strip()[:150]
+                    if response.status_code in (200, 201, 204):
+                        if _is_response_ok(response) or _is_already_deleted(response) or response.status_code == 204:
+                            xbmc.log(f"Webshare: delete_file {ident_clean} OK via POST {ep}", xbmc.LOGINFO)
+                            return True
             except Exception as e:
-                xbmc.log(f"Webshare delete_file error on POST {ep}: {e}", xbmc.LOGDEBUG)
+                xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGDEBUG)
 
-    for ep in ('file_delete/', 'delete_file/', 'delete/'):
-        url = BASE_URL + ep
-        for data in ({'ident': ident_clean, 'wst': token}, {'id': ident_clean, 'wst': token}):
-            try:
-                response = requests.get(url, params=data, timeout=10, verify=ssl_v)
-                if response and response.status_code in (200, 201, 204):
-                    if _is_response_ok(response) or _is_already_deleted(response) or response.status_code == 204:
-                        xbmc.log(f"Webshare: delete_file {ident_clean} OK via GET {ep}", xbmc.LOGINFO)
-                        return True
-            except Exception:
-                pass
-
-    for ep in ('file_delete/', 'delete_file/'):
-        url = BASE_URL + ep
-        try:
-            response = requests.post(url, json={'ident': ident_clean, 'wst': token}, timeout=10, verify=ssl_v)
-            if response and response.status_code in (200, 201, 204):
-                if _is_response_ok(response) or _is_already_deleted(response) or response.status_code == 204:
-                    xbmc.log(f"Webshare: delete_file {ident_clean} OK via JSON POST {ep}", xbmc.LOGINFO)
-                    return True
-        except Exception:
-            pass
-
-    xbmc.log(f"Webshare delete_file failed for ident {ident_clean}. Last response: {last_resp_preview}", xbmc.LOGWARNING)
+    xbmc.log(f"Webshare delete_file failed for ident {ident_clean}", xbmc.LOGWARNING)
     return False
 
 def get_sync_files(filename_pattern=None):
@@ -417,73 +403,42 @@ def get_sync_files(filename_pattern=None):
         search_term = str(filename_pattern or 'streamcontinuum').lower().strip()
         matched_files = []
         seen_idents = set()
-        ssl_v = get_ssl_verify()
 
-        search_queries = [search_term]
-        if search_term != 'streamcontinuum' and 'streamcontinuum' not in search_queries:
-            search_queries.append('streamcontinuum')
-
-        for q in search_queries:
-            param_variants = [
-                {'what': q, 'wst': token, 'mine': '1', 'sort': 'recent', 'limit': 100, 'offset': 0},
-                {'what': q, 'wst': token, 'sort': 'recent', 'limit': 100, 'offset': 0},
-                {'what': q, 'wst': token, 'only_mine': '1', 'sort': 'recent', 'limit': 100, 'offset': 0},
-            ]
-            for p in param_variants:
-                try:
-                    resp = requests.post(BASE_URL + 'search/', data=p, headers=HEADERS, timeout=10, verify=ssl_v)
-                    if resp and resp.status_code == 200:
-                        if _is_token_error(resp):
-                            token = get_token(force_refresh=True)
-                            if token:
-                                p['wst'] = token
-                                resp = requests.post(BASE_URL + 'search/', data=p, headers=HEADERS, timeout=10, verify=ssl_v)
-                        parsed = _parse_files_from_content(resp.content)
-                        for item in parsed:
-                            ident = item.get('ident')
-                            name = str(item.get('name', '')).lower()
-                            if ident and ident not in seen_idents:
-                                if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
-                                    seen_idents.add(ident)
-                                    matched_files.append(item)
-                except Exception as e:
-                    xbmc.log(f"Webshare get_sync_files search error for query '{q}': {e}", xbmc.LOGDEBUG)
-
-        fallback_endpoints = ['user_files/', 'user_files', 'files/']
-        for ep in fallback_endpoints:
-            try:
-                for f_param in (None, 'StreamContinuum_Sync'):
-                    p_data = {'wst': token, 'limit': 100, 'offset': 0}
-                    if f_param:
-                        p_data['folder'] = f_param
-                        p_data['dir'] = f_param
-                    r_f = requests.post(BASE_URL + ep, data=p_data, headers=HEADERS, timeout=10, verify=ssl_v)
-                    if r_f and r_f.status_code == 200:
-                        parsed_fallback = _parse_files_from_content(r_f.content)
-                        for item in parsed_fallback:
-                            ident = item.get('ident')
-                            name = str(item.get('name', '')).lower()
-                            if ident and ident not in seen_idents:
-                                if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
-                                    seen_idents.add(ident)
-                                    matched_files.append(item)
-            except Exception:
-                pass
+        root_files = get_all_folder_files(folder=None)
+        for item in root_files:
+            ident = item.get('ident')
+            name = str(item.get('name', '')).lower()
+            if ident and ident not in seen_idents:
+                if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
+                    seen_idents.add(ident)
+                    matched_files.append(item)
 
         user_folders = get_user_folders()
+        checked_folders = set()
         for fld in user_folders:
             fld_ident = fld.get('ident')
             fld_name = fld.get('name')
-            target_ids = [v for v in (fld_ident, fld_name) if v]
-            for tid in target_ids:
-                sub_files = list_user_files(folder=tid)
-                for item in sub_files:
-                    ident = item.get('ident')
-                    name = str(item.get('name', '')).lower()
-                    if ident and ident not in seen_idents:
-                        if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
-                            seen_idents.add(ident)
-                            matched_files.append(item)
+            for tid in (fld_ident, fld_name):
+                if tid and tid not in checked_folders:
+                    checked_folders.add(tid)
+                    sub_files = get_all_folder_files(folder=tid)
+                    for item in sub_files:
+                        ident = item.get('ident')
+                        name = str(item.get('name', '')).lower()
+                        if ident and ident not in seen_idents:
+                            if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
+                                seen_idents.add(ident)
+                                matched_files.append(item)
+
+        if 'StreamContinuum_Sync' not in checked_folders:
+            sync_fld_files = get_all_folder_files(folder='StreamContinuum_Sync')
+            for item in sync_fld_files:
+                ident = item.get('ident')
+                name = str(item.get('name', '')).lower()
+                if ident and ident not in seen_idents:
+                    if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
+                        seen_idents.add(ident)
+                        matched_files.append(item)
 
         xbmc.log(f"Webshare get_sync_files: found {len(matched_files)} matching user files for pattern '{search_term}'", xbmc.LOGINFO)
         return matched_files
