@@ -33,7 +33,7 @@ def _is_response_ok(response):
     txt = response.text.upper()
     if not txt.strip():
         return True
-    if '<STATUS>OK</STATUS>' in txt or '"STATUS":"OK"' in txt or '"STATUS": "OK"' in txt or '<RESULT>OK</RESULT>' in txt or '"RESULT":"OK"' in txt or '"RESULT": "OK"' in txt:
+    if '<STATUS>OK</STATUS>' in txt or '"STATUS":"OK"' in txt or '"STATUS": "OK"' in txt or '<RESULT>OK</RESULT>' in txt or '"RESULT":"OK"' in txt or '"RESULT": "OK"' in txt or txt.strip() == 'OK':
         return True
     try:
         root = ElementTree.fromstring(response.content)
@@ -71,7 +71,7 @@ def _is_already_deleted(response):
     if not response:
         return False
     txt = response.text.upper()
-    return ('FILE_NOT_FOUND' in txt or 'DOES_NOT_EXIST' in txt or 'NOT_FOUND' in txt or 'ALREADY_DELETED' in txt or 'FILE DOES NOT EXIST' in txt or 'NOT FOUND' in txt or 'UNKNOWN_FILE' in txt)
+    return ('FILE_NOT_FOUND' in txt or 'DOES_NOT_EXIST' in txt or 'NOT_FOUND' in txt or 'ALREADY_DELETED' in txt or 'FILE DOES NOT EXIST' in txt or 'NOT FOUND' in txt or 'UNKNOWN_FILE' in txt or 'FILE_UNKNOWN' in txt or 'FILE_NOT_OWNED' in txt)
 
 def _get_node_text_or_attr(elem, keys):
     for k in keys:
@@ -94,10 +94,8 @@ def _parse_files_from_content(content):
 
     try:
         root = ElementTree.fromstring(content)
-        for elem in root.iter():
-            tag = elem.tag.lower() if elem.tag else ''
-            if tag in ('folder', 'dir', 'directory', 'folders', 'dirs'):
-                continue
+        elements_to_check = root.findall('.//file') or [elem for elem in root.iter() if elem is not root and elem.tag.lower() not in ('status', 'result', 'state', 'response', 'folder', 'dir', 'directory', 'folders', 'dirs')]
+        for elem in elements_to_check:
             ident = _get_node_text_or_attr(elem, ['ident', 'file_ident', 'id'])
             name = _get_node_text_or_attr(elem, ['name', 'file_name', 'filename', 'title'])
             if ident and name and ident not in seen_idents:
@@ -328,58 +326,48 @@ def delete_file(ident, retry_auth=True):
         xbmc.log("Webshare delete_file failed: no token available", xbmc.LOGWARNING)
         return False
 
-    try:
-        test_link = get_link(ident_clean)
-        if not test_link:
-            xbmc.log(f"Webshare delete_file: file {ident_clean} already does not exist or has no link", xbmc.LOGINFO)
-            return True
-    except Exception:
-        pass
-        
     endpoints = [
         'file_delete/',
         'delete_file/',
         'file_delete',
         'delete_file',
-        'delete/',
         'user_file_delete/',
         'user_files_delete/',
+        'files_delete/',
         'file_remove/',
-        'remove_file/'
+        'remove_file/',
+        'delete/'
     ]
     param_variations = [
         {'ident': ident_clean, 'wst': token},
-        {'ident': ident_clean, 'idents': ident_clean, 'wst': token},
         {'file_ident': ident_clean, 'wst': token},
-        {'id': ident_clean, 'wst': token}
+        {'id': ident_clean, 'wst': token},
+        {'idents': ident_clean, 'wst': token},
+        {'ident[]': ident_clean, 'wst': token},
+        {'idents[]': ident_clean, 'wst': token}
     ]
     
     last_resp_preview = ""
     ssl_v = get_ssl_verify()
-    header_options = [
-        {'Content-Type': 'application/x-www-form-urlencoded'},
-        HEADERS
-    ]
 
     for ep in endpoints:
         url = BASE_URL + ep
         for data in param_variations:
-            for hdr in header_options:
-                try:
-                    response = requests.post(url, params=data, data=data, headers=hdr, timeout=10, verify=ssl_v)
-                    if response:
-                        if response.status_code in (200, 201, 204):
-                            if _is_response_ok(response) or _is_already_deleted(response) or response.status_code == 204 or not response.text.strip():
-                                xbmc.log(f"Webshare: delete_file {ident_clean} OK via POST {ep}", xbmc.LOGINFO)
-                                return True
-                        if _is_token_error(response) and retry_auth:
-                            new_token = get_token(force_refresh=True)
-                            if new_token:
-                                return delete_file(ident, retry_auth=False)
-                        if response.status_code == 200:
-                            last_resp_preview = response.text.replace('\n', ' ').strip()[:150]
-                except Exception as e:
-                    xbmc.log(f"Webshare delete_file error on POST {ep}: {e}", xbmc.LOGDEBUG)
+            try:
+                response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=ssl_v)
+                if response:
+                    if response.status_code in (200, 201, 204):
+                        if _is_response_ok(response) or _is_already_deleted(response) or response.status_code == 204 or not response.text.strip():
+                            xbmc.log(f"Webshare: delete_file {ident_clean} OK via POST {ep}", xbmc.LOGINFO)
+                            return True
+                    if _is_token_error(response) and retry_auth:
+                        new_token = get_token(force_refresh=True)
+                        if new_token:
+                            return delete_file(ident, retry_auth=False)
+                    if response.status_code == 200:
+                        last_resp_preview = response.text.replace('\n', ' ').strip()[:150]
+            except Exception as e:
+                xbmc.log(f"Webshare delete_file error on POST {ep}: {e}", xbmc.LOGDEBUG)
 
     for ep in ('file_delete/', 'delete_file/', 'delete/'):
         url = BASE_URL + ep
@@ -403,14 +391,6 @@ def delete_file(ident, retry_auth=True):
                     return True
         except Exception:
             pass
-
-    try:
-        check_link = get_link(ident_clean)
-        if not check_link:
-            xbmc.log(f"Webshare delete_file: confirmed file {ident_clean} no longer exists", xbmc.LOGINFO)
-            return True
-    except Exception:
-        pass
 
     xbmc.log(f"Webshare delete_file failed for ident {ident_clean}. Last response: {last_resp_preview}", xbmc.LOGWARNING)
     return False
