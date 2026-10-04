@@ -132,7 +132,7 @@ def list_categories():
             list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
             
             url = f"{sys.argv[0]}?action={action}"
-            is_folder = False if action in ('settings', 'search') else True
+            is_folder = False if action == 'settings' else True
                 
             success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
             if success:
@@ -159,10 +159,9 @@ def trakt_menu():
     ]
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
-        is_fld = False if action == 'trakt_search_menu' else True
         list_item = xbmcgui.ListItem(label=f"[COLOR #9f42c6]{label}[/COLOR]")
         list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
-        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_fld)
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
     xbmcplugin.endOfDirectory(HANDLE)
 
 def search(query=None):
@@ -171,21 +170,21 @@ def search(query=None):
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
             query = keyboard.getText().strip()
-            if query:
-                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(query)})')
-        if HANDLE >= 0:
-            try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-            except Exception:
-                pass
-        return
+        if not query:
+            if HANDLE >= 0:
+                try:
+                    xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                except Exception:
+                    pass
+            return
 
     if query:
         xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30052)}: {query}")
         results = webshare.search(query)
         if not results:
             xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            if HANDLE >= 0:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
         
         edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} ({query})...[/COLOR]"
@@ -260,7 +259,8 @@ def search(query=None):
             list_item.setProperty('IsPlayable', 'true')
             xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=False)
         
-        xbmcplugin.endOfDirectory(HANDLE)
+        if HANDLE >= 0:
+            xbmcplugin.endOfDirectory(HANDLE)
 
 def _matches_season_episode(file_name, target_season, target_episode):
     if not file_name:
@@ -966,21 +966,21 @@ def trakt_search(query=None):
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
             query = keyboard.getText().strip()
-            if query:
-                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=trakt_search&query={urllib.parse.quote_plus(query)})')
-        if HANDLE >= 0:
-            try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-            except Exception:
-                pass
-        return
+        if not query:
+            if HANDLE >= 0:
+                try:
+                    xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                except Exception:
+                    pass
+            return
 
     if query:
         xbmcplugin.setPluginCategory(HANDLE, f"Trakt.tv: {query}")
         results = trakt.search_trakt(query)
         if not results:
             xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            if HANDLE >= 0:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
         for item in results:
@@ -1039,7 +1039,8 @@ def trakt_search(query=None):
                        f"&fanart={urllib.parse.quote_plus(fanart)}")
                 xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
 
-        xbmcplugin.endOfDirectory(HANDLE)
+        if HANDLE >= 0:
+            xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
     changelog_path = os.path.join(ADDON_PATH, "changelog.txt")
@@ -1266,10 +1267,9 @@ def show_tmdb_menu():
     ]
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
-        is_fld = False if action == 'tmdb_search' else True
         li = xbmcgui.ListItem(label=f"[COLOR #01b4e4]{label}[/COLOR]")
         li.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
-        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=is_fld)
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
@@ -1647,7 +1647,8 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
 def show_tmdb_search(query=None):
     if tmdb_module is None:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        if HANDLE >= 0:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
     if not query:
@@ -1655,21 +1656,21 @@ def show_tmdb_search(query=None):
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
             query = keyboard.getText().strip()
-            if query:
-                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=tmdb_search&query={urllib.parse.quote_plus(query)})')
-        if HANDLE >= 0:
-            try:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
-            except Exception:
-                pass
-        return
+        if not query:
+            if HANDLE >= 0:
+                try:
+                    xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                except Exception:
+                    pass
+            return
 
     if query:
         xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30099)}: {query}")
         all_items = tmdb_module.search_tmdb(query)
         if not all_items:
             xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_WARNING, 3000)
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            if HANDLE >= 0:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
         for item in all_items:
@@ -1698,23 +1699,24 @@ def show_tmdb_search(query=None):
             else:
                 cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)})"))
             
-        if tmdb_item_id:
-            cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&title={urllib.parse.quote_plus(raw_title)}&year={year})"))
-            cm.append((ADDON.getLocalizedString(30072), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=1)"))
-            cm.append((ADDON.getLocalizedString(30073), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=0)"))
-        li.addContextMenuItems(cm)
+            if tmdb_item_id:
+                cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&title={urllib.parse.quote_plus(raw_title)}&year={year})"))
+                cm.append((ADDON.getLocalizedString(30072), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=1)"))
+                cm.append((ADDON.getLocalizedString(30073), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=0)"))
+            li.addContextMenuItems(cm)
 
-        if is_show:
-            url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
-                   f"&title={urllib.parse.quote_plus(raw_title)}&year={year}"
-                   f"&tmdb_id={tmdb_item_id if tmdb_item_id is not None else ''}")
-        else:
-            url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
+            if is_show:
+                url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
+                       f"&title={urllib.parse.quote_plus(raw_title)}&year={year}"
+                       f"&tmdb_id={tmdb_item_id if tmdb_item_id is not None else ''}")
+            else:
+                url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
 
-        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
+            xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
-    xbmcplugin.setContent(HANDLE, 'movies')
-    xbmcplugin.endOfDirectory(HANDLE)
+        if HANDLE >= 0:
+            xbmcplugin.setContent(HANDLE, 'movies')
+            xbmcplugin.endOfDirectory(HANDLE)
 
 def show_seasons(show_title, trakt_id, poster='', fanart='', ws_base=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)}")
