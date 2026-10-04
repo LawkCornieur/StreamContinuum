@@ -249,7 +249,7 @@ def search(query):
         xbmc.log(f"Webshare search error: {e}", xbmc.LOGERROR)
     return []
 
-def list_user_files(folder=None, offset=0, limit=100, retry_auth=True):
+def list_user_files(folder=None, search=None, private=None, offset=0, limit=100, retry_auth=True):
     token = get_token()
     if not token:
         return []
@@ -263,6 +263,12 @@ def list_user_files(folder=None, offset=0, limit=100, retry_auth=True):
         fld_val = str(folder).strip()
         data['folder'] = fld_val
         data['folder_ident'] = fld_val
+    if search is not None and str(search).strip():
+        s_val = str(search).strip()
+        data['search'] = s_val
+        data['what'] = s_val
+    if private is not None:
+        data['private'] = str(private)
     try:
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
@@ -270,19 +276,19 @@ def list_user_files(folder=None, offset=0, limit=100, retry_auth=True):
                 token = get_token(force_refresh=True)
                 if token:
                     data['wst'] = token
-                    return list_user_files(folder=folder, offset=offset, limit=limit, retry_auth=False)
+                    return list_user_files(folder=folder, search=search, private=private, offset=offset, limit=limit, retry_auth=False)
             return _parse_files_from_content(response.content)
     except Exception as e:
-        xbmc.log(f"Webshare list_user_files error (folder={folder}, offset={offset}): {e}", xbmc.LOGWARNING)
+        xbmc.log(f"Webshare list_user_files error (folder={folder}, search={search}, private={private}, offset={offset}): {e}", xbmc.LOGWARNING)
     return []
 
-def get_all_folder_files(folder=None):
+def get_all_folder_files(folder=None, private=None):
     all_files = []
     offset = 0
     page_size = 100
     seen = set()
     while offset < 1000:
-        batch = list_user_files(folder=folder, offset=offset, limit=page_size)
+        batch = list_user_files(folder=folder, private=private, offset=offset, limit=page_size)
         if not batch:
             break
         new_count = 0
@@ -404,34 +410,20 @@ def get_sync_files(filename_pattern=None):
         matched_files = []
         seen_idents = set()
 
-        root_files = get_all_folder_files(folder=None)
-        for item in root_files:
-            ident = item.get('ident')
-            name = str(item.get('name', '')).lower()
-            if ident and ident not in seen_idents:
-                if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
-                    seen_idents.add(ident)
-                    matched_files.append(item)
+        # 1. Přímé vyhledávání podle vzoru názvu v privátních i veřejných uživatelských souborech
+        for priv_flag in ('1', '0', None):
+            direct_results = list_user_files(search=search_term, private=priv_flag, limit=100)
+            for item in direct_results:
+                ident = item.get('ident')
+                name = str(item.get('name', '')).lower()
+                if ident and ident not in seen_idents:
+                    if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
+                        seen_idents.add(ident)
+                        matched_files.append(item)
 
-        user_folders = get_user_folders()
-        checked_folders = set()
-        for fld in user_folders:
-            fld_ident = fld.get('ident')
-            fld_name = fld.get('name')
-            for tid in (fld_ident, fld_name):
-                if tid and tid not in checked_folders:
-                    checked_folders.add(tid)
-                    sub_files = get_all_folder_files(folder=tid)
-                    for item in sub_files:
-                        ident = item.get('ident')
-                        name = str(item.get('name', '')).lower()
-                        if ident and ident not in seen_idents:
-                            if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
-                                seen_idents.add(ident)
-                                matched_files.append(item)
-
-        if 'StreamContinuum_Sync' not in checked_folders:
-            sync_fld_files = get_all_folder_files(folder='StreamContinuum_Sync')
+        # 2. Kontrola složky StreamContinuum_Sync (kde jsou soubory ukládány)
+        for priv_flag in ('1', None):
+            sync_fld_files = list_user_files(folder='StreamContinuum_Sync', private=priv_flag, limit=100)
             for item in sync_fld_files:
                 ident = item.get('ident')
                 name = str(item.get('name', '')).lower()
@@ -439,6 +431,18 @@ def get_sync_files(filename_pattern=None):
                     if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
                         seen_idents.add(ident)
                         matched_files.append(item)
+
+        # 3. Kontrola kořene a ostatních uživatelských složek v případě potřeby
+        if not matched_files:
+            for priv_flag in ('1', None):
+                root_files = list_user_files(folder=None, private=priv_flag, limit=100)
+                for item in root_files:
+                    ident = item.get('ident')
+                    name = str(item.get('name', '')).lower()
+                    if ident and ident not in seen_idents:
+                        if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
+                            seen_idents.add(ident)
+                            matched_files.append(item)
 
         xbmc.log(f"Webshare get_sync_files: found {len(matched_files)} matching user files for pattern '{search_term}'", xbmc.LOGINFO)
         return matched_files
