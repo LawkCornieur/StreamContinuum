@@ -132,7 +132,7 @@ def list_categories():
             list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
             
             url = f"{sys.argv[0]}?action={action}"
-            is_folder = False if action == 'settings' else True
+            is_folder = False if action in ('settings', 'search') else True
                 
             success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
             if success:
@@ -159,9 +159,10 @@ def trakt_menu():
     ]
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
+        is_fld = False if action == 'trakt_search_menu' else True
         list_item = xbmcgui.ListItem(label=f"[COLOR #9f42c6]{label}[/COLOR]")
         list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
-        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_fld)
     xbmcplugin.endOfDirectory(HANDLE)
 
 def search(query=None):
@@ -170,10 +171,14 @@ def search(query=None):
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
             query = keyboard.getText().strip()
-        else:
-            if HANDLE >= 0:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            return
+            if query:
+                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(query)})')
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
+        return
 
     if query:
         xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30052)}: {query}")
@@ -757,6 +762,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                     has_next_ep = False
             has_next_season = any(s.get('season_number') == season + 1 for s in seasons_meta)
 
+        n_lbl = n_still = n_plot = n_yr = n_rt = n_dur = None
         if has_next_ep:
             next_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode + 1), None)
             n_lbl, n_still, n_plot, n_yr, n_rt, n_dur = _format_ep_info(next_ep_obj, f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', ADDON.getLocalizedString(30068))
@@ -774,6 +780,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'is_folder': True
             })
 
+        p_lbl = p_still = p_plot = p_yr = p_rt = p_dur = None
         if episode > 1:
             prev_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode - 1), None)
             p_lbl, p_still, p_plot, p_yr, p_rt, p_dur = _format_ep_info(prev_ep_obj, f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', ADDON.getLocalizedString(30069))
@@ -791,6 +798,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'is_folder': True
             })
 
+        ns_lbl = ns_still = ns_plot = ns_yr = ns_rt = ns_dur = None
         if has_next_season:
             next_s_first_ep = None
             if clean_tmdb_id and tmdb_module:
@@ -814,6 +822,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'is_folder': True
             })
 
+        ps_lbl = ps_still = ps_plot = ps_yr = ps_rt = ps_dur = None
         if season > 1:
             prev_s_first_ep = None
             if clean_tmdb_id and tmdb_module:
@@ -957,10 +966,14 @@ def trakt_search(query=None):
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
             query = keyboard.getText().strip()
-        else:
-            if HANDLE >= 0:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            return
+            if query:
+                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=trakt_search&query={urllib.parse.quote_plus(query)})')
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
+        return
 
     if query:
         xbmcplugin.setPluginCategory(HANDLE, f"Trakt.tv: {query}")
@@ -1253,9 +1266,10 @@ def show_tmdb_menu():
     ]
     for label, action, icon in items:
         url = f"{sys.argv[0]}?action={action}"
+        is_fld = False if action == 'tmdb_search' else True
         li = xbmcgui.ListItem(label=f"[COLOR #01b4e4]{label}[/COLOR]")
         li.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
-        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=is_fld)
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
@@ -1641,10 +1655,14 @@ def show_tmdb_search(query=None):
         keyboard.doModal()
         if keyboard.isConfirmed() and keyboard.getText():
             query = keyboard.getText().strip()
-        else:
-            if HANDLE >= 0:
-                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            return
+            if query:
+                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=tmdb_search&query={urllib.parse.quote_plus(query)})')
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
+        return
 
     if query:
         xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30099)}: {query}")
