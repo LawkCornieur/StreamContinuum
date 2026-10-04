@@ -632,14 +632,14 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     if show_full_history_link and source != 'watchlist':
         items.append({
             'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
-            'action': 'history_list',
+            'action': 'history_list_replace',
             'icon': 'DefaultFolder.png',
             'thumb': 'DefaultFolder.png',
             'poster': None,
             'fanart': fanart,
             'plot': '',
             'is_utility': True,
-            'is_folder': True
+            'is_folder': False
         })
 
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
@@ -2421,7 +2421,12 @@ def run():
         search_prefill(params.get('query', ''))
         return
     elif action == 'history_list_replace':
-        show_history(force_list=True)
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_list,replace)')
         return
 
     if HANDLE < 0:
