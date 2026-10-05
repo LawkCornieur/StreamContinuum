@@ -112,7 +112,7 @@ def list_categories():
     main_fanart = get_asset('fa.png')
 
     items = [
-        (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png', get_asset('fa-ws.png'), '#012a39'),
+        (ADDON.getLocalizedString(30052), 'search_prompt', 'DefaultAddonsSearch.png', get_asset('fa-ws.png'), '#012a39'),
         (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fa-history.png'), '#cc9900'),
         (ADDON.getLocalizedString(30051), 'watchlist', 'DefaultWatchlist.png', get_asset('fa-watchlist.jpg'), '#e50914')
     ]
@@ -132,7 +132,7 @@ def list_categories():
             list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
             
             url = f"{sys.argv[0]}?action={action}"
-            is_folder = False if action == 'settings' else True
+            is_folder = False if action in ('settings', 'search_prompt') else True
                 
             success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
             if success:
@@ -163,6 +163,14 @@ def trakt_menu():
         list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
     xbmcplugin.endOfDirectory(HANDLE)
+
+def search_prompt():
+    keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30057))
+    keyboard.doModal()
+    if keyboard.isConfirmed():
+        query = keyboard.getText().strip()
+        if query:
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(query)})')
 
 def search(query=None):
     if not query:
@@ -1251,25 +1259,33 @@ def search_prefill(query):
         except Exception:
             pass
 
+def tmdb_search_prompt():
+    keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30130))
+    keyboard.doModal()
+    if keyboard.isConfirmed():
+        query = keyboard.getText().strip()
+        if query:
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=tmdb_search&query={urllib.parse.quote_plus(query)})')
+
 def show_tmdb_menu():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30099))
     fanart = get_asset('fa.png')
     items = [
-        (ADDON.getLocalizedString(30096), 'tmdb_category&category=tv_tips&offset=0', 'DefaultTVShows.png'),
-        (ADDON.getLocalizedString(30097), 'tmdb_category&category=vod&offset=0', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30098), 'tmdb_category&category=disks&offset=0', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30138), 'tmdb_category&category=top_movies&offset=0', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30139), 'tmdb_category&category=top_shows&offset=0', 'DefaultTVShows.png'),
-        (ADDON.getLocalizedString(30136), 'tmdb_genres_menu&media_type=movies', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30137), 'tmdb_genres_menu&media_type=shows', 'DefaultTVShows.png'),
-        (ADDON.getLocalizedString(30140), 'tmdb_category&category=random_tips&offset=0', 'DefaultAddonVideo.png'),
-        (ADDON.getLocalizedString(30130), 'tmdb_search', 'DefaultAddonsSearch.png'),
+        (ADDON.getLocalizedString(30096), 'tmdb_category&category=tv_tips&offset=0', 'DefaultTVShows.png', True),
+        (ADDON.getLocalizedString(30097), 'tmdb_category&category=vod&offset=0', 'DefaultMovies.png', True),
+        (ADDON.getLocalizedString(30098), 'tmdb_category&category=disks&offset=0', 'DefaultMovies.png', True),
+        (ADDON.getLocalizedString(30138), 'tmdb_category&category=top_movies&offset=0', 'DefaultMovies.png', True),
+        (ADDON.getLocalizedString(30139), 'tmdb_category&category=top_shows&offset=0', 'DefaultTVShows.png', True),
+        (ADDON.getLocalizedString(30136), 'tmdb_genres_menu&media_type=movies', 'DefaultMovies.png', True),
+        (ADDON.getLocalizedString(30137), 'tmdb_genres_menu&media_type=shows', 'DefaultTVShows.png', True),
+        (ADDON.getLocalizedString(30140), 'tmdb_category&category=random_tips&offset=0', 'DefaultAddonVideo.png', True),
+        (ADDON.getLocalizedString(30130), 'tmdb_search_prompt', 'DefaultAddonsSearch.png', False),
     ]
-    for label, action, icon in items:
+    for label, action, icon, is_fld in items:
         url = f"{sys.argv[0]}?action={action}"
         li = xbmcgui.ListItem(label=f"[COLOR #01b4e4]{label}[/COLOR]")
         li.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
-        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=is_fld)
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
@@ -2194,7 +2210,10 @@ def run():
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:])) if len(sys.argv) > 2 else {}
     action = params.get('action')
 
-    if action == 'show_changelog':
+    if action == 'play':
+        play(params.get('ident'), params.get('query'), params.get('title'))
+        return
+    elif action == 'show_changelog':
         show_changelog()
         return
     elif action == 'settings':
@@ -2419,8 +2438,14 @@ def run():
             media_type=params.get('media_type')
         )
         return
+    elif action == 'search_prompt':
+        search_prompt()
+        return
     elif action == 'search_prefill':
         search_prefill(params.get('query', ''))
+        return
+    elif action == 'tmdb_search_prompt':
+        tmdb_search_prompt()
         return
     elif action == 'history_list_replace':
         if HANDLE >= 0:
@@ -2432,12 +2457,9 @@ def run():
         return
 
     if HANDLE < 0:
-        addon_id = ADDON.getAddonInfo('id')
-        target_url = f"plugin://{addon_id}/"
-        if len(sys.argv) > 2 and sys.argv[2]:
-            target_url += sys.argv[2]
-        xbmc.log(f"StreamContinuum: Invalid handle (< 0) for action '{action}'. Redirecting to ActivateWindow.", xbmc.LOGWARNING)
-        xbmc.executebuiltin(f'ActivateWindow(Videos, {target_url}, return)')
+        if not action:
+            addon_id = ADDON.getAddonInfo('id')
+            xbmc.executebuiltin(f'ActivateWindow(Videos, plugin://{addon_id}/, return)')
         return
 
     if action:
@@ -2458,8 +2480,6 @@ def run():
         trakt_search()
     elif action == 'search':
         search(params.get('query'))
-    elif action == 'play':
-        play(params.get('ident'), params.get('query'), params.get('title'))
     elif action == 'trending_movies':
         xbmcgui.Dialog().ok("StreamContinuum", f"{ADDON.getLocalizedString(30055)} (WIP)")
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
