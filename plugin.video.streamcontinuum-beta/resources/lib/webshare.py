@@ -249,6 +249,27 @@ def search(query):
         xbmc.log(f"Webshare search error: {e}", xbmc.LOGERROR)
     return []
 
+def search_sync_files(query):
+    if not query:
+        return []
+    token = get_token()
+    url = BASE_URL + 'search/'
+    data = {
+        'what': str(query).strip(),
+        'sort': 'largest',
+        'limit': 50,
+        'offset': 0
+    }
+    if token:
+        data['wst'] = token
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+        if response.status_code == 200:
+            return _parse_files_from_content(response.content)
+    except Exception as e:
+        xbmc.log(f"Webshare search_sync_files error: {e}", xbmc.LOGWARNING)
+    return []
+
 def list_user_files(folder=None, search=None, private=None, offset=0, limit=100, retry_auth=True):
     token = get_token()
     if not token:
@@ -263,6 +284,8 @@ def list_user_files(folder=None, search=None, private=None, offset=0, limit=100,
         fld_val = str(folder).strip()
         data['folder'] = fld_val
         data['folder_ident'] = fld_val
+        data['folder_name'] = fld_val
+        data['dir'] = fld_val
     if search is not None and str(search).strip():
         s_val = str(search).strip()
         data['search'] = s_val
@@ -324,7 +347,7 @@ def get_user_folders(retry_auth=True):
                     name = elem.findtext('name') or elem.findtext('folder_name') or elem.findtext('title')
                     ident = elem.findtext('ident') or elem.findtext('folder_ident') or elem.findtext('id') or elem.attrib.get('ident') or elem.attrib.get('id')
                     if name and str(name).strip():
-                        folders.append({'name': str(name).strip(), 'ident': ident})
+                        folders.append({'name': str(name).strip(), 'ident': str(ident).strip() if ident else None})
     except Exception as e:
         xbmc.log(f"Webshare get_user_folders error: {e}", xbmc.LOGDEBUG)
     return folders
@@ -410,39 +433,43 @@ def get_sync_files(filename_pattern=None):
         matched_files = []
         seen_idents = set()
 
-        # 1. Přímé vyhledávání podle vzoru názvu v privátních i veřejných uživatelských souborech
+        def _add_candidates(file_list):
+            if not file_list:
+                return
+            for item in file_list:
+                ident = item.get('ident')
+                name = str(item.get('name', '')).lower()
+                if ident and ident not in seen_idents:
+                    if (search_term in name) or (search_term.replace('_', ' ') in name.replace('_', ' ')) or (search_term.replace('_', '.') in name):
+                        seen_idents.add(ident)
+                        matched_files.append(item)
+
+        # 1. Autentizované vyhledávání přes Webshare API search bez omezení na video kategorii
+        search_variants = {search_term, search_term.replace('_', ' '), search_term.replace('_', '.')}
+        for s_query in search_variants:
+            if s_query:
+                api_results = search_sync_files(s_query)
+                _add_candidates(api_results)
+
+        # 2. Přímé listování uživatelských souborů s vyhledávacím parametrem a v kořeni
         for priv_flag in ('1', '0', None):
             direct_results = list_user_files(search=search_term, private=priv_flag, limit=100)
-            for item in direct_results:
-                ident = item.get('ident')
-                name = str(item.get('name', '')).lower()
-                if ident and ident not in seen_idents:
-                    if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
-                        seen_idents.add(ident)
-                        matched_files.append(item)
+            _add_candidates(direct_results)
+            root_results = list_user_files(folder=None, private=priv_flag, limit=100)
+            _add_candidates(root_results)
 
-        # 2. Kontrola složky StreamContinuum_Sync (kde jsou soubory ukládány)
-        for priv_flag in ('1', None):
-            sync_fld_files = list_user_files(folder='StreamContinuum_Sync', private=priv_flag, limit=100)
-            for item in sync_fld_files:
-                ident = item.get('ident')
-                name = str(item.get('name', '')).lower()
-                if ident and ident not in seen_idents:
-                    if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
-                        seen_idents.add(ident)
-                        matched_files.append(item)
-
-        # 3. Kontrola kořene a ostatních uživatelských složek v případě potřeby
-        if not matched_files:
+        # 3. Zjištění všech uživatelských složek a prohledání souborů v každé z nich (zejména StreamContinuum_Sync)
+        user_folders = get_user_folders()
+        for fld in user_folders:
+            fld_ident = fld.get('ident')
+            fld_name = fld.get('name', '')
             for priv_flag in ('1', None):
-                root_files = list_user_files(folder=None, private=priv_flag, limit=100)
-                for item in root_files:
-                    ident = item.get('ident')
-                    name = str(item.get('name', '')).lower()
-                    if ident and ident not in seen_idents:
-                        if search_term in name or (search_term.replace('_', ' ') in name.replace('_', ' ')):
-                            seen_idents.add(ident)
-                            matched_files.append(item)
+                if fld_ident:
+                    fld_files = list_user_files(folder=fld_ident, private=priv_flag, limit=100)
+                    _add_candidates(fld_files)
+                if fld_name:
+                    fld_files_name = list_user_files(folder=fld_name, private=priv_flag, limit=100)
+                    _add_candidates(fld_files_name)
 
         xbmc.log(f"Webshare get_sync_files: found {len(matched_files)} matching user files for pattern '{search_term}'", xbmc.LOGINFO)
         return matched_files
@@ -470,14 +497,29 @@ def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
         return False
 
     folder_name = target_folder_name or 'StreamContinuum_Sync'
+    folder_ident = None
+    try:
+        folders = get_user_folders()
+        for uf in folders:
+            if uf.get('name') == folder_name and uf.get('ident'):
+                folder_ident = uf.get('ident')
+                break
+    except Exception:
+        pass
+
     for attempt in range(2):
         try:
             xbmc.log(f"StreamContinuum: Uploading {filename} to Webshare (folder: {folder_name}, attempt {attempt + 1}/2)...", xbmc.LOGINFO)
-            url_res = requests.post(BASE_URL + 'upload_url/', data={'wst': token, 'folder': folder_name, 'dir': folder_name, 'directory': folder_name}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+            post_url_data = {'wst': token, 'folder': folder_name, 'dir': folder_name, 'directory': folder_name}
+            if folder_ident:
+                post_url_data['folder_ident'] = folder_ident
+
+            url_res = requests.post(BASE_URL + 'upload_url/', data=post_url_data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
             if _is_token_error(url_res):
                 token = get_token(force_refresh=True)
                 if token:
-                    url_res = requests.post(BASE_URL + 'upload_url/', data={'wst': token, 'folder': folder_name, 'dir': folder_name, 'directory': folder_name}, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+                    post_url_data['wst'] = token
+                    url_res = requests.post(BASE_URL + 'upload_url/', data=post_url_data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
 
             if url_res.status_code != 200 or not _is_response_ok(url_res):
                 xbmc.log(f"StreamContinuum: Failed to obtain upload_url from Webshare", xbmc.LOGWARNING)
@@ -499,6 +541,8 @@ def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
                 'dir': folder_name,
                 'directory': folder_name
             }
+            if folder_ident:
+                upload_data['folder_ident'] = folder_ident
             
             up_resp = requests.post(upload_url, data=upload_data, files=files, timeout=25, verify=get_ssl_verify())
             if up_resp.status_code in (200, 201):
