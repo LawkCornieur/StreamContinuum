@@ -397,27 +397,29 @@ def delete_file(ident, retry_auth=True):
         return False
 
     ssl_v = get_ssl_verify()
-    endpoints = ['file_delete/', 'delete_file/']
+    endpoints = ['user_delete_file/', 'delete_file/', 'file_delete/', 'user_file_delete/', 'delete_user_file/']
     
+    last_resp_text = ""
     for ep in endpoints:
         url = BASE_URL + ep
         for p_name in ('ident', 'file_ident', 'id'):
             data = {'wst': token, p_name: ident_clean}
             try:
-                response = requests.post(url, data=data, headers=HEADERS, timeout=5, verify=ssl_v)
+                response = requests.post(url, data=data, headers=HEADERS, timeout=8, verify=ssl_v)
                 if response:
+                    last_resp_text = (response.text or "")[:150]
                     if _is_token_error(response) and retry_auth:
                         new_token = get_token(force_refresh=True)
                         if new_token:
                             return delete_file(ident, retry_auth=False)
                     if response.status_code in (200, 201, 204):
                         if _is_response_ok(response) or _is_already_deleted(response) or response.status_code == 204:
-                            xbmc.log(f"Webshare: delete_file {ident_clean} OK via POST {ep}", xbmc.LOGINFO)
+                            xbmc.log(f"Webshare: delete_file {ident_clean} OK via POST {ep} (param {p_name})", xbmc.LOGINFO)
                             return True
             except Exception as e:
                 xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGDEBUG)
 
-    xbmc.log(f"Webshare delete_file failed for ident {ident_clean}", xbmc.LOGWARNING)
+    xbmc.log(f"Webshare delete_file failed for ident {ident_clean} (last resp: {last_resp_text})", xbmc.LOGWARNING)
     return False
 
 def get_sync_files(filename_pattern=None):
@@ -444,21 +446,18 @@ def get_sync_files(filename_pattern=None):
                         seen_idents.add(ident)
                         matched_files.append(item)
 
-        # 1. Autentizované vyhledávání přes Webshare API search bez omezení na video kategorii
         search_variants = {search_term, search_term.replace('_', ' '), search_term.replace('_', '.')}
         for s_query in search_variants:
             if s_query:
                 api_results = search_sync_files(s_query)
                 _add_candidates(api_results)
 
-        # 2. Přímé listování uživatelských souborů s vyhledávacím parametrem a v kořeni
         for priv_flag in ('1', '0', None):
             direct_results = list_user_files(search=search_term, private=priv_flag, limit=100)
             _add_candidates(direct_results)
             root_results = list_user_files(folder=None, private=priv_flag, limit=100)
             _add_candidates(root_results)
 
-        # 3. Zjištění všech uživatelských složek a prohledání souborů v každé z nich (zejména StreamContinuum_Sync)
         user_folders = get_user_folders()
         for fld in user_folders:
             fld_ident = fld.get('ident')
