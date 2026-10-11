@@ -2,7 +2,7 @@ import os
 import json
 import base64
 import requests
-from openai import OpenAI
+from huggingface_hub import InferenceClient
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -11,6 +11,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 GITHUB_TOKEN = os.getenv("GH_TOKEN")
 REPO_OWNER = "LawkCornieur"
 REPO_NAME = "StreamContinuum"
+# Zůstáváme u špičkového kódovacího modelu, který je na HF perfektně optimalizován
 MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct"
 
 DOC_TITLE_CHYBY = "Známé chyby"
@@ -97,13 +98,12 @@ def nacti_konkretni_soubor(cesta):
     return {"cesta": cesta, "sha": None, "content": ""}
 
 def main():
-    print("Spouštím bezpečnějšího AI agenta...")
+    print("Spouštím agenta přes oficiální Hugging Face InferenceClient...")
     
     docs_service_chyby, doc_id_chyby, text_chyb = nacti_google_doc(DOC_TITLE_CHYBY)
     _, _, text_webshare_tahak = nacti_google_doc(DOC_TITLE_WEBSHARE)
     github_issues = nacti_github_issues()
     
-    # Načteme klíčové soubory sync.py a webshare.py pro analýzu
     predpripraveny_kod = {}
     for cesta in [f"{BETA_DIR}/resources/lib/sync.py", f"{BETA_DIR}/resources/lib/webshare.py"]:
         info = nacti_konkretni_soubor(cesta)
@@ -114,7 +114,7 @@ def main():
         f"Jsi zkušený vývojový inženýr pro Kodi doplněk. Pracuješ VÝHRADNĚ ve složce '{BETA_DIR}/'.\n"
         "1. Respektuj existující strukturu projektu. NIKDY nevytvářej importy neexistujících modulů (např. žádný modul 'utils' neexistuje).\n"
         "2. Pro správu chyb a úkolů zakládej GitHub Issues a po jejich vyřešení je uzavírej (přidej komentář a nastav resene_issue_cislo).\n"
-        "3. Google Doc 'Známé chyby' udržuj čistý a přehledný jako seznam aktuálních vývojových cílů, nepiš tam surové chybové výpisy.\n\n"
+        "3. Google Doc 'Známé chyby' udržuj čistý a přehledný jako seznam aktuálních vývojových cílů.\n\n"
         "STRIKTNÍ PRAVIDLA:\n"
         f"- Změny smíš provádět POUZE v souborech uvnitř adresáře '{BETA_DIR}/'.\n"
         "- ZÁKAZ zasahovat do 'addon.xml'.\n"
@@ -140,17 +140,16 @@ def main():
         f"AKTUÁLNÍ KÓD SOUBORŮ:\n{json.dumps(predpripraveny_kod)}"
     )
     
-    client = OpenAI(base_url="https://router.huggingface.co/v1/", api_key=HF_TOKEN)
+    # Inicializace oficiálního HF klienta s využitím PRO tokenu
+    client = InferenceClient(model=MODEL_NAME, token=HF_TOKEN)
     
-    messages = [
-        {"role": "system", "content": system_instruction},
-        {"role": "user", "content": user_prompt}
-    ]
-    
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=messages,
-        response_format={"type": "json_object"}
+    response = client.chat_completion(
+        messages=[
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_prompt}
+        ],
+        response_format={"type": "json_object"},
+        max_tokens=4000
     )
     
     raw_output = response.choices[0].message.content
@@ -164,14 +163,12 @@ def main():
         
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     
-    # Vytvoření nového Issue
     ni = vysledek.get("nove_issue")
     if ni and ni.get("vytvorit") and ni.get("title"):
         url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues"
         requests.post(url, headers=headers, json={"title": ni["title"], "body": ni["body"]})
         print("Založeno nové GitHub Issue.")
         
-    # Aplikace změn v kódu
     for zmena in vysledek.get("zmeny", []):
         cesta = zmena.get("cesta_k_souboru") or zmena.get("cesta") or zmena.get("path")
         novy_obsah = zmena.get("novy_obsah") or zmena.get("obsah")
@@ -199,15 +196,12 @@ def main():
         requests.put(url, headers=headers, json=payload)
         print(f"Aktualizován soubor: {cesta}")
         
-    # Uzavření/Komentář k vyřešenému Issue
     res_iss = vysledek.get("resene_issue_cislo")
     kom = vysledek.get("komentar_k_issue")
     if res_iss and kom:
-        # Přidání komentáře
         url_kom = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues/{res_iss}/comments"
         requests.post(url_kom, headers=headers, json={"body": kom})
         
-        # Zavření issue (state: closed)
         url_close = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues/{res_iss}"
         requests.patch(url_close, headers=headers, json={"state": "closed"})
         print(f"Issue #{res_iss} vyřešeno, uzavřeno a opatřeno komentářem.")
