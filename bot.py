@@ -18,42 +18,32 @@ DOC_TITLE_CHYBY = "Známé chyby"
 DOC_TITLE_WEBSHARE = "API Webshare"
 BETA_DIR = "plugin.video.streamcontinuum-beta"
 
-STRUKTURA_BETA_PROJEKTU = [
-    f"{BETA_DIR}/addon.py",
-    f"{BETA_DIR}/addon.xml",
-    f"{BETA_DIR}/service.py",
-    f"{BETA_DIR}/resources/settings.xml",
-    f"{BETA_DIR}/resources/language/resource.language.cs_cz/strings.po",
-    f"{BETA_DIR}/resources/language/resource.language.de_de/strings.po",
-    f"{BETA_DIR}/resources/language/resource.language.en_gb/strings.po",
-    f"{BETA_DIR}/resources/lib/history.py",
-    f"{BETA_DIR}/resources/lib/md5crypt.py",
+# Klíčové soubory, které se automaticky předpřipraví podle povahy chyb
+PREDSEZNAM_SOUBORU = [
     f"{BETA_DIR}/resources/lib/sync.py",
-    f"{BETA_DIR}/resources/lib/tmdb.py",
-    f"{BETA_DIR}/resources/lib/trakt.py",
     f"{BETA_DIR}/resources/lib/webshare.py"
 ]
 
 def optimalizuj_text(text):
-    """Odstraní nadbytečné bílé znaky, prázdné řádky a balast pro úsporu tokenů."""
+    """Odstraní nadbytečné bílé znaky a prázdné řádky."""
     if not text:
         return ""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     return "\n".join(lines)
 
-def vyber_relevantni_cast_kodu(obsah_kodu, cilova_chyba):
-    """Pokusí se extrahovat pouze relevantní funkce/třídy podle chybového hlášení."""
+def vyber_relevantni_cast_kodu(obsah_kodu):
+    """Extrahuje klíčové funkce z kódu pro úsporu místa."""
     if len(obsah_kodu) < 4000:
         return obsah_kodu
     
-    klíčová_slova = ["get_sync_files", "search", "history", "folder", "get_all_user_files"]
+    klíčová_slova = ["get_sync_files", "search", "history", "folder", "get_all_user_files", "login", "file_search"]
     nalezené_řádky = []
     řádky = obsah_kodu.splitlines()
     
     for i, řádek in enumerate(řádky):
         if any(kw in řádek for kw in klíčová_slova) or řádek.startswith("def ") or řádek.startswith("class "):
             start = max(0, i - 2)
-            end = min(len(řádky), i + 30)
+            end = min(len(řádky), i + 35)
             nalezené_řádky.append(f"\n# --- úsek kolem řádku {i} ---")
             nalezené_řádky.extend(řádky[start:end])
             
@@ -122,32 +112,38 @@ def nacti_konkretni_soubor(cesta):
     return {"cesta": cesta, "sha": None, "content": ""}
 
 def main():
-    print("Spouštím vysoce optimalizovaného AI agenta...")
+    print("Spouštím jednokolového AI agenta...")
     
     docs_service_chyby, doc_id_chyby, text_chyb = nacti_google_doc(DOC_TITLE_CHYBY)
     _, _, text_webshare_tahak = nacti_google_doc(DOC_TITLE_WEBSHARE)
     github_issues = nacti_github_issues()
-    seznam_souboru = STRUKTURA_BETA_PROJEKTU
     
+    # Proaktivní přednačtení a optimalizace kritických souborů
+    predpripraveny_kod = {}
+    for cesta in PREDSEZNAM_SOUBORU:
+        info = nacti_konkretni_soubor(cesta)
+        if info["content"]:
+            predpripraveny_kod[cesta] = vyber_relevantni_cast_kodu(info["content"])
+            print(f"Přednačten a optimalizován soubor: {cesta}")
+
     system_instruction = (
         f"Jsi autonomní vývojový inženýr pro Kodi doplněk. Pracuješ VÝHRADNĚ ve složce '{BETA_DIR}/'.\n"
-        "1. Analyzuj známé chyby z Google Docs, otevřená GitHub Issues a stručný API tahák pro Webshare.\n"
-        "2. Pokud potřebuješ prozkoumat kód, uveď cestu v poli 'potrebny_soubor'. Jinak ho nastav na null.\n\n"
+        "Analyzuj známé chyby z Google Docs, otevřená GitHub Issues, API tahák a dodaný kód.\n"
+        "Proveď nezbytné opravy přímo v kódu.\n\n"
         "STRIKTNÍ PRAVIDLA:\n"
         f"- Změny smíš provádět POUZE v souborech uvnitř adresáře '{BETA_DIR}/'.\n"
         "- ZÁKAZ zasahovat do 'addon.xml'.\n"
         "- Odpověď vrať VÝHRADNĚ jako validní JSON bez markdownu.\n\n"
         "Formát JSON:\n"
         "{\n"
-        '  "potrebny_soubor": "cesta k souboru k načtení nebo null",\n'
-        '  "analyza": "Zhodnocení stavu",\n'
-        '  "vycisteny_text_dokumentu": "Aktualizovaný text pro Google Docs (Známé chyby)",\n'
+        '  "analyza": "Zhodnocení stavu a řešení",\n'
+        '  "vycisteny_text_dokumentu": "Aktualizovaný text pro Google Docs bez vyřešených chyb",\n'
         '  "nove_issue": { "vytvorit": false, "title": "", "body": "" },\n'
         '  "resene_issue_cislo": null,\n'
         '  "komentar_k_issue": null,\n'
         '  "commit_message": "Popis změn",\n'
         '  "zmeny": [\n'
-        f'    {{ "cesta_k_souboru": "{BETA_DIR}/soubor.py", "novy_obsah": "kompletní nový obsah souboru" }}\n'
+        f'    {{ "cesta_k_souboru": "{BETA_DIR}/resources/lib/sync.py", "novy_obsah": "kompletní nový obsah souboru" }}\n'
         '  ]\n'
         "}"
     )
@@ -156,7 +152,7 @@ def main():
         f"ZNÁMÉ CHYBY:\n{text_chyb}\n\n"
         f"API TAHÁK WEBSHARE:\n{text_webshare_tahak}\n\n"
         f"GITHUB ISSUES:\n{json.dumps(github_issues)}\n\n"
-        f"Dostupné soubory:\n{json.dumps(seznam_souboru)}"
+        f"AKTUÁLNÍ KÓD KLÍČOVÝCH SOUBORŮ:\n{json.dumps(predpripraveny_kod)}"
     )
     
     client = OpenAI(base_url="https://router.huggingface.co/v1/", api_key=HF_TOKEN)
@@ -166,6 +162,7 @@ def main():
         {"role": "user", "content": user_prompt}
     ]
     
+    # Jediný bezpečný API požadavek
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=messages,
@@ -175,25 +172,6 @@ def main():
     raw_output = response.choices[0].message.content
     vysledek = json.loads(raw_output.replace("```json", "").replace("```", "").strip())
     
-    potřebný_soubor = vysledek.get("potrebny_soubor")
-    
-    if potřebný_soubor and potřebný_soubor in STRUKTURA_BETA_PROJEKTU:
-        print(f"Model si vyžádal optimalizovaný obsah souboru: {potřebný_soubor}")
-        obsah_f = nacti_konkretni_soubor(potřebný_soubor)
-        
-        optimalizovany_obsah = vyber_relevantni_cast_kodu(obsah_f['content'], text_chyb)
-        doplněk = f"\nRelevantní kód souboru {potřebný_soubor}:\n{optimalizovany_obsah}\n"
-        
-        messages.append({"role": "assistant", "content": raw_output})
-        messages.append({"role": "user", "content": f"Zde jsou vyžádané podklady:\n{doplněk}\n\nNyní proveď finální úpravy a vrať kompletní JSON s polem 'zmeny'."})
-        
-        final_response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            response_format={"type": "json_object"}
-        )
-        vysledek = json.loads(final_response.choices[0].message.content.replace("```json", "").replace("```", "").strip())
-
     print("Analýza modelu:", vysledek.get("analyza"))
     
     if "vycisteny_text_dokumentu" in vysledek and docs_service_chyby:
