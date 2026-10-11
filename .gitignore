@@ -6,7 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
-
+inputs/private_input.txt
 # Kodi assets (tracked in repository)
 # plugin.video.streamcontinuum/resources/icon.png
 # plugin.video.streamcontinuum/resources/fanart.png
