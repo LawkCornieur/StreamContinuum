@@ -1,18 +1,16 @@
 name: StreamContinuum AI Agent
 
 on:
-  workflow_dispatch: # Možnost ručního spuštění v záložce Actions
+  workflow_dispatch:
   schedule:
-    - cron: '0 */8 * * *' # Automatické spuštění každých 8 hodin
+    - cron: '0 */8 * * *'
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository (beta branch)
+      - name: Checkout repository (main branch)
         uses: actions/checkout@v4
-        with:
-          ref: beta
 
       - name: Set up Python
         uses: actions/setup-python@v5
