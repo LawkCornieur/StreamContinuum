@@ -14,25 +14,25 @@ REPO_OWNER = "LawkCornieur"
 REPO_NAME = "StreamContinuum"
 MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct"
 DOC_TITLE = "Známé chyby"
+BETA_DIR = "plugin.video.streamcontinuum-beta"
 
 STRUKTURA_BETA_PROJEKTU = [
-    "plugin.video.streamcontinuum-beta/addon.py",
-    "plugin.video.streamcontinuum-beta/addon.xml",
-    "plugin.video.streamcontinuum-beta/service.py",
-    "plugin.video.streamcontinuum-beta/resources/settings.xml",
-    "plugin.video.streamcontinuum-beta/resources/language/resource.language.cs_cz/strings.po",
-    "plugin.video.streamcontinuum-beta/resources/language/resource.language.de_de/strings.po",
-    "plugin.video.streamcontinuum-beta/resources/language/resource.language.en_gb/strings.po",
-    "plugin.video.streamcontinuum-beta/resources/lib/history.py",
-    "plugin.video.streamcontinuum-beta/resources/lib/md5crypt.py",
-    "plugin.video.streamcontinuum-beta/resources/lib/sync.py",
-    "plugin.video.streamcontinuum-beta/resources/lib/tmdb.py",
-    "plugin.video.streamcontinuum-beta/resources/lib/trakt.py",
-    "plugin.video.streamcontinuum-beta/resources/lib/webshare.py"
+    f"{BETA_DIR}/addon.py",
+    f"{BETA_DIR}/addon.xml",
+    f"{BETA_DIR}/service.py",
+    f"{BETA_DIR}/resources/settings.xml",
+    f"{BETA_DIR}/resources/language/resource.language.cs_cz/strings.po",
+    f"{BETA_DIR}/resources/language/resource.language.de_de/strings.po",
+    f"{BETA_DIR}/resources/language/resource.language.en_gb/strings.po",
+    f"{BETA_DIR}/resources/lib/history.py",
+    f"{BETA_DIR}/resources/lib/md5crypt.py",
+    f"{BETA_DIR}/resources/lib/sync.py",
+    f"{BETA_DIR}/resources/lib/tmdb.py",
+    f"{BETA_DIR}/resources/lib/trakt.py",
+    f"{BETA_DIR}/resources/lib/webshare.py"
 ]
 
 def nacti_google_doc():
-    """Načte obsah a ID Google Dokumentu 'Známé chyby'."""
     sa_info = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
     creds = service_account.Credentials.from_service_account_info(
         sa_info, scopes=['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/drive.readonly']
@@ -41,18 +41,16 @@ def nacti_google_doc():
     drive_service = build('drive', 'v3', credentials=creds)
     docs_service = build('docs', 'v1', credentials=creds)
     
-    # Vyhledání dokumentu podle názvu
     query = f"name = '{DOC_TITLE}' and mimeType = 'application/vnd.google-apps.document'"
     results = drive_service.files().list(q=query, pageSize=1).execute()
     files = results.get('files', [])
     
     if not files:
-        raise Exception(f"Google Dokument '{DOC_TITLE}' nebyl nalezen nebo k němu nemá servisní účet přístup.")
+        raise Exception(f"Google Dokument '{DOC_TITLE} nenalezen.'")
         
     doc_id = files[0]['id']
     document = docs_service.documents().get(documentId=doc_id).execute()
     
-    # Extrakce textu z dokumentu
     text = ""
     for element in document.get('body').get('content'):
         if 'paragraph' in element:
@@ -63,7 +61,6 @@ def nacti_google_doc():
     return docs_service, doc_id, text
 
 def aktualizuj_google_doc(docs_service, doc_id, novy_text):
-    """Přepíše obsah Google Dokumentu vyčištěným textem."""
     document = docs_service.documents().get(documentId=doc_id).execute()
     end_index = document.get('body').get('content')[-1].get('endIndex', 1)
     
@@ -76,7 +73,6 @@ def aktualizuj_google_doc(docs_service, doc_id, novy_text):
     docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': requests_body}).execute()
 
 def stahni_dokumentaci():
-    """Stáhne klíčové API dokumentace pro přesný vývoj."""
     urls = {
         "Kodi Wiki": "https://kodi.wiki/view/Add-on_development",
         "Webshare": "https://webshare.cz/apidoc/",
@@ -92,7 +88,7 @@ def stahni_dokumentaci():
             if resp.status_code == 200:
                 docs_text += f"\n=== {nazev} ===\n{resp.text[:4000]}\n"
         except Exception as e:
-                docs_text += f"\n=== {nazev} (Nelze načíst: {e}) ===\n"
+            docs_text += f"\n=== {nazev} (Nelze načíst: {e}) ===\n"
     return docs_text
 
 def nacti_github_issues():
@@ -117,43 +113,36 @@ def nacti_vsechny_soubory(soubory):
             vysledek.append({"cesta": cesta, "sha": None, "content": ""})
     return vysledek
 
-def ziskej_verzi_z_addon_xml(soubory):
-    for f in soubory:
-        if f["cesta"].endswith("addon.xml"):
-            m = re.search(r'version="([^"]+)"', f["content"])
-            if m:
-                return m.group(1)
-    return "Neznámá verze"
-
 def main():
-    print("Spouštím AI vývojového agenta...")
+    print("Spouštím AI vývojového agenta pro beta adresář...")
     
     docs_service, doc_id, text_chyb = nacti_google_doc()
     api_docs = stahni_dokumentaci()
     github_issues = nacti_github_issues()
     beta_soubory = nacti_vsechny_soubory(STRUKTURA_BETA_PROJEKTU)
-    aktualni_verze = ziskej_verzi_z_addon_xml(beta_soubory)
     
     system_instruction = (
-        f"Jsi autonomní vývojový inženýr pro Kodi doplněk StreamContinuum-Beta.\n"
+        f"Jsi autonomní vývojový inženýr pro Kodi doplněk. Pracuješ VÝHRADNĚ ve složce '{BETA_DIR}/'.\n"
         f"Máš k dispozici referenční dokumentace:\n{api_docs}\n\n"
-        "Analyzuj známé chyby z Google Docs, otevřená GitHub Issues a zdrojový kód.\n"
-        "Vrať odpověď VÝHRADNĚ jako validní JSON objekt bez jakéhokoliv formátování markdown (žádné ```json).\n"
+        "Analyzuj známé chyby, GitHub Issues a zdrojový kód beta adresáře.\n"
+        "STRIKTNÍ PRAVIDLO: ZMĚNY SMÍŠ PROVÁDĚT POUZE V SOUBORECH UVNITŘ ADRESÁŘE 'plugin.video.streamcontinuum-beta/'. "
+        "ZÁKAZ SAHAT DO 'addon.xml' (verzování spravuje externí skript).\n"
+        "Vrať odpověď VÝHRADNĚ jako validní JSON objekt bez markdown formátování (žádné ```json).\n"
         "Formát JSON:\n"
         "{\n"
         '  "analyza": "Zhodnocení stavu",\n'
-        '  "vycisteny_text_dokumentu": "Aktualizovaný text pro Google Docs bez vyřešených chyb",\n'
+        '  "vycisteny_text_dokumentu": "Aktualizovaný text pro Google Docs",\n'
         '  "nove_issue": { "vytvorit": false, "title": "", "body": "" },\n'
         '  "resene_issue_cislo": null,\n'
         '  "komentar_k_issue": null,\n'
         '  "commit_message": "Popis změn",\n'
         '  "zmeny": [\n'
-        '    { "cesta_k_souboru": "cesta", "novy_obsah": "kompletní nový obsah souboru" }\n'
+        '    { "cesta_k_souboru": "plugin.video.streamcontinuum-beta/nazev_souboru.py", "novy_obsah": "kompletní kód" }\n'
         '  ]\n'
         "}"
     )
     
-    user_prompt = f"GOOGLE DOCS - ZNÁMÉ CHYBY:\n{text_chyb}\n\nGITHUB ISSUES:\n{json.dumps(github_issues)}\n\nKÓD BETY:\n{json.dumps(beta_soubory)}"
+    user_prompt = f"GOOGLE DOCS:\n{text_chyb}\n\nGITHUB ISSUES:\n{json.dumps(github_issues)}\n\nKÓD BETY:\n{json.dumps(beta_soubory)}"
     
     client = OpenAI(base_url="[https://router.huggingface.co/v1](https://router.huggingface.co/v1)", api_key=HF_TOKEN)
     
@@ -169,24 +158,24 @@ def main():
     vysledek = json.loads(response.choices.message.content)
     print("Analýza modelu:", vysledek.get("analyza"))
     
-    # 1. Zápis vyčištěného dokumentu zpět do Google Docs
     if "vycisteny_text_dokumentu" in vysledek:
         aktualizuj_google_doc(docs_service, doc_id, vysledek["vycisteny_text_dokumentu"])
-        print("Google Docs úspěšně aktualizován.")
+        print("Google Docs aktualizován.")
         
-    # 2. Vytvoření nového Issue pokud je požadováno
     ni = vysledek.get("nove_issue")
     if ni and ni.get("vytvorit") and ni.get("title"):
         url = f"[https://api.github.com/repos/](https://api.github.com/repos/){REPO_OWNER}/{REPO_NAME}/issues"
         headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
         requests.post(url, headers=headers, json={"title": ni["title"], "body": ni["body"]})
-        print("Založeno nové GitHub Issue.")
+        print("Založeno GitHub Issue.")
         
-    # 3. Zápis změn v kódu na GitHub
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     for zmena in vysledek.get("zmeny", []):
         cesta = zmena["cesta_k_souboru"]
-        if cesta.endswith("addon.xml"):
+        
+        # Bezpečnostní pojistka: kontrola cesty
+        if not cesta.startswith(BETA_DIR + "/") or cesta.endswith("addon.xml"):
+            print(f"Ignorována neautorizovaná cesta nebo zakázaný soubor: {cesta}")
             continue
             
         stara_data = next((f for f in beta_soubory if f["cesta"] == cesta), None)
@@ -203,9 +192,8 @@ def main():
             payload["sha"] = sha
             
         requests.put(url, headers=headers, json=payload)
-        print(f"Aktualizován soubor: {cesta}")
+        print(f"Aktualizován soubor v beta adresáři: {cesta}")
         
-    # 4. Komentář k řešenému Issue
     res_iss = vysledek.get("resene_issue_cislo")
     kom = vysledek.get("komentar_k_issue")
     if res_iss and kom:
