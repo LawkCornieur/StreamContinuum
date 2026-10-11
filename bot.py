@@ -16,10 +16,6 @@ MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct"
 
 DOC_TITLE_CHYBY = "Známé chyby"
 DOC_TITLE_WEBSHARE = "API Webshare"
-# Budoucí dokumentace (prozatím nepoužité/zakomentované)
-# DOC_TITLE_KODI = "API Kodi"
-# DOC_TITLE_TRAKT = "API Trakt"
-
 BETA_DIR = "plugin.video.streamcontinuum-beta"
 
 STRUKTURA_BETA_PROJEKTU = [
@@ -37,6 +33,37 @@ STRUKTURA_BETA_PROJEKTU = [
     f"{BETA_DIR}/resources/lib/trakt.py",
     f"{BETA_DIR}/resources/lib/webshare.py"
 ]
+
+def optimalizuj_text(text):
+    """Odstraní nadbytečné bílé znaky, prázdné řádky a balast pro úsporu tokenů."""
+    if not text:
+        return ""
+    # Smaže vícenásobné mezery a prázdné řádky
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return "\n".join(lines)
+
+def vyber_relevantni_cast_kodu(obsah_kodu, cilova_ch}${ova}):
+    """Pokusí se extrahovat pouze relevantní funkce/třídy podle chybového hlášení."""
+    if len(obsah_kodu) < 4000:
+        return obsah_kodu # Pokud je soubor malý, pošleme ho celý
+    
+    # Pokud soubor obsahuje sync.py a řešíme historii/hledání, zaměříme se na klíčové funkce
+    klíčová_slova = ["get_sync_files", "search", "history", "folder", "get_all_user_files"]
+    nalezené_řádky = []
+    řádky = obsah_kodu.splitlines()
+    
+    # Vytáhneme definice funkcí a jejich bezprostřední okolí
+    for i, řádek in enumerate(řádky):
+        if any(kw in řádek for kw in klíčová_slova) or řádek.startswith("def ") or řádek.startswith("class "):
+            start = max(0, i - 2)
+            end = min(len(řádky), i + 30)
+            nalezené_řádky.append(f"\n# --- úsek kolem řádku {i} ---")
+            nalezené_řádky.extend(řádky[start:end])
+            
+    if nalezené_řádky:
+        return "\n".join(nalezené_řádky)
+    
+    return obsah_kodu[:4000] # Fallback na prvních 4000 znaků
 
 def nacti_google_doc(doc_title):
     sa_info = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
@@ -63,7 +90,8 @@ def nacti_google_doc(doc_title):
             for run in element['paragraph'].get('elements', []):
                 if 'textRun' in run:
                     text += run['textRun'].get('content', '')
-    return docs_service, doc_id, text
+                    
+    return docs_service, doc_id, optimalizuj_text(text)
 
 def aktualizuj_google_doc(docs_service, doc_id, novy_text):
     if not docs_service or not doc_id:
@@ -97,23 +125,17 @@ def nacti_konkretni_soubor(cesta):
     return {"cesta": cesta, "sha": None, "content": ""}
 
 def main():
-    print("Spouštím odlehčeného AI agenta s integrovaným API tahákem...")
+    print("Spouštím vysoce optimalizovaného AI agenta...")
     
-    # Načtení dokumentů z Google Drive
     docs_service_chyby, doc_id_chyby, text_chyb = nacti_google_doc(DOC_TITLE_CHYBY)
     _, _, text_webshare_tahak = nacti_google_doc(DOC_TITLE_WEBSHARE)
-    
-    # Zde by se v budoucnu načítaly další dokumenty (zakomentováno)
-    # _, _, text_kodi_tahak = nacti_google_doc(DOC_TITLE_KODI)
-    # _, _, text_trakt_tahak = nacti_google_doc(DOC_TITLE_TRAKT)
-
     github_issues = nacti_github_issues()
     seznam_souboru = STRUKTURA_BETA_PROJEKTU
     
     system_instruction = (
         f"Jsi autonomní vývojový inženýr pro Kodi doplněk. Pracuješ VÝHRADNĚ ve složce '{BETA_DIR}/'.\n"
-        "1. Analyzuj známé chyby z Google Docs, otevřená GitHub Issues a přiložený API tahák pro Webshare.\n"
-        "2. Pokud k úkolu potřebuješ prozkoumat nebo upravit konkrétní soubor ze seznamu, uveď jeho cestu v poli 'potrebny_soubor'. Jinak ho nastav na null.\n\n"
+        "1. Analyzuj známé chyby z Google Docs, otevřená GitHub Issues a stručný API tahák pro Webshare.\n"
+        "2. Pokud potřebuješ prozkoumat kód, uveď cestu v poli 'potrebny_soubor'. Jinak ho nastav na null.\n\n"
         "STRIKTNÍ PRAVIDLA:\n"
         f"- Změny smíš provádět POUZE v souborech uvnitř adresáře '{BETA_DIR}/'.\n"
         "- ZÁKAZ zasahovat do 'addon.xml'.\n"
@@ -134,10 +156,10 @@ def main():
     )
     
     user_prompt = (
-        f"GOOGLE DOCS - ZNÁMÉ CHYBY:\n{text_chyb}\n\n"
-        f"REFERENČNÍ TAHÁK - API WEBSHARE:\n{text_webshare_tahak}\n\n"
+        f"ZNÁMÉ CHYBY:\n{text_chyb}\n\n"
+        f"API TAHÁK WEBSHARE:\n{text_webshare_tahak}\n\n"
         f"GITHUB ISSUES:\n{json.dumps(github_issues)}\n\n"
-        f"Dostupné soubory projektu:\n{json.dumps(seznam_souboru)}"
+        f"Dostupné soubory:\n{json.dumps(seznam_souboru)}"
     )
     
     client = OpenAI(base_url="https://router.huggingface.co/v1/", api_key=HF_TOKEN)
@@ -147,7 +169,6 @@ def main():
         {"role": "user", "content": user_prompt}
     ]
     
-    # 1. Kolo: Analýza a volitelný požadavek na podrobný kód souboru
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=messages,
@@ -160,9 +181,12 @@ def main():
     potřebný_soubor = vysledek.get("potrebny_soubor")
     
     if potřebný_soubor and potřebný_soubor in STRUKTURA_BETA_PROJEKTU:
-        print(f"Model si vyžádal obsah souboru: {potřebný_soubor}")
+        print(f"Model si vyžádal optimalizovaný obsah souboru: {potřebný_soubor}")
         obsah_f = nacti_konkretni_soubor(potřebný_soubor)
-        doplněk = f"\nObsah souboru {potřebný_soubor}:\n{obsah_f['content']}\n"
+        
+        # Aplikace chytrého ořezání na relevantní část
+        optimalizovany_obsah = vyber_relevantni_cast_kodu(obsah_f['content'], text_chyb)
+        doplněk = f"\nRelevantní kód souboru {potřebný_soubor}:\n{optimalizovany_obsah}\n"
         
         messages.append({"role": "assistant", "content": raw_output})
         messages.append({"role": "user", "content": f"Zde jsou vyžádané podklady:\n{doplněk}\n\nNyní proveď finální úpravy a vrať kompletní JSON s polem 'zmeny'."})
@@ -176,12 +200,10 @@ def main():
 
     print("Analýza modelu:", vysledek.get("analyza"))
     
-    # Aktualizace Google Docs (Známé chyby)
     if "vycisteny_text_dokumentu" in vysledek and docs_service_chyby:
         aktualizuj_google_doc(docs_service_chyby, doc_id_chyby, vysledek["vycisteny_text_dokumentu"])
-        print("Google Docs (Známé chyby) úspěšně aktualizován.")
+        print("Google Docs úspěšně aktualizován.")
         
-    # Vytvoření GitHub Issue
     ni = vysledek.get("nove_issue")
     if ni and ni.get("vytvorit") and ni.get("title"):
         url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues"
@@ -189,14 +211,12 @@ def main():
         requests.post(url, headers=headers, json={"title": ni["title"], "body": ni["body"]})
         print("Založeno nové GitHub Issue.")
         
-    # Zápis změn do beta adresáře na GitHubu
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     for zmena in vysledek.get("zmeny", []):
         cesta = zmena.get("cesta_k_souboru") or zmena.get("cesta") or zmena.get("path")
         novy_obsah = zmena.get("novy_obsah") or zmena.get("obsah")
         
         if not cesta or not novy_obsah:
-            print(f"Přeskakuji neúplnou změnu od modelu: {zmena}")
             continue
             
         if not cesta.startswith(BETA_DIR + "/") or cesta.endswith("addon.xml"):
@@ -218,14 +238,6 @@ def main():
             
         requests.put(url, headers=headers, json=payload)
         print(f"Aktualizován soubor: {cesta}")
-        
-    # Komentář k vyřešenému Issue
-    res_iss = vysledek.get("resene_issue_cislo")
-    kom = vysledek.get("komentar_k_issue")
-    if res_iss and kom:
-        url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues/{res_iss}/comments"
-        requests.post(url, headers=headers, json={"body": kom})
-        print(f"Přidán komentář k Issue #{res_iss}.")
 
 if __name__ == "__main__":
     main()
