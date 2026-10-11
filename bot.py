@@ -148,7 +148,11 @@ def main():
         f"KOMPLETNÍ KÓD PROJEKTU:\n{json.dumps(kompletni_kod_projektu)}"
     )
     
-    client = InferenceClient(model=MODEL_NAME, token=HF_TOKEN)
+    client = InferenceClient(
+    model="Qwen/Qwen2.5-72B-Instruct",
+    provider="together",  # Explicitní volba poskytovatele s plným kontextem
+    token=HF_TOKEN
+    )
     
     response = client.chat_completion(
         messages=[
