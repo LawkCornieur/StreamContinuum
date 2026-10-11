@@ -38,21 +38,18 @@ def optimalizuj_text(text):
     """Odstraní nadbytečné bílé znaky, prázdné řádky a balast pro úsporu tokenů."""
     if not text:
         return ""
-    # Smaže vícenásobné mezery a prázdné řádky
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     return "\n".join(lines)
 
-def vyber_relevantni_cast_kodu(obsah_kodu, cilova_ch}${ova}):
+def vyber_relevantni_cast_kodu(obsah_kodu, cilova_chyba):
     """Pokusí se extrahovat pouze relevantní funkce/třídy podle chybového hlášení."""
     if len(obsah_kodu) < 4000:
-        return obsah_kodu # Pokud je soubor malý, pošleme ho celý
+        return obsah_kodu
     
-    # Pokud soubor obsahuje sync.py a řešíme historii/hledání, zaměříme se na klíčové funkce
     klíčová_slova = ["get_sync_files", "search", "history", "folder", "get_all_user_files"]
     nalezené_řádky = []
     řádky = obsah_kodu.splitlines()
     
-    # Vytáhneme definice funkcí a jejich bezprostřední okolí
     for i, řádek in enumerate(řádky):
         if any(kw in řádek for kw in klíčová_slova) or řádek.startswith("def ") or řádek.startswith("class "):
             start = max(0, i - 2)
@@ -63,7 +60,7 @@ def vyber_relevantni_cast_kodu(obsah_kodu, cilova_ch}${ova}):
     if nalezené_řádky:
         return "\n".join(nalezené_řádky)
     
-    return obsah_kodu[:4000] # Fallback na prvních 4000 znaků
+    return obsah_kodu[:4000]
 
 def nacti_google_doc(doc_title):
     sa_info = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
@@ -184,7 +181,6 @@ def main():
         print(f"Model si vyžádal optimalizovaný obsah souboru: {potřebný_soubor}")
         obsah_f = nacti_konkretni_soubor(potřebný_soubor)
         
-        # Aplikace chytrého ořezání na relevantní část
         optimalizovany_obsah = vyber_relevantni_cast_kodu(obsah_f['content'], text_chyb)
         doplněk = f"\nRelevantní kód souboru {potřebný_soubor}:\n{optimalizovany_obsah}\n"
         
