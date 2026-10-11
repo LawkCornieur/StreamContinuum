@@ -18,13 +18,11 @@ DOC_TITLE_CHYBY = "Známé chyby"
 DOC_TITLE_WEBSHARE = "API Webshare"
 BETA_DIR = "plugin.video.streamcontinuum-beta"
 
+# Vynechali jsme rozsáhlé překladové soubory (.po), které zbytečně vyčerpávaly kontextové okno.
 POVOLENE_SOUBORY = [
     f"{BETA_DIR}/addon.py",
     f"{BETA_DIR}/service.py",
     f"{BETA_DIR}/resources/settings.xml",
-    f"{BETA_DIR}/resources/language/resource.language.cs_cz/strings.po",
-    f"{BETA_DIR}/resources/language/resource.language.de_de/strings.po",
-    f"{BETA_DIR}/resources/language/resource.language.en_gb/strings.po",
     f"{BETA_DIR}/resources/lib/history.py",
     f"{BETA_DIR}/resources/lib/md5crypt.py",
     f"{BETA_DIR}/resources/lib/sync.py",
@@ -107,13 +105,12 @@ def extrahuj_json_z_textu(text):
     raise ValueError(f"Nepodařilo se z odpovědi modelu extrahovat platný JSON. Surový výstup:\n{text}")
 
 def main():
-    print("Spouštím AI agenta s plným kontextem všech zdrojových souborů...")
+    print("Spouštím AI agenta s optimalizovaným kontextem (bez lokalizačních souborů)...")
     
     docs_service_chyby, doc_id_chyby, text_chyb = nacti_google_doc(DOC_TITLE_CHYBY)
     _, _, text_webshare_tahak = nacti_google_doc(DOC_TITLE_WEBSHARE)
     github_issues = nacti_github_issues()
     
-    # Načteme kompletní kód všech povolených souborů, aby měl model dokonalý přehled o celém doplňku
     kompletni_kod_projektu = {}
     for cesta in POVOLENE_SOUBORY:
         info = nacti_konkretni_soubor(cesta)
