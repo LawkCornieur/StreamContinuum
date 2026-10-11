@@ -13,7 +13,13 @@ GITHUB_TOKEN = os.getenv("GH_TOKEN")
 REPO_OWNER = "LawkCornieur"
 REPO_NAME = "StreamContinuum"
 MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct"
-DOC_TITLE = "Známé chyby"
+
+DOC_TITLE_CHYBY = "Známé chyby"
+DOC_TITLE_WEBSHARE = "API Webshare"
+# Budoucí dokumentace (prozatím nepoužité/zakomentované)
+# DOC_TITLE_KODI = "API Kodi"
+# DOC_TITLE_TRAKT = "API Trakt"
+
 BETA_DIR = "plugin.video.streamcontinuum-beta"
 
 STRUKTURA_BETA_PROJEKTU = [
@@ -32,23 +38,7 @@ STRUKTURA_BETA_PROJEKTU = [
     f"{BETA_DIR}/resources/lib/webshare.py"
 ]
 
-def stahni_dokumentaci(zdroj):
-    urls = {
-        "kodi": "https://kodi.wiki/view/Add-on_development",
-        "webshare": "https://webshare.cz/apidoc/",
-        "trakt": "https://developer.trakt.tv/",
-        "tmdb": "https://developer.themoviedb.org/docs/getting-started"
-    }
-    target_url = urls.get(zdroj)
-    if not target_url:
-        return "Neznámý zdroj dokumentace."
-    try:
-        resp = requests.get(target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        return resp.text[:3000] if resp.status_code == 200 else f"Chyba při stahování: HTTP {resp.status_code}"
-    except Exception as e:
-        return f"Chyba připojení: {e}"
-
-def nacti_google_doc():
+def nacti_google_doc(doc_title):
     sa_info = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
     creds = service_account.Credentials.from_service_account_info(
         sa_info, scopes=['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/drive.readonly']
@@ -56,12 +46,13 @@ def nacti_google_doc():
     drive_service = build('drive', 'v3', credentials=creds)
     docs_service = build('docs', 'v1', credentials=creds)
     
-    query = f"name = '{DOC_TITLE}' and mimeType = 'application/vnd.google-apps.document'"
+    query = f"name = '{doc_title}' and mimeType = 'application/vnd.google-apps.document'"
     results = drive_service.files().list(q=query, pageSize=1).execute()
     files = results.get('files', [])
     
     if not files:
-        raise Exception(f"Google Dokument '{DOC_TITLE}' nebyl nalezen.")
+        print(f"Varování: Google Dokument '{doc_title}' nebyl nalezen.")
+        return None, None, ""
         
     doc_id = files[0]['id']
     document = docs_service.documents().get(documentId=doc_id).execute()
@@ -75,6 +66,8 @@ def nacti_google_doc():
     return docs_service, doc_id, text
 
 def aktualizuj_google_doc(docs_service, doc_id, novy_text):
+    if not docs_service or not doc_id:
+        return
     document = docs_service.documents().get(documentId=doc_id).execute()
     end_index = document.get('body').get('content')[-1].get('endIndex', 1)
     
@@ -104,19 +97,23 @@ def nacti_konkretni_soubor(cesta):
     return {"cesta": cesta, "sha": None, "content": ""}
 
 def main():
-    print("Spouštím odlehčeného AI agenta...")
+    print("Spouštím odlehčeného AI agenta s integrovaným API tahákem...")
     
-    docs_service, doc_id, text_chyb = nacti_google_doc()
+    # Načtení dokumentů z Google Drive
+    docs_service_chyby, doc_id_chyby, text_chyb = nacti_google_doc(DOC_TITLE_CHYBY)
+    _, _, text_webshare_tahak = nacti_google_doc(DOC_TITLE_WEBSHARE)
+    
+    # Zde by se v budoucnu načítaly další dokumenty (zakomentováno)
+    # _, _, text_kodi_tahak = nacti_google_doc(DOC_TITLE_KODI)
+    # _, _, text_trakt_tahak = nacti_google_doc(DOC_TITLE_TRAKT)
+
     github_issues = nacti_github_issues()
-    
     seznam_souboru = STRUKTURA_BETA_PROJEKTU
     
     system_instruction = (
         f"Jsi autonomní vývojový inženýr pro Kodi doplněk. Pracuješ VÝHRADNĚ ve složce '{BETA_DIR}/'.\n"
-        "1. Analyzuj známé chyby z Google Docs a otevřená GitHub Issues.\n"
-        "2. Pokud k úkolu potřebuješ prozkoumat nebo upravit konkrétní soubor ze seznamu, uveď jeho cestu v poli 'potrebny_soubor'.\n"
-        "3. Pokud potřebuješ dokumentaci, uveď ji v poli 'potrebna_dokumentace' ('kodi', 'webshare', 'trakt', 'tmdb').\n"
-        "Jinak obě pole nastav na null a rovnou vrať řešení.\n\n"
+        "1. Analyzuj známé chyby z Google Docs, otevřená GitHub Issues a přiložený API tahák pro Webshare.\n"
+        "2. Pokud k úkolu potřebuješ prozkoumat nebo upravit konkrétní soubor ze seznamu, uveď jeho cestu v poli 'potrebny_soubor'. Jinak ho nastav na null.\n\n"
         "STRIKTNÍ PRAVIDLA:\n"
         f"- Změny smíš provádět POUZE v souborech uvnitř adresáře '{BETA_DIR}/'.\n"
         "- ZÁKAZ zasahovat do 'addon.xml'.\n"
@@ -124,9 +121,8 @@ def main():
         "Formát JSON:\n"
         "{\n"
         '  "potrebny_soubor": "cesta k souboru k načtení nebo null",\n'
-        '  "potrebna_dokumentace": "kodi/webshare/trakt/tmdb nebo null",\n'
         '  "analyza": "Zhodnocení stavu",\n'
-        '  "vycisteny_text_dokumentu": "Aktualizovaný text pro Google Docs",\n'
+        '  "vycisteny_text_dokumentu": "Aktualizovaný text pro Google Docs (Známé chyby)",\n'
         '  "nove_issue": { "vytvorit": false, "title": "", "body": "" },\n'
         '  "resene_issue_cislo": null,\n'
         '  "komentar_k_issue": null,\n'
@@ -137,7 +133,12 @@ def main():
         "}"
     )
     
-    user_prompt = f"GOOGLE DOCS - ZNÁMÉ CHYBY:\n{text_chyb}\n\nGITHUB ISSUES:\n{json.dumps(github_issues)}\n\nDostupné soubory projektu:\n{json.dumps(seznam_souboru)}"
+    user_prompt = (
+        f"GOOGLE DOCS - ZNÁMÉ CHYBY:\n{text_chyb}\n\n"
+        f"REFERENČNÍ TAHÁK - API WEBSHARE:\n{text_webshare_tahak}\n\n"
+        f"GITHUB ISSUES:\n{json.dumps(github_issues)}\n\n"
+        f"Dostupné soubory projektu:\n{json.dumps(seznam_souboru)}"
+    )
     
     client = OpenAI(base_url="https://router.huggingface.co/v1/", api_key=HF_TOKEN)
     
@@ -146,7 +147,7 @@ def main():
         {"role": "user", "content": user_prompt}
     ]
     
-    # 1. Kolo: Rychlá analýza a případný požadavek na data
+    # 1. Kolo: Analýza a volitelný požadavek na podrobný kód souboru
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=messages,
@@ -156,21 +157,13 @@ def main():
     raw_output = response.choices[0].message.content
     vysledek = json.loads(raw_output.replace("```json", "").replace("```", "").strip())
     
-    # Pokud model vyžádal doplňková data (soubor nebo dokumentaci)
     potřebný_soubor = vysledek.get("potrebny_soubor")
-    potřebná_doc = vysledek.get("potrebna_dokumentace")
     
-    if potřebný_soubor or potřebná_doc:
-        doplněk = ""
-        if potřebný_soubor and potřebný_soubor in STRUKTURA_BETA_PROJEKTU:
-            print(f"Model si vyžádal obsah souboru: {potřebný_soubor}")
-            obsah_f = nacti_konkretni_soubor(potřebný_soubor)
-            doplněk += f"\nObsah souboru {potřebný_soubor}:\n{obsah_f['content']}\n"
+    if potřebný_soubor and potřebný_soubor in STRUKTURA_BETA_PROJEKTU:
+        print(f"Model si vyžádal obsah souboru: {potřebný_soubor}")
+        obsah_f = nacti_konkretni_soubor(potřebný_soubor)
+        doplněk = f"\nObsah souboru {potřebný_soubor}:\n{obsah_f['content']}\n"
         
-        if potřebná_doc in ["kodi", "webshare", "trakt", "tmdb"]:
-            print(f"Model si vyžádal dokumentaci: {potřebná_doc}")
-            doplněk += f"\nDokumentace {potřebná_doc}:\n{stahni_dokumentaci(potřebná_doc)}\n"
-            
         messages.append({"role": "assistant", "content": raw_output})
         messages.append({"role": "user", "content": f"Zde jsou vyžádané podklady:\n{doplněk}\n\nNyní proveď finální úpravy a vrať kompletní JSON s polem 'zmeny'."})
         
@@ -183,10 +176,10 @@ def main():
 
     print("Analýza modelu:", vysledek.get("analyza"))
     
-    # Aktualizace Google Docs
-    if "vycisteny_text_dokumentu" in vysledek:
-        aktualizuj_google_doc(docs_service, doc_id, vysledek["vycisteny_text_dokumentu"])
-        print("Google Docs úspěšně aktualizován.")
+    # Aktualizace Google Docs (Známé chyby)
+    if "vycisteny_text_dokumentu" in vysledek and docs_service_chyby:
+        aktualizuj_google_doc(docs_service_chyby, doc_id_chyby, vysledek["vycisteny_text_dokumentu"])
+        print("Google Docs (Známé chyby) úspěšně aktualizován.")
         
     # Vytvoření GitHub Issue
     ni = vysledek.get("nove_issue")
