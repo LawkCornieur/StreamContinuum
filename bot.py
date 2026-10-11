@@ -150,7 +150,7 @@ def main():
     
     client = InferenceClient(
     model="Qwen/Qwen2.5-72B-Instruct",
-    provider="together",  # Explicitní volba poskytovatele s plným kontextem
+    provider="deepinfra",  # Explicitní volba poskytovatele s plným kontextem, třeba umí i Qwen
     token=HF_TOKEN
     )
     
