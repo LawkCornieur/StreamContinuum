@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import re
 import requests
 from huggingface_hub import InferenceClient
 from google.oauth2 import service_account
@@ -11,8 +12,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 GITHUB_TOKEN = os.getenv("GH_TOKEN")
 REPO_OWNER = "LawkCornieur"
 REPO_NAME = "StreamContinuum"
-# Zůstáváme u špičkového kódovacího modelu, který je na HF perfektně optimalizován
-MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct"
+MODEL_NAME = "Qwen/Qwen2.5-72B-Instruct"
 
 DOC_TITLE_CHYBY = "Známé chyby"
 DOC_TITLE_WEBSHARE = "API Webshare"
@@ -97,35 +97,42 @@ def nacti_konkretni_soubor(cesta):
         return {"cesta": cesta, "sha": data["sha"], "content": decoded_content}
     return {"cesta": cesta, "sha": None, "content": ""}
 
+def extrahuj_json_z_textu(text):
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+    raise ValueError(f"Nepodařilo se z odpovědi modelu extrahovat platný JSON. Surový výstup:\n{text}")
+
 def main():
-    print("Spouštím agenta přes oficiální Hugging Face InferenceClient...")
+    print("Spouštím AI agenta s plným kontextem všech zdrojových souborů...")
     
     docs_service_chyby, doc_id_chyby, text_chyb = nacti_google_doc(DOC_TITLE_CHYBY)
     _, _, text_webshare_tahak = nacti_google_doc(DOC_TITLE_WEBSHARE)
     github_issues = nacti_github_issues()
     
-    predpripraveny_kod = {}
-    for cesta in [f"{BETA_DIR}/resources/lib/sync.py", f"{BETA_DIR}/resources/lib/webshare.py"]:
+    # Načteme kompletní kód všech povolených souborů, aby měl model dokonalý přehled o celém doplňku
+    kompletni_kod_projektu = {}
+    for cesta in POVOLENE_SOUBORY:
         info = nacti_konkretni_soubor(cesta)
         if info["content"]:
-            predpripraveny_kod[cesta] = info["content"]
+            kompletni_kod_projektu[cesta] = info["content"]
+            print(f"Načten soubor do kontextu: {cesta}")
 
     system_instruction = (
         f"Jsi zkušený vývojový inženýr pro Kodi doplněk. Pracuješ VÝHRADNĚ ve složce '{BETA_DIR}/'.\n"
-        "1. Respektuj existující strukturu projektu. NIKDY nevytvářej importy neexistujících modulů (např. žádný modul 'utils' neexistuje).\n"
-        "2. Pro správu chyb a úkolů zakládej GitHub Issues a po jejich vyřešení je uzavírej (přidej komentář a nastav resene_issue_cislo).\n"
-        "3. Google Doc 'Známé chyby' udržuj čistý a přehledný jako seznam aktuálních vývojových cílů.\n\n"
-        "STRIKTNÍ PRAVIDLA:\n"
-        f"- Změny smíš provádět POUZE v souborech uvnitř adresáře '{BETA_DIR}/'.\n"
-        "- ZÁKAZ zasahovat do 'addon.xml'.\n"
-        "- Odpověď vrať VÝHRADNĚ jako validní JSON bez markdownu.\n\n"
-        "Formát JSON:\n"
+        "1. Respektuj existující strukturu projektu a závislosti mezi moduly. NIKDY nevytvářej importy neexistujících modulů.\n"
+        "2. Pro správu chyb a úkolů zakládej GitHub Issues a po jejich vyřešení je uzavírej.\n"
+        "3. Svou odpověď zabal do platného JSON objektu.\n\n"
+        "Požadovaná struktura JSON:\n"
         "{\n"
-        '  "analyza": "Stručné zhodnocení problému",\n'
+        '  "analyza": "Stručné zhodnocení",\n'
         '  "vycisteny_text_dokumentu": "Aktualizovaný čistý text pro Google Docs",\n'
         '  "nove_issue": { "vytvorit": false, "title": "", "body": "" },\n'
         '  "resene_issue_cislo": null,\n'
-        '  "komentar_k_issue": "Popis řešení pro uzavření issue",\n'
+        '  "komentar_k_issue": "Popis řešení",\n'
         '  "commit_message": "Popis změn",\n'
         '  "zmeny": [\n'
         f'    {{ "cesta_k_souboru": "{BETA_DIR}/resources/lib/sync.py", "novy_obsah": "celý opravený kód souboru" }}\n'
@@ -137,10 +144,9 @@ def main():
         f"CÍLE V GOOGLE DOCS:\n{text_chyb}\n\n"
         f"API TAHÁK WEBSHARE:\n{text_webshare_tahak}\n\n"
         f"OTEVŘENÁ GITHUB ISSUES:\n{json.dumps(github_issues)}\n\n"
-        f"AKTUÁLNÍ KÓD SOUBORŮ:\n{json.dumps(predpripraveny_kod)}"
+        f"KOMPLETNÍ KÓD PROJEKTU:\n{json.dumps(kompletni_kod_projektu)}"
     )
     
-    # Inicializace oficiálního HF klienta s využitím PRO tokenu
     client = InferenceClient(model=MODEL_NAME, token=HF_TOKEN)
     
     response = client.chat_completion(
@@ -148,12 +154,12 @@ def main():
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": user_prompt}
         ],
-        response_format={"type": "json_object"},
-        max_tokens=4000
+        max_tokens=6000,
+        temperature=0.2
     )
     
     raw_output = response.choices[0].message.content
-    vysledek = json.loads(raw_output.replace("```json", "").replace("```", "").strip())
+    vysledek = extrahuj_json_z_textu(raw_output)
     
     print("Analýza modelu:", vysledek.get("analyza"))
     
