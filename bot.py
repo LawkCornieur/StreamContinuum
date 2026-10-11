@@ -13,7 +13,7 @@ GITHUB_TOKEN = os.getenv("GH_TOKEN")
 REPO_OWNER = "LawkCornieur"
 REPO_NAME = "StreamContinuum"
 # Qwen reasoning / thinking model optimalizovaný pro komplexní logiku a kód
-MODEL_NAME = "Qwen/QwQ-32B"
+MODEL_NAME = "bottlecapai/ThinkingCap-Qwen3.8-27B"
 DOC_TITLE = "Známé chyby"
 BETA_DIR = "plugin.video.streamcontinuum-beta"
 
