@@ -1,7 +1,6 @@
 import os
 import json
 import base64
-import re
 import requests
 from openai import OpenAI
 from google.oauth2 import service_account
@@ -18,39 +17,26 @@ DOC_TITLE_CHYBY = "Známé chyby"
 DOC_TITLE_WEBSHARE = "API Webshare"
 BETA_DIR = "plugin.video.streamcontinuum-beta"
 
-# Klíčové soubory, které se automaticky předpřipraví podle povahy chyb
-PREDSEZNAM_SOUBORU = [
+POVOLENE_SOUBORY = [
+    f"{BETA_DIR}/addon.py",
+    f"{BETA_DIR}/service.py",
+    f"{BETA_DIR}/resources/settings.xml",
+    f"{BETA_DIR}/resources/language/resource.language.cs_cz/strings.po",
+    f"{BETA_DIR}/resources/language/resource.language.de_de/strings.po",
+    f"{BETA_DIR}/resources/language/resource.language.en_gb/strings.po",
+    f"{BETA_DIR}/resources/lib/history.py",
+    f"{BETA_DIR}/resources/lib/md5crypt.py",
     f"{BETA_DIR}/resources/lib/sync.py",
+    f"{BETA_DIR}/resources/lib/tmdb.py",
+    f"{BETA_DIR}/resources/lib/trakt.py",
     f"{BETA_DIR}/resources/lib/webshare.py"
 ]
 
 def optimalizuj_text(text):
-    """Odstraní nadbytečné bílé znaky a prázdné řádky."""
     if not text:
         return ""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     return "\n".join(lines)
-
-def vyber_relevantni_cast_kodu(obsah_kodu):
-    """Extrahuje klíčové funkce z kódu pro úsporu místa."""
-    if len(obsah_kodu) < 4000:
-        return obsah_kodu
-    
-    klíčová_slova = ["get_sync_files", "search", "history", "folder", "get_all_user_files", "login", "file_search"]
-    nalezené_řádky = []
-    řádky = obsah_kodu.splitlines()
-    
-    for i, řádek in enumerate(řádky):
-        if any(kw in řádek for kw in klíčová_slova) or řádek.startswith("def ") or řádek.startswith("class "):
-            start = max(0, i - 2)
-            end = min(len(řádky), i + 35)
-            nalezené_řádky.append(f"\n# --- úsek kolem řádku {i} ---")
-            nalezené_řádky.extend(řádky[start:end])
-            
-    if nalezené_řádky:
-        return "\n".join(nalezené_řádky)
-    
-    return obsah_kodu[:4000]
 
 def nacti_google_doc(doc_title):
     sa_info = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
@@ -65,7 +51,6 @@ def nacti_google_doc(doc_title):
     files = results.get('files', [])
     
     if not files:
-        print(f"Varování: Google Dokument '{doc_title}' nebyl nalezen.")
         return None, None, ""
         
     doc_id = files[0]['id']
@@ -112,47 +97,47 @@ def nacti_konkretni_soubor(cesta):
     return {"cesta": cesta, "sha": None, "content": ""}
 
 def main():
-    print("Spouštím jednokolového AI agenta...")
+    print("Spouštím bezpečnějšího AI agenta...")
     
     docs_service_chyby, doc_id_chyby, text_chyb = nacti_google_doc(DOC_TITLE_CHYBY)
     _, _, text_webshare_tahak = nacti_google_doc(DOC_TITLE_WEBSHARE)
     github_issues = nacti_github_issues()
     
-    # Proaktivní přednačtení a optimalizace kritických souborů
+    # Načteme klíčové soubory sync.py a webshare.py pro analýzu
     predpripraveny_kod = {}
-    for cesta in PREDSEZNAM_SOUBORU:
+    for cesta in [f"{BETA_DIR}/resources/lib/sync.py", f"{BETA_DIR}/resources/lib/webshare.py"]:
         info = nacti_konkretni_soubor(cesta)
         if info["content"]:
-            predpripraveny_kod[cesta] = vyber_relevantni_cast_kodu(info["content"])
-            print(f"Přednačten a optimalizován soubor: {cesta}")
+            predpripraveny_kod[cesta] = info["content"]
 
     system_instruction = (
-        f"Jsi autonomní vývojový inženýr pro Kodi doplněk. Pracuješ VÝHRADNĚ ve složce '{BETA_DIR}/'.\n"
-        "Analyzuj známé chyby z Google Docs, otevřená GitHub Issues, API tahák a dodaný kód.\n"
-        "Proveď nezbytné opravy přímo v kódu.\n\n"
+        f"Jsi zkušený vývojový inženýr pro Kodi doplněk. Pracuješ VÝHRADNĚ ve složce '{BETA_DIR}/'.\n"
+        "1. Respektuj existující strukturu projektu. NIKDY nevytvářej importy neexistujících modulů (např. žádný modul 'utils' neexistuje).\n"
+        "2. Pro správu chyb a úkolů zakládej GitHub Issues a po jejich vyřešení je uzavírej (přidej komentář a nastav resene_issue_cislo).\n"
+        "3. Google Doc 'Známé chyby' udržuj čistý a přehledný jako seznam aktuálních vývojových cílů, nepiš tam surové chybové výpisy.\n\n"
         "STRIKTNÍ PRAVIDLA:\n"
         f"- Změny smíš provádět POUZE v souborech uvnitř adresáře '{BETA_DIR}/'.\n"
         "- ZÁKAZ zasahovat do 'addon.xml'.\n"
         "- Odpověď vrať VÝHRADNĚ jako validní JSON bez markdownu.\n\n"
         "Formát JSON:\n"
         "{\n"
-        '  "analyza": "Zhodnocení stavu a řešení",\n'
-        '  "vycisteny_text_dokumentu": "Aktualizovaný text pro Google Docs bez vyřešených chyb",\n'
+        '  "analyza": "Stručné zhodnocení problému",\n'
+        '  "vycisteny_text_dokumentu": "Aktualizovaný čistý text pro Google Docs",\n'
         '  "nove_issue": { "vytvorit": false, "title": "", "body": "" },\n'
         '  "resene_issue_cislo": null,\n'
-        '  "komentar_k_issue": null,\n'
+        '  "komentar_k_issue": "Popis řešení pro uzavření issue",\n'
         '  "commit_message": "Popis změn",\n'
         '  "zmeny": [\n'
-        f'    {{ "cesta_k_souboru": "{BETA_DIR}/resources/lib/sync.py", "novy_obsah": "kompletní nový obsah souboru" }}\n'
+        f'    {{ "cesta_k_souboru": "{BETA_DIR}/resources/lib/sync.py", "novy_obsah": "celý opravený kód souboru" }}\n'
         '  ]\n'
         "}"
     )
     
     user_prompt = (
-        f"ZNÁMÉ CHYBY:\n{text_chyb}\n\n"
+        f"CÍLE V GOOGLE DOCS:\n{text_chyb}\n\n"
         f"API TAHÁK WEBSHARE:\n{text_webshare_tahak}\n\n"
-        f"GITHUB ISSUES:\n{json.dumps(github_issues)}\n\n"
-        f"AKTUÁLNÍ KÓD KLÍČOVÝCH SOUBORŮ:\n{json.dumps(predpripraveny_kod)}"
+        f"OTEVŘENÁ GITHUB ISSUES:\n{json.dumps(github_issues)}\n\n"
+        f"AKTUÁLNÍ KÓD SOUBORŮ:\n{json.dumps(predpripraveny_kod)}"
     )
     
     client = OpenAI(base_url="https://router.huggingface.co/v1/", api_key=HF_TOKEN)
@@ -162,7 +147,6 @@ def main():
         {"role": "user", "content": user_prompt}
     ]
     
-    # Jediný bezpečný API požadavek
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=messages,
@@ -176,16 +160,18 @@ def main():
     
     if "vycisteny_text_dokumentu" in vysledek and docs_service_chyby:
         aktualizuj_google_doc(docs_service_chyby, doc_id_chyby, vysledek["vycisteny_text_dokumentu"])
-        print("Google Docs úspěšně aktualizován.")
+        print("Google Docs aktualizován.")
         
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    
+    # Vytvoření nového Issue
     ni = vysledek.get("nove_issue")
     if ni and ni.get("vytvorit") and ni.get("title"):
         url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues"
-        headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
         requests.post(url, headers=headers, json={"title": ni["title"], "body": ni["body"]})
         print("Založeno nové GitHub Issue.")
         
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    # Aplikace změn v kódu
     for zmena in vysledek.get("zmeny", []):
         cesta = zmena.get("cesta_k_souboru") or zmena.get("cesta") or zmena.get("path")
         novy_obsah = zmena.get("novy_obsah") or zmena.get("obsah")
@@ -193,8 +179,8 @@ def main():
         if not cesta or not novy_obsah:
             continue
             
-        if not cesta.startswith(BETA_DIR + "/") or cesta.endswith("addon.xml"):
-            print(f"Ignorována neautorizovaná cesta nebo zakázaný soubor: {cesta}")
+        if cesta not in POVOLENE_SOUBORY:
+            print(f"Ignorována neautorizovaná cesta: {cesta}")
             continue
             
         aktualni_info = nacti_konkretni_soubor(cesta)
@@ -204,7 +190,7 @@ def main():
         encoded_content = base64.b64encode(novy_obsah.encode("utf-8")).decode("utf-8")
         
         payload = {
-            "message": f"Konťa (Beta - Qwen): {vysledek.get('commit_message', 'Optimalizace')}",
+            "message": f"Konťa (Beta - Qwen): {vysledek.get('commit_message', 'Oprava')}",
             "content": encoded_content
         }
         if sha:
@@ -212,6 +198,19 @@ def main():
             
         requests.put(url, headers=headers, json=payload)
         print(f"Aktualizován soubor: {cesta}")
+        
+    # Uzavření/Komentář k vyřešenému Issue
+    res_iss = vysledek.get("resene_issue_cislo")
+    kom = vysledek.get("komentar_k_issue")
+    if res_iss and kom:
+        # Přidání komentáře
+        url_kom = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues/{res_iss}/comments"
+        requests.post(url_kom, headers=headers, json={"body": kom})
+        
+        # Zavření issue (state: closed)
+        url_close = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues/{res_iss}"
+        requests.patch(url_close, headers=headers, json={"state": "closed"})
+        print(f"Issue #{res_iss} vyřešeno, uzavřeno a opatřeno komentářem.")
 
 if __name__ == "__main__":
     main()
