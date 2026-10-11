@@ -44,7 +44,7 @@ def stahni_dokumentaci(zdroj):
         return "Neznámý zdroj dokumentace."
     try:
         resp = requests.get(target_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        return resp.text[:4000] if resp.status_code == 200 else f"Chyba při stahování: HTTP {resp.status_code}"
+        return resp.text[:3000] if resp.status_code == 200 else f"Chyba při stahování: HTTP {resp.status_code}"
     except Exception as e:
         return f"Chyba připojení: {e}"
 
@@ -93,38 +93,38 @@ def nacti_github_issues():
         return [{"number": i["number"], "title": i["title"], "body": i["body"]} for i in resp.json()]
     return []
 
-def nacti_vsechny_soubory(soubory):
-    vysledek = []
+def nacti_konkretni_soubor(cesta):
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    for cesta in soubory:
-        url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{cesta.strip()}"
-        resp = requests.get(url, headers=headers)
-        if resp.status_code == 200:
-            data = resp.json()
-            decoded_content = base64.b64decode(data["content"]).decode("utf-8")
-            vysledek.append({"cesta": cesta, "sha": data["sha"], "content": decoded_content})
-        else:
-            vysledek.append({"cesta": cesta, "sha": None, "content": ""})
-    return vysledek
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{cesta.strip()}"
+    resp = requests.get(url, headers=headers)
+    if resp.status_code == 200:
+        data = resp.json()
+        decoded_content = base64.b64decode(data["content"]).decode("utf-8")
+        return {"cesta": cesta, "sha": data["sha"], "content": decoded_content}
+    return {"cesta": cesta, "sha": None, "content": ""}
 
 def main():
-    print("Spouštím autonomního AI agenta...")
+    print("Spouštím odlehčeného AI agenta...")
     
     docs_service, doc_id, text_chyb = nacti_google_doc()
     github_issues = nacti_github_issues()
-    beta_soubory = nacti_vsechny_soubory(STRUKTURA_BETA_PROJEKTU)
+    
+    # Modelu pošleme zpočátku pouze seznam souborů (cesty), ne jejich celý kód naráz
+    seznam_souboru = STRUKTURA_BETA_PROJEKTU
     
     system_instruction = (
         f"Jsi autonomní vývojový inženýr pro Kodi doplněk. Pracuješ VÝHRADNĚ ve složce '{BETA_DIR}/'.\n"
-        "Pokud pro opravu kódu neznáš přesnou syntaxi nebo parametry API, můžeš si vyžádat dokumentaci "
-        "tak, že v prvním kroku vyplníš pole 'potrebna_dokumentace' hodnotou ('kodi', 'webshare', 'trakt' nebo 'tmdb'). "
-        "Pokud dokumentaci nepotřebuješ, nastav ho na null.\n\n"
+        "1. Analyzuj známé chyby z Google Docs a otevřená GitHub Issues.\n"
+        "2. Pokud k úkolu potřebuješ prozkoumat nebo upravit konkrétní soubor ze seznamu, uveď jeho cestu v poli 'potrebny_soubor'.\n"
+        "3. Pokud potřebuješ dokumentaci, uveď ji v poli 'potrebna_dokumentace' ('kodi', 'webshare', 'trakt', 'tmdb').\n"
+        "Jinak obě pole nastav na null a rovnou vrať řešení.\n\n"
         "STRIKTNÍ PRAVIDLA:\n"
         f"- Změny smíš provádět POUZE v souborech uvnitř adresáře '{BETA_DIR}/'.\n"
-        "- ZÁKAZ zasahovat do 'addon.xml' (verzování spravuje externí skript).\n"
-        "- Odpověď vrať VÝHRADNĚ jako validní JSON objekt bez markdown formátování.\n\n"
-        "Požadovaný formát JSON:\n"
+        "- ZÁKAZ zasahovat do 'addon.xml'.\n"
+        "- Odpověď vrať VÝHRADNĚ jako validní JSON bez markdownu.\n\n"
+        "Formát JSON:\n"
         "{\n"
+        '  "potrebny_soubor": "cesta k souboru k načtení nebo null",\n'
         '  "potrebna_dokumentace": "kodi/webshare/trakt/tmdb nebo null",\n'
         '  "analyza": "Zhodnocení stavu",\n'
         '  "vycisteny_text_dokumentu": "Aktualizovaný text pro Google Docs",\n'
@@ -132,13 +132,11 @@ def main():
         '  "resene_issue_cislo": null,\n'
         '  "komentar_k_issue": null,\n'
         '  "commit_message": "Popis změn",\n'
-        '  "zmeny": [\n'
-        f'    {{ "cesta_k_souboru": "{BETA_DIR}/soubor.py", "novy_obsah": "kompletní nový obsah souboru" }}\n'
-        '  ]\n'
+        '  "zmeny": []\n'
         "}"
     )
     
-    user_prompt = f"GOOGLE DOCS - ZNÁMÉ CHYBY:\n{text_chyb}\n\nGITHUB ISSUES:\n{json.dumps(github_issues)}\n\nKÓD BETY:\n{json.dumps(beta_soubory)}"
+    user_prompt = f"GOOGLE DOCS - ZNÁMÉ CHYBY:\n{text_chyb}\n\nGITHUB ISSUES:\n{json.dumps(github_issues)}\n\nDostupné soubory projektu:\n{json.dumps(seznam_souboru)}"
     
     client = OpenAI(base_url="https://router.huggingface.co/v1/", api_key=HF_TOKEN)
     
@@ -147,7 +145,7 @@ def main():
         {"role": "user", "content": user_prompt}
     ]
     
-    # 1. Kolo dotazu
+    # 1. Kolo: Rychlá analýza a případný požadavek na data
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=messages,
@@ -157,14 +155,23 @@ def main():
     raw_output = response.choices[0].message.content
     vysledek = json.loads(raw_output.replace("```json", "").replace("```", "").strip())
     
-    # Pokud si model vyžádal dokumentaci
-    požadovaná_doc = vysledek.get("potrebna_dokumentace")
-    if požadovaná_doc in ["kodi", "webshare", "trakt", "tmdb"]:
-        print(f"Model si vyžádal dokumentaci: {požadovaná_doc}")
-        stazena_doc = stahni_dokumentaci(požadovaná_doc)
+    # Pokud model vyžádal doplňková data (soubor nebo dokumentaci)
+    potřebný_soubor = vysledek.get("potrebny_soubor")
+    potřebná_doc = vysledek.get("potrebna_dokumentace")
+    
+    if potřebný_soubor or potřebná_doc:
+        doplněk = ""
+        if potřebný_soubor and potřebný_soubor in STRUKTURA_BETA_PROJEKTU:
+            print(f"Model si vyžádal obsah souboru: {potřebný_soubor}")
+            obsah_f = nacti_konkretni_soubor(potřebný_soubor)
+            doplněk += f"\nObsah souboru {potřebný_soubor}:\n{obsah_f['content']}\n"
         
+        if potřebná_doc in ["kodi", "webshare", "trakt", "tmdb"]:
+            print(f"Model si vyžádal dokumentaci: {potřebná_doc}")
+            doplněk += f"\nDokumentace {potřebná_doc}:\n{stahni_dokumentaci(potřebná_doc)}\n"
+            
         messages.append({"role": "assistant", "content": raw_output})
-        messages.append({"role": "user", "content": f"Zde je vyžádaná dokumentace pro {požadovaná_doc}:\n{stazena_doc}\n\nNyní proveď finální analýzu a vygeneruj JSON se změnami v kódu."})
+        messages.append({"role": "user", "content": f"Zde jsou vyžádané podklady:\n{doplněk}\n\nNyní proveď finální úpravy a vrať kompletní JSON s polem 'zmeny'."})
         
         final_response = client.chat.completions.create(
             model=MODEL_NAME,
@@ -197,8 +204,9 @@ def main():
             print(f"Ignorována neautorizovaná cesta nebo zakázaný soubor: {cesta}")
             continue
             
-        stara_data = next((f for f in beta_soubory if f["cesta"] == cesta), None)
-        sha = stara_data["sha"] if stara_data else None
+        # Získání SHA aktuálního souboru pro bezpečný update
+        aktualni_info = nacti_konkretni_soubor(cesta)
+        sha = aktualni_info["sha"]
         
         url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{cesta}"
         encoded_content = base64.b64encode(zmena["novy_obsah"].encode("utf-8")).decode("utf-8")
