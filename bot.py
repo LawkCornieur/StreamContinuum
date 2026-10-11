@@ -12,8 +12,8 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 GITHUB_TOKEN = os.getenv("GH_TOKEN")
 REPO_OWNER = "LawkCornieur"
 REPO_NAME = "StreamContinuum"
-# Qwen reasoning / thinking model optimalizovaný pro komplexní logiku a kód
-MODEL_NAME = "bottlecapai/ThinkingCap-Qwen3.8-27B"
+# Oficiálně podporovaný a vysoce výkonný model pro kód přes Hugging Face router
+MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct"
 DOC_TITLE = "Známé chyby"
 BETA_DIR = "plugin.video.streamcontinuum-beta"
 
@@ -131,7 +131,7 @@ def nacti_vsechny_soubory(soubory):
     return vysledek
 
 def main():
-    print("Spouštím autonomního AI agenta s dynamickým čtením dokumentace...")
+    print("Spouštím autonomního AI agenta s podporou tool-callingu...")
     
     docs_service, doc_id, text_chyb = nacti_google_doc()
     github_issues = nacti_github_issues()
@@ -178,7 +178,7 @@ def main():
     
     response_message = response.choices[0].message
     
-    # Pokud model vyhodnotil, že potřebuje dokumentaci
+    # Pokud model vyhodnotil potřebu dokumentace
     if response_message.tool_calls:
         messages.append(response_message)
         for tool_call in response_message.tool_calls:
@@ -197,7 +197,7 @@ def main():
                     "content": tool_output
                 })
                 
-        # 2. Kolo: Finální zpracování s již načtenou dokumentací
+        # 2. Kolo: Finální zpracování s načtenou dokumentací
         final_response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
@@ -207,7 +207,6 @@ def main():
     else:
         raw_output = response_message.content
 
-    # Čistění případného balastu kolem JSONu
     cisty_json = raw_output.replace("```json", "").replace("```", "").strip()
     vysledek = json.loads(cisty_json)
     
@@ -242,7 +241,7 @@ def main():
         encoded_content = base64.b64encode(zmena["novy_obsah"].encode("utf-8")).decode("utf-8")
         
         payload = {
-            "message": f"Konťa (Beta - QwQ): {vysledek.get('commit_message', 'Optimalizace')}",
+            "message": f"Konťa (Beta - Qwen): {vysledek.get('commit_message', 'Optimalizace')}",
             "content": encoded_content
         }
         if sha:
