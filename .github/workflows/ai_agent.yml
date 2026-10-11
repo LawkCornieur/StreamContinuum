@@ -1,0 +1,30 @@
+name: StreamContinuum AI Agent
+
+on:
+  workflow_dispatch: # Možnost ručního spuštění v záložce Actions
+  schedule:
+    - cron: '0 */8 * * *' # Automatické spuštění každých 8 hodin
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (beta branch)
+        uses: actions/checkout@v4
+        with:
+          ref: beta
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests openai google-api-python-client google-auth
+
+      - name: Run AI Agent
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python bot.py
