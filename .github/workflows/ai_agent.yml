@@ -18,7 +18,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install requests openai google-api-python-client google-auth
+        run: pip install requests openai google-api-python-client google-auth huggingface_hub
 
       - name: Run AI Agent
         env:
