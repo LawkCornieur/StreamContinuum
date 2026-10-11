@@ -109,7 +109,6 @@ def main():
     docs_service, doc_id, text_chyb = nacti_google_doc()
     github_issues = nacti_github_issues()
     
-    # Modelu pošleme zpočátku pouze seznam souborů (cesty), ne jejich celý kód naráz
     seznam_souboru = STRUKTURA_BETA_PROJEKTU
     
     system_instruction = (
@@ -132,7 +131,9 @@ def main():
         '  "resene_issue_cislo": null,\n'
         '  "komentar_k_issue": null,\n'
         '  "commit_message": "Popis změn",\n'
-        '  "zmeny": []\n'
+        '  "zmeny": [\n'
+        f'    {{ "cesta_k_souboru": "{BETA_DIR}/soubor.py", "novy_obsah": "kompletní nový obsah souboru" }}\n'
+        '  ]\n'
         "}"
     )
     
@@ -198,18 +199,22 @@ def main():
     # Zápis změn do beta adresáře na GitHubu
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     for zmena in vysledek.get("zmeny", []):
-        cesta = zmena["cesta_k_souboru"]
+        cesta = zmena.get("cesta_k_souboru") or zmena.get("cesta") or zmena.get("path")
+        novy_obsah = zmena.get("novy_obsah") or zmena.get("obsah")
         
+        if not cesta or not novy_obsah:
+            print(f"Přeskakuji neúplnou změnu od modelu: {zmena}")
+            continue
+            
         if not cesta.startswith(BETA_DIR + "/") or cesta.endswith("addon.xml"):
             print(f"Ignorována neautorizovaná cesta nebo zakázaný soubor: {cesta}")
             continue
             
-        # Získání SHA aktuálního souboru pro bezpečný update
         aktualni_info = nacti_konkretni_soubor(cesta)
         sha = aktualni_info["sha"]
         
         url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{cesta}"
-        encoded_content = base64.b64encode(zmena["novy_obsah"].encode("utf-8")).decode("utf-8")
+        encoded_content = base64.b64encode(novy_obsah.encode("utf-8")).decode("utf-8")
         
         payload = {
             "message": f"Konťa (Beta - Qwen): {vysledek.get('commit_message', 'Optimalizace')}",
