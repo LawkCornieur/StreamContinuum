@@ -144,8 +144,11 @@ def main():
     
     user_prompt = f"GOOGLE DOCS:\n{text_chyb}\n\nGITHUB ISSUES:\n{json.dumps(github_issues)}\n\nKÓD BETY:\n{json.dumps(beta_soubory)}"
     
-    client = OpenAI(base_url="[https://router.huggingface.co/v1](https://router.huggingface.co/v1)", api_key=HF_TOKEN)
-    
+# Správná inicializace s plnou URL včetně https://
+    client = OpenAI(
+        base_url="https://router.huggingface.co/v1/", 
+        api_key=HF_TOKEN
+    )    
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
