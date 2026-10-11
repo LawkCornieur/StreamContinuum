@@ -12,17 +12,21 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 GITHUB_TOKEN = os.getenv("GH_TOKEN")
 REPO_OWNER = "LawkCornieur"
 REPO_NAME = "StreamContinuum"
-MODEL_NAME = "Qwen/Qwen2.5-72B-Instruct"
+# Změna na model s obřím kontextovým oknem (128k tokenů), který bez problému pojme celý projekt i s překlady
+MODEL_NAME = "meta-llama/Llama-3.1-70B-Instruct"
 
 DOC_TITLE_CHYBY = "Známé chyby"
 DOC_TITLE_WEBSHARE = "API Webshare"
 BETA_DIR = "plugin.video.streamcontinuum-beta"
 
-# Vynechali jsme rozsáhlé překladové soubory (.po), které zbytečně vyčerpávaly kontextové okno.
+# Plná sada souborů včetně překladů a konfigurací – nic se neořezává
 POVOLENE_SOUBORY = [
     f"{BETA_DIR}/addon.py",
     f"{BETA_DIR}/service.py",
     f"{BETA_DIR}/resources/settings.xml",
+    f"{BETA_DIR}/resources/language/resource.language.cs_cz/strings.po",
+    f"{BETA_DIR}/resources/language/resource.language.de_de/strings.po",
+    f"{BETA_DIR}/resources/language/resource.language.en_gb/strings.po",
     f"{BETA_DIR}/resources/lib/history.py",
     f"{BETA_DIR}/resources/lib/md5crypt.py",
     f"{BETA_DIR}/resources/lib/sync.py",
