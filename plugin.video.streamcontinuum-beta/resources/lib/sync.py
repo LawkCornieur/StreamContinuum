@@ -148,19 +148,20 @@ def export_settings(pin):
             f.write(encrypted)
             
         old_files = webshare.get_sync_files('streamcontinuum_settings')
+        upload_res = webshare.upload_file(filepath, 'streamcontinuum_settings.enc', target_folder_name='StreamContinuum_Sync')
+        if not upload_res:
+            return False, "Nahrávání nastavení na Webshare selhalo. Zkontrolujte přihlášení."
+
+        uploaded_ident = str(upload_res) if (isinstance(upload_res, str) and upload_res not in ('True', '1')) else None
         for f in old_files:
             ident = f.get('ident')
-            if ident:
+            if ident and ident != uploaded_ident:
                 xbmc.log(f"StreamContinuum: Cleaning old settings file {f.get('name')} ({ident})", xbmc.LOGINFO)
                 deleted = webshare.delete_file(ident)
                 if deleted:
                     xbmc.log(f"StreamContinuum: Deleted old settings file {ident}", xbmc.LOGINFO)
                 else:
                     xbmc.log(f"StreamContinuum: Failed to delete old settings file {ident}", xbmc.LOGWARNING)
-                
-        upload_res = webshare.upload_file(filepath, 'streamcontinuum_settings.enc', target_folder_name='StreamContinuum_Sync')
-        if not upload_res:
-            return False, "Nahrávání nastavení na Webshare selhalo. Zkontrolujte přihlášení."
             
         xbmc.log("StreamContinuum: Export settings successful", xbmc.LOGINFO)
         return True, None
@@ -331,21 +332,22 @@ def sync_history():
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(final_history, f, ensure_ascii=False, indent=4)
             
+        upload_res = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json', target_folder_name='StreamContinuum_Sync')
+        if not upload_res:
+            xbmc.log("StreamContinuum: Failed to upload history file to Webshare", xbmc.LOGERROR)
+            return False
+
+        uploaded_ident = str(upload_res) if (isinstance(upload_res, str) and upload_res not in ('True', '1')) else None
         for f in remote_files:
             ident = f.get('ident')
-            if ident:
+            if ident and ident != uploaded_ident:
                 xbmc.log(f"StreamContinuum: Cleaning old remote history file {f.get('name')} ({ident})", xbmc.LOGINFO)
                 deleted = webshare.delete_file(ident)
                 if deleted:
                     xbmc.log(f"StreamContinuum: Deleted old remote history file {ident}", xbmc.LOGINFO)
                 else:
                     xbmc.log(f"StreamContinuum: Failed to delete old remote history file {ident}", xbmc.LOGWARNING)
-                
-        upload_res = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json', target_folder_name='StreamContinuum_Sync')
-        if not upload_res:
-            xbmc.log("StreamContinuum: Failed to upload history file to Webshare", xbmc.LOGERROR)
-            return False
-            
+
         xbmc.log("StreamContinuum: History sync completed successfully", xbmc.LOGINFO)
         return True
     except Exception as e:

@@ -258,7 +258,8 @@ def search_sync_files(query):
         'what': str(query).strip(),
         'sort': 'largest',
         'limit': 50,
-        'offset': 0
+        'offset': 0,
+        'mine': 1
     }
     if token:
         data['wst'] = token
@@ -266,6 +267,8 @@ def search_sync_files(query):
         response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
         if response.status_code == 200:
             return _parse_files_from_content(response.content)
+        else:
+            xbmc.log(f"Webshare search_sync_files HTTP {response.status_code}: {response.text[:100]}", xbmc.LOGWARNING)
     except Exception as e:
         xbmc.log(f"Webshare search_sync_files error: {e}", xbmc.LOGWARNING)
     return []
@@ -281,15 +284,9 @@ def list_user_files(folder=None, search=None, private=None, offset=0, limit=100,
         'offset': offset
     }
     if folder is not None and str(folder).strip():
-        fld_val = str(folder).strip()
-        data['folder'] = fld_val
-        data['folder_ident'] = fld_val
-        data['folder_name'] = fld_val
-        data['dir'] = fld_val
+        data['folder'] = str(folder).strip()
     if search is not None and str(search).strip():
-        s_val = str(search).strip()
-        data['search'] = s_val
-        data['what'] = s_val
+        data['search'] = str(search).strip()
     if private is not None:
         data['private'] = str(private)
     try:
@@ -300,7 +297,12 @@ def list_user_files(folder=None, search=None, private=None, offset=0, limit=100,
                 if token:
                     data['wst'] = token
                     return list_user_files(folder=folder, search=search, private=private, offset=offset, limit=limit, retry_auth=False)
-            return _parse_files_from_content(response.content)
+            res = _parse_files_from_content(response.content)
+            if not res and response.text and 'FATAL_ERROR' in response.text.upper():
+                xbmc.log(f"Webshare list_user_files (folder={folder}, search={search}) returned status: {response.text[:120]}", xbmc.LOGDEBUG)
+            return res
+        else:
+            xbmc.log(f"Webshare list_user_files HTTP {response.status_code}: {response.text[:100]}", xbmc.LOGWARNING)
     except Exception as e:
         xbmc.log(f"Webshare list_user_files error (folder={folder}, search={search}, private={private}, offset={offset}): {e}", xbmc.LOGWARNING)
     return []
@@ -397,27 +399,28 @@ def delete_file(ident, retry_auth=True):
         return False
 
     ssl_v = get_ssl_verify()
-    endpoints = ['user_delete_file/', 'delete_file/', 'file_delete/', 'user_file_delete/', 'delete_user_file/']
+    # Webshare API endpoints: remove_file/ is the primary verified endpoint
+    endpoints = ['remove_file/', 'file_delete/', 'delete_file/']
     
     last_resp_text = ""
     for ep in endpoints:
         url = BASE_URL + ep
-        for p_name in ('ident', 'file_ident', 'id'):
-            data = {'wst': token, p_name: ident_clean}
-            try:
-                response = requests.post(url, data=data, headers=HEADERS, timeout=8, verify=ssl_v)
-                if response:
-                    last_resp_text = (response.text or "")[:150]
-                    if _is_token_error(response) and retry_auth:
-                        new_token = get_token(force_refresh=True)
-                        if new_token:
-                            return delete_file(ident, retry_auth=False)
-                    if response.status_code in (200, 201, 204):
-                        if _is_response_ok(response) or _is_already_deleted(response) or response.status_code == 204:
-                            xbmc.log(f"Webshare: delete_file {ident_clean} OK via POST {ep} (param {p_name})", xbmc.LOGINFO)
-                            return True
-            except Exception as e:
-                xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGDEBUG)
+        data = {'wst': token, 'ident': ident_clean}
+        try:
+            response = requests.post(url, data=data, headers=HEADERS, timeout=8, verify=ssl_v)
+            if response:
+                last_resp_text = (response.text or "")[:150]
+                if _is_token_error(response) and retry_auth:
+                    new_token = get_token(force_refresh=True)
+                    if new_token:
+                        return delete_file(ident, retry_auth=False)
+                if response.status_code in (200, 201, 204):
+                    if _is_response_ok(response) or _is_already_deleted(response) or response.status_code == 204:
+                        xbmc.log(f"Webshare: delete_file {ident_clean} OK via POST {ep}", xbmc.LOGINFO)
+                        time.sleep(0.3)  # API rate-limiting / flooding protection
+                        return True
+        except Exception as e:
+            xbmc.log(f"Webshare delete_file error on {ep}: {e}", xbmc.LOGDEBUG)
 
     xbmc.log(f"Webshare delete_file failed for ident {ident_clean} (last resp: {last_resp_text})", xbmc.LOGWARNING)
     return False
@@ -458,6 +461,12 @@ def get_sync_files(filename_pattern=None):
             root_results = list_user_files(folder=None, private=priv_flag, limit=100)
             _add_candidates(root_results)
 
+        # Check StreamContinuum_Sync folder directly
+        for sync_folder_name in ('StreamContinuum_Sync', '/StreamContinuum_Sync/'):
+            for priv_flag in ('1', None):
+                fld_files = list_user_files(folder=sync_folder_name, private=priv_flag, limit=100)
+                _add_candidates(fld_files)
+
         user_folders = get_user_folders()
         for fld in user_folders:
             fld_ident = fld.get('ident')
@@ -466,7 +475,7 @@ def get_sync_files(filename_pattern=None):
                 if fld_ident:
                     fld_files = list_user_files(folder=fld_ident, private=priv_flag, limit=100)
                     _add_candidates(fld_files)
-                if fld_name:
+                if fld_name and fld_name not in ('StreamContinuum_Sync', '/StreamContinuum_Sync/'):
                     fld_files_name = list_user_files(folder=fld_name, private=priv_flag, limit=100)
                     _add_candidates(fld_files_name)
 

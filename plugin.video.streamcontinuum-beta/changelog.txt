@@ -1,3 +1,8 @@
+[B]Verze 1.4.3[/B] - 2026-10-17
+- Oprava synchronizace historie a nastavení na Webshare (Issue #51).
+- Obnoven ověřený endpoint pro mazání souborů (remove_file) a přidána ochrana proti přetížení API.
+- Opraveno vyhledávání privátních synchronizačních souborů (parametr mine=1) a odstraněno riziko duplikace při nahrávání.
+
 [B]Verze 1.4.2[/B] - 2026-08-26
 - Oprava funkce autoplay. Přidání procházení do seznamu k zhlédnutí.
 
