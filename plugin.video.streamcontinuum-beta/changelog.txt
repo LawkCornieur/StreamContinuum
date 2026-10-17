@@ -1,7 +1,9 @@
 [B]Verze 1.4.3[/B] - 2026-10-17
-- Oprava synchronizace historie a nastavení na Webshare (Issue #51).
-- Obnoven ověřený endpoint pro mazání souborů (remove_file) a přidána ochrana proti přetížení API.
-- Opraveno vyhledávání privátních synchronizačních souborů (parametr mine=1) a odstraněno riziko duplikace při nahrávání.
+- Kompletní oprava synchronizace dle oficiální Webshare API dokumentace (Issue #51).
+- Nahrazen neexistující endpoint user_files správným cestovním endpointem files/ (procházení /StreamContinuum_Sync/ a kořene /).
+- Odstraněno veřejné vyhledávání search/, které načítalo cizí veřejné soubory z celého Webshare.
+- Implementována správa složek create_folder a přesun move_file po nahrání.
+- Opravena detekce chybového stavu FATAL a mazání souborů přes remove_file.
 
 [B]Verze 1.4.2[/B] - 2026-08-26
 - Oprava funkce autoplay. Přidání procházení do seznamu k zhlédnutí.
