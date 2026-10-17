@@ -4,6 +4,12 @@ import xbmcaddon
 import requests
 import time
 import urllib.parse
+import urllib3
+
+try:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
 
 try:
     import tmdb
@@ -13,6 +19,12 @@ except Exception as _tmdb_e:
 
 ADDON = xbmcaddon.Addon()
 
+def get_ssl_verify():
+    try:
+        return ADDON.getSettingBool('ssl_verify')
+    except Exception:
+        return True
+
 def authenticate():
     client_id = ADDON.getSetting('trakt_client_id')
     client_secret = ADDON.getSetting('trakt_client_secret')
@@ -21,12 +33,11 @@ def authenticate():
         xbmcgui.Dialog().ok("Trakt.tv Error", "Chybí Client ID nebo Client Secret v nastavení API.")
         return
 
-    # 1. Generate Device Code
     url = "https://api.trakt.tv/oauth/device/code"
     payload = {"client_id": client_id}
     
     try:
-        res = requests.post(url, json=payload)
+        res = requests.post(url, json=payload, verify=get_ssl_verify())
         if res.status_code != 200:
             xbmcgui.Dialog().ok("Trakt.tv Error", f"Chyba při komunikaci s Trakt.tv (Status: {res.status_code})\nZkontrolujte Client ID.")
             return
@@ -44,43 +55,41 @@ def authenticate():
         xbmcgui.Dialog().ok("Trakt.tv Error", "API nevrátilo aktivační kódy.")
         return
     
-    # 2. Show Dialog to User
     progress = xbmcgui.DialogProgress()
     progress.create("Trakt.tv Activation", 
                     f"Go to: trakt.tv/activate\nEnter code: {user_code}")
     
-    # 3. Poll for Token
-    start_time = time.time()
-    while time.time() - start_time < expires_in:
-        if progress.iscanceled():
-            break
+    try:
+        start_time = time.time()
+        while time.time() - start_time < expires_in:
+            if progress.iscanceled():
+                break
+                
+            token_url = "https://api.trakt.tv/oauth/device/token"
+            token_payload = {
+                "code": device_code,
+                "client_id": client_id,
+                "client_secret": client_secret
+            }
             
-        token_url = "https://api.trakt.tv/oauth/device/token"
-        token_payload = {
-            "code": device_code,
-            "client_id": client_id,
-            "client_secret": client_secret
-        }
-        
-        token_res = requests.post(token_url, json=token_payload)
-        
-        if token_res.status_code == 200:
-            data = token_res.json()
-            ADDON.setSetting('trakt_token', data['access_token'])
+            token_res = requests.post(token_url, json=token_payload, verify=get_ssl_verify())
             
-            # Fetch and save username
-            user_info = get_user_info()
-            if user_info:
-                ADDON.setSetting('trakt_username', user_info.get('username', 'Připojeno'))
-            
-            xbmcgui.Dialog().notification("Trakt.tv", "Successfully connected!", xbmcgui.NOTIFICATION_INFO)
-            break
-        elif token_res.status_code == 400:
-            time.sleep(interval)
-        else:
-            break
-            
-    progress.close()
+            if token_res.status_code == 200:
+                data = token_res.json()
+                ADDON.setSetting('trakt_token', data['access_token'])
+                
+                user_info = get_user_info()
+                if user_info:
+                    ADDON.setSetting('trakt_username', user_info.get('username', 'Připojeno'))
+                
+                xbmcgui.Dialog().notification("Trakt.tv", "Successfully connected!", xbmcgui.NOTIFICATION_INFO)
+                break
+            elif token_res.status_code == 400:
+                time.sleep(interval)
+            else:
+                break
+    finally:
+        progress.close()
 
 def get_headers():
     client_id = ADDON.getSetting('trakt_client_id')
@@ -98,7 +107,7 @@ def get_user_info():
     url = "https://api.trakt.tv/users/me"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -114,7 +123,7 @@ def get_trakt_id_from_tmdb_id(tmdb_id, media_type):
     headers = get_headers()
 
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             results = res.json()
             if results:
@@ -135,7 +144,7 @@ def search_trakt(query):
     headers = get_headers()
 
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -146,7 +155,7 @@ def get_watchlist():
     url = "https://api.trakt.tv/sync/watchlist"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -164,7 +173,7 @@ def add_to_watchlist(media_type, item_id, id_type='trakt'):
         return False
     payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        res = requests.post(url, json=payload, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code in (200, 201):
             return True
     except Exception as e:
@@ -182,7 +191,7 @@ def remove_from_watchlist(media_type, item_id, id_type='trakt'):
         return False
     payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        res = requests.post(url, json=payload, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code in (200, 201):
             return True
     except Exception as e:
@@ -193,7 +202,7 @@ def get_playback():
     url = "https://api.trakt.tv/sync/playback"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -204,7 +213,7 @@ def get_progress():
     url = "https://api.trakt.tv/sync/playback/episodes"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -215,7 +224,7 @@ def get_trending(media_type):
     url = f"https://api.trakt.tv/{media_type}/trending"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -226,7 +235,7 @@ def get_popular(media_type):
     url = f"https://api.trakt.tv/{media_type}/popular"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -237,7 +246,7 @@ def get_recommended(media_type):
     url = f"https://api.trakt.tv/recommendations/{media_type}"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -248,7 +257,7 @@ def get_seasons(trakt_id):
     url = f"https://api.trakt.tv/shows/{trakt_id}/seasons?extended=full"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -259,7 +268,7 @@ def get_episodes(trakt_id, season_num):
     url = f"https://api.trakt.tv/shows/{trakt_id}/seasons/{season_num}?extended=full"
     headers = get_headers()
     try:
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code == 200:
             return res.json()
     except Exception as e:
@@ -277,7 +286,7 @@ def mark_watched(media_type, item_id, id_type='trakt'):
         return False
     payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        res = requests.post(url, json=payload, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code in (200, 201):
             return True
     except Exception as e:
@@ -295,7 +304,7 @@ def mark_unwatched(media_type, item_id, id_type='trakt'):
         return False
     payload = {item_key: [{"ids": {id_field: item_id}}]}
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        res = requests.post(url, json=payload, headers=headers, timeout=10, verify=get_ssl_verify())
         if res.status_code in (200, 201):
             return True
     except Exception as e:
@@ -313,7 +322,7 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
         trakt_endpoint_type = 'movies' if media_type == 'movie' else 'shows'
         url = f"https://api.trakt.tv/{trakt_endpoint_type}/{item_id}"
         try:
-            res = requests.get(url, headers=get_headers(), timeout=10)
+            res = requests.get(url, headers=get_headers(), timeout=10, verify=get_ssl_verify())
             if res.status_code == 200:
                 trakt_item_data = res.json()
                 tmdb_id = trakt_item_data.get('ids', {}).get('tmdb')
@@ -366,7 +375,7 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
         cs_overview = tmdb_data_cs.get('overview')
         
         tmdb_data_en = {}
-        if (not cs_title_or_name or not cs_overview) and ('language=cs-CZ' in tmdb_url_template_cs):
+        if (not cs_title_or_name or tmdb._has_non_latin(cs_title_or_name) or not cs_overview) and ('language=cs-CZ' in tmdb_url_template_cs):
             tmdb_url_template_en = tmdb_url_template_cs.replace('language=cs-CZ', 'language=en-US')
             try:
                 tmdb_res_en = tmdb.make_tmdb_request(tmdb_url_template_en)
@@ -375,20 +384,55 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
             except Exception:
                 pass
 
+        def _has_non_latin(s):
+            if not s:
+                return False
+            for ch in str(s):
+                o = ord(ch)
+                if o > 0x024F and not (0x1E00 <= o <= 0x1EFF or 0x2000 <= o <= 0x206F):
+                    return True
+            return False
+
+        def _sanitize_string(s):
+            if not s:
+                return ""
+            cleaned = []
+            for ch in str(s):
+                o = ord(ch)
+                if o < 32 or (0x007F <= o <= 0x009F) or (0xD800 <= o <= 0xDFFF) or (0xFFF0 <= o <= 0xFFFF) or o >= 0x10000:
+                    continue
+                cleaned.append(ch)
+            return "".join(cleaned).strip()
+
+        def _get_best_title(log_context=""):
+            cs_t = _sanitize_string(tmdb_data_cs.get('title') if media_type == 'movie' else tmdb_data_cs.get('name'))
+            if cs_t and not _has_non_latin(cs_t):
+                return cs_t
+            
+            orig_t = _sanitize_string(tmdb_data_cs.get('original_title') if media_type == 'movie' else tmdb_data_cs.get('original_name'))
+            if orig_t and not _has_non_latin(orig_t):
+                return orig_t
+
+            en_t = _sanitize_string(tmdb_data_en.get('title') if media_type == 'movie' else tmdb_data_en.get('name'))
+            if en_t and not _has_non_latin(en_t):
+                return en_t
+
+            trakt_t = _sanitize_string(trakt_item_data.get('title')) if id_type == 'trakt' else ''
+            if trakt_t and not _has_non_latin(trakt_t):
+                return trakt_t
+
+            return cs_t or orig_t or en_t or trakt_t or ''
+
         def _get_best_string(cs_key_movie, cs_key_tv, en_key_movie, en_key_tv, trakt_key=None, log_context=""):
             cs_value = tmdb_data_cs.get(cs_key_movie if media_type == 'movie' else cs_key_tv)
             if cs_value:
                 return cs_value
             en_value = tmdb_data_en.get(en_key_movie if media_type == 'movie' else en_key_tv)
             if en_value:
-                if "Title" in log_context:
-                    return f"[EN] {en_value}"
                 return en_value
             if id_type == 'trakt' and trakt_key: 
                 trakt_value = trakt_item_data.get(trakt_key, '')
                 if trakt_value:
-                    if "Title" in log_context and not tmdb_data_en.get(en_key_movie if media_type == 'movie' else en_key_tv):
-                        return f"[TRAKT] {trakt_value}"
                     return trakt_value
             return ''
 
@@ -407,13 +451,13 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
             
         result = {}
         if media_type == 'movie':
-            result['title'] = _get_best_string('title', '', 'title', '', 'title', log_context='Movie Title')
+            result['title'] = _get_best_title(log_context='Movie Title')
             result['overview'] = _get_best_string('overview', 'overview', 'overview', 'overview', 'overview', log_context='Movie Overview')
             result['year'] = _get_best_year('release_date', 'release_date', 'year', log_context='Movie Year')
             result['runtime'] = tmdb_data_cs.get('runtime', 0) or tmdb_data_en.get('runtime', 0) or trakt_item_data.get('runtime', 0)
             result['rating'] = tmdb_data_cs.get('vote_average', 0) or tmdb_data_en.get('vote_average', 0) or trakt_item_data.get('rating', 0)
         elif media_type == 'show':
-            result['title'] = _get_best_string('', 'name', '', 'name', 'title', log_context='Show Title')
+            result['title'] = _get_best_title(log_context='Show Title')
             result['overview'] = _get_best_string('overview', 'overview', 'overview', 'overview', 'overview', log_context='Show Overview')
             result['year'] = _get_best_year('first_air_date', 'first_air_date', 'year', log_context='Show Year')
             result['status'] = (tmdb_data_cs.get('status') or tmdb_data_en.get('status') or trakt_item_data.get('status', ''))
@@ -422,13 +466,13 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
                                 trakt_item_data.get('runtime', 0)
             result['rating'] = tmdb_data_cs.get('vote_average', 0) or tmdb_data_en.get('vote_average', 0) or trakt_item_data.get('rating', 0)
         elif media_type == 'season':
-            result['title'] = _get_best_string('', 'name', '', 'name', None, log_context=f'Season Title S{season_num}') or f"{ADDON.getLocalizedString(30105)} {season_num}"
+            result['title'] = _get_best_title(log_context=f'Season Title S{season_num}') or f"{ADDON.getLocalizedString(30105)} {season_num}"
             result['overview'] = _get_best_string('overview', 'overview', 'overview', 'overview', None, log_context=f'Season Overview S{season_num}')
             result['episode_count'] = tmdb_data_cs.get('episode_count', 0) or tmdb_data_en.get('episode_count', 0)
             result['year'] = _get_best_year('air_date', 'air_date', None, log_context=f'Season Year S{season_num}')
             result['rating'] = tmdb_data_cs.get('vote_average', 0) or tmdb_data_en.get('vote_average', 0)
         elif media_type == 'episode':
-            result['title'] = _get_best_string('', 'name', '', 'name', None, log_context=f'Episode Title S{season_num}E{episode_num}')
+            result['title'] = _get_best_title(log_context=f'Episode Title S{season_num}E{episode_num}')
             result['overview'] = _get_best_string('overview', 'overview', 'overview', 'overview', None, log_context=f'Episode Overview S{season_num}E{episode_num}')
             result['runtime'] = tmdb_data_cs.get('runtime', 0) or tmdb_data_en.get('runtime', 0)
             result['year'] = _get_best_year('air_date', 'air_date', None, log_context=f'Episode Year S{season_num}E{episode_num}')

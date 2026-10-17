@@ -8,16 +8,28 @@ try:
 except ImportError:
     from Cryptodome.Cipher import AES
     from Cryptodome.Util.Padding import pad, unpad
-# This is a virtual module provided by Kodi, it must be imported for the addon to function.
 import xbmc
 import xbmcaddon
 import xbmcvfs
 import webshare
 import requests
+import urllib3
+import history
+
+try:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
 
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
 HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
+
+def get_ssl_verify():
+    try:
+        return ADDON.getSettingBool('ssl_verify')
+    except Exception:
+        return True
 
 def get_key(pin):
     return hashlib.sha256(pin.encode('utf-8')).digest()
@@ -36,17 +48,28 @@ def decrypt_data(data, pin):
     pt = unpad(cipher.decrypt(ct), AES.block_size)
     return pt.decode('utf-8')
 
+def validate_history_item(item):
+    norm = history.normalize_history_item(item)
+    if norm:
+        norm.pop('_raw_title_hint', None)
+    return norm
+
 def export_settings(pin):
-    import xbmc
     try:
         xbmc.log("StreamContinuum: Starting export_settings", xbmc.LOGINFO)
         
-        # Check credentials
         if not ADDON.getSetting('ws_username') or not ADDON.getSetting('ws_password'):
             return False, "Není vyplněno uživatelské jméno nebo heslo pro Webshare."
 
         settings = {}
-        for key in ['ws_username', 'ws_password', 'trakt_token', 'trakt_username', 'trakt_client_id', 'trakt_client_secret', 'tmdb_api_key']:
+        settings_keys = [
+            'ws_username', 'ws_password', 'trakt_token', 'trakt_username', 
+            'trakt_client_id', 'trakt_client_secret', 'tmdb_api_key',
+            'autoplay_next', 'optimize_results', 'after_playback', 
+            'open_last_history', 'enable_welcome_melody', 'auto_start', 
+            'ssl_verify', 'enable_trakt_menu'
+        ]
+        for key in settings_keys:
             settings[key] = ADDON.getSetting(key)
         
         data = json.dumps(settings)
@@ -59,37 +82,19 @@ def export_settings(pin):
         with open(filepath, 'wb') as f:
             f.write(encrypted)
             
-        xbmc.log(f"StreamContinuum: Settings encrypted and saved to {filepath}", xbmc.LOGINFO)
-            
-        # Clean up sync folder
-        files = webshare.get_sync_files()
-        for f in files:
-            name = f['name']
-            if name.startswith('streamcontinuum_settings') and name.endswith('.enc'):
-                xbmc.log(f"StreamContinuum: Found old settings file {name} ({f['ident']}), deleting...", xbmc.LOGINFO)
-                webshare.delete_file(f['ident'])
-                time.sleep(0.5)
-                
-        # Clean up public root
-        public_files = webshare.get_user_files()
-        for f in public_files:
-            name = f['name']
-            if name.startswith('streamcontinuum_settings') and name.endswith('.enc'):
-                xbmc.log(f"StreamContinuum: Found old settings in root {name} ({f['ident']}), deleting...", xbmc.LOGINFO)
-                webshare.delete_file(f['ident'])
-                time.sleep(0.5)
-                
-        # Pauza, aby Webshare stačil zpracovat smazání před nahráváním nového souboru
-        time.sleep(3)
-        
-        success = webshare.upload_file(filepath, 'streamcontinuum_settings.enc')
-        if success:
-            # Sleep 2 seconds to allow Webshare backend indexing to complete
-            time.sleep(2)
-            moved = webshare.move_to_sync('streamcontinuum_settings.enc')
-            if not moved:
-                return False, "Chyba při přesunu nastavení do složky StreamContinuum_Sync."
-        else:
+        old_files = webshare.get_sync_files('streamcontinuum_settings')
+        for f in old_files:
+            ident = f.get('ident')
+            if ident:
+                xbmc.log(f"StreamContinuum: Cleaning old settings file {f.get('name')} ({ident}) before upload", xbmc.LOGINFO)
+                deleted = webshare.delete_file(ident)
+                if deleted:
+                    xbmc.log(f"StreamContinuum: Deleted old settings file {ident}", xbmc.LOGINFO)
+                else:
+                    xbmc.log(f"StreamContinuum: Failed to delete old settings file {ident}", xbmc.LOGWARNING)
+
+        upload_res = webshare.upload_file(filepath, 'streamcontinuum_settings.enc', target_folder_name='StreamContinuum_Sync')
+        if not upload_res:
             return False, "Nahrávání nastavení na Webshare selhalo. Zkontrolujte přihlášení."
             
         xbmc.log("StreamContinuum: Export settings successful", xbmc.LOGINFO)
@@ -99,62 +104,60 @@ def export_settings(pin):
         return False, f"Chyba při exportu: {str(e)}"
 
 def import_settings(pin):
-    import xbmc
     try:
-        # Check credentials
         if not ADDON.getSetting('ws_username') or not ADDON.getSetting('ws_password'):
             return False, "Není vyplněno uživatelské jméno nebo heslo pro Webshare."
 
-        files = webshare.get_sync_files()
-        ident = None
-        matched_name = None
-        
-        # First try to find exact name match
-        for f in files:
-            if f['name'] == 'streamcontinuum_settings.enc':
-                ident = f['ident']
-                matched_name = f['name']
-                break
-                
-        # Fallback to any matching name
-        if not ident:
-            for f in files:
-                name = f['name']
-                if name.startswith('streamcontinuum_settings') and name.endswith('.enc'):
-                    ident = f['ident']
-                    matched_name = name
-                    break
-                    
-        if not ident:
+        candidates = webshare.get_sync_files('streamcontinuum_settings')
+        if not candidates:
             return False, "Soubor s nastavením nebyl na Webshare nalezen."
             
-        xbmc.log(f"StreamContinuum: Importing settings from file: {matched_name} ({ident})", xbmc.LOGINFO)
+        successful_settings = None
+        valid_ident = None
         
-        link = webshare.get_link(ident)
-        if not link:
-            return False, "Nelze získat odkaz pro stažení souboru z Webshare."
+        for f in candidates:
+            ident = f.get('ident')
+            if not ident:
+                continue
+            matched_name = f.get('name')
+            xbmc.log(f"StreamContinuum: Attempting to import settings from: {matched_name} ({ident})", xbmc.LOGINFO)
+            link = webshare.get_link(ident)
+            if not link:
+                continue
+            try:
+                resp = requests.get(link, timeout=10, verify=get_ssl_verify())
+                if resp.status_code != 200:
+                    continue
+                encrypted = resp.content
+                data = decrypt_data(encrypted, pin)
+                settings = json.loads(data)
+                if isinstance(settings, dict) and settings:
+                    successful_settings = settings
+                    valid_ident = ident
+                    break
+            except Exception as candidate_err:
+                xbmc.log(f"StreamContinuum: Candidate {ident} decryption failed: {candidate_err}", xbmc.LOGWARNING)
+                continue
+                
+        if not successful_settings:
+            return False, "Chyba dešifrování nastavení (nesprávný PIN nebo poškozený soubor)."
             
-        resp = requests.get(link)
-        if resp.status_code != 200:
-            return False, f"Chyba při stahování souboru z Webshare (HTTP {resp.status_code})."
+        for key, value in successful_settings.items():
+            if isinstance(value, bool):
+                ADDON.setSettingBool(key, value)
+            elif isinstance(value, int):
+                ADDON.setSettingInt(key, value)
+            else:
+                ADDON.setSetting(key, str(value))
             
-        encrypted = resp.content
-        
-        try:
-            data = decrypt_data(encrypted, pin)
-        except Exception as decrypt_err:
-            xbmc.log(f"StreamContinuum: Decryption failed: {decrypt_err}", xbmc.LOGERROR)
-            return False, "Chyba dešifrování nastavení (nesprávný PIN?)."
-            
-        try:
-            settings = json.loads(data)
-        except Exception as json_err:
-            xbmc.log(f"StreamContinuum: JSON parsing failed: {json_err}", xbmc.LOGERROR)
-            return False, "Soubor obsahuje neplatná data (poškozená záloha)."
-            
-        for key, value in settings.items():
-            ADDON.setSetting(key, value)
-            
+        for f in candidates:
+            ident = f.get('ident')
+            if ident and ident != valid_ident:
+                try:
+                    webshare.delete_file(ident)
+                except Exception:
+                    pass
+                    
         xbmc.log("StreamContinuum: Settings imported successfully", xbmc.LOGINFO)
         return True, None
     except Exception as e:
@@ -162,100 +165,70 @@ def import_settings(pin):
         return False, f"Chyba importu nastavení: {str(e)}"
 
 def sync_history():
-    import xbmc
     try:
         xbmc.log("StreamContinuum: Starting sync_history", xbmc.LOGINFO)
         
-        # Check credentials
         if not ADDON.getSetting('ws_username') or not ADDON.getSetting('ws_password'):
             xbmc.log("StreamContinuum: Missing Webshare credentials for history sync", xbmc.LOGERROR)
             return False
 
-        local_history = []
+        raw_local = []
         if os.path.exists(HISTORY_FILE):
             with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
                 try:
-                    local_history = json.load(f)
+                    loaded = json.load(f)
+                    if isinstance(loaded, list):
+                        raw_local = loaded
                 except Exception as e:
                     xbmc.log(f"StreamContinuum: Error loading local history: {e}", xbmc.LOGWARNING)
+                    raw_local = []
                     
-        files = webshare.get_sync_files()
-        
-        # Find all history files
-        remote_history_files = []
-        for f in files:
-            name = f['name']
-            if name.startswith('streamcontinuum_history') and name.endswith('.json'):
-                remote_history_files.append(f)
-                
+        remote_files = webshare.get_sync_files('streamcontinuum_history')
+        xbmc.log(f"StreamContinuum: Found {len(remote_files)} remote history files across Webshare", xbmc.LOGINFO)
+
         remote_history = []
-        for f in remote_history_files:
-            xbmc.log(f"StreamContinuum: Loading remote history from {f['name']} ({f['ident']})", xbmc.LOGINFO)
-            link = webshare.get_link(f['ident'])
+        for f in remote_files:
+            ident = f.get('ident')
+            name = f.get('name', 'streamcontinuum_history.json')
+            if not ident:
+                continue
+            xbmc.log(f"StreamContinuum: Loading remote history from {name} ({ident})", xbmc.LOGINFO)
+            link = webshare.get_link(ident)
             if link:
                 try:
-                    resp = requests.get(link, timeout=10)
+                    resp = requests.get(link, timeout=10, verify=get_ssl_verify())
                     if resp.status_code == 200:
-                        data = resp.json()
+                        try:
+                            data = resp.json()
+                        except Exception:
+                            data = json.loads(resp.text)
                         if isinstance(data, list):
-                            remote_history.extend(data)
+                            for r_it in data:
+                                if isinstance(r_it, dict) and r_it.get('query'):
+                                    remote_history.append(r_it)
                 except Exception as read_err:
-                    xbmc.log(f"StreamContinuum: Error reading remote history from {f['name']}: {read_err}", xbmc.LOGERROR)
+                    xbmc.log(f"StreamContinuum: Error reading remote history from {name}: {read_err}", xbmc.LOGERROR)
                     
-        # Merge histories intelligently by comparing timestamps
-        merged_map = {}
-        for item in local_history + remote_history:
-            key = item.get('query') or item.get('title')
-            if not key:
-                continue
-            if key not in merged_map:
-                merged_map[key] = item
-            else:
-                existing_time = merged_map[key].get('last_played_at') or merged_map[key].get('added_at') or 0
-                item_time = item.get('last_played_at') or item.get('added_at') or 0
-                if item_time >= existing_time:
-                    merged_map[key] = item
-                
-        final_history = list(merged_map.values())
-        final_history.sort(key=lambda x: (x.get('last_played_at') or x.get('added_at') or 0), reverse=True)
-        final_history = final_history[:50]
-        
-        if not os.path.exists(PROFILE_DIR):
-            os.makedirs(PROFILE_DIR)
+        final_history = history.consolidate_history_items(raw_local + remote_history)
+        history._save_history(final_history)
+
+        # Nejprve smazat staré soubory historie na Webshare, aby při nahrání nového souboru
+        # nedocházelo ke kolizi názvu (přejmenování na streamcontinuum_history(ident).json) a selhání move_file
+        for f in remote_files:
+            ident = f.get('ident')
+            if ident:
+                xbmc.log(f"StreamContinuum: Cleaning old remote history file {f.get('name')} ({ident})", xbmc.LOGINFO)
+                deleted = webshare.delete_file(ident)
+                if deleted:
+                    xbmc.log(f"StreamContinuum: Deleted old remote history file {ident}", xbmc.LOGINFO)
+                else:
+                    xbmc.log(f"StreamContinuum: Failed to delete old remote history file {ident}", xbmc.LOGWARNING)
             
-        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-            json.dump(final_history, f, ensure_ascii=False, indent=4)
-            
-        # Delete all remote history files from sync folder
-        for f in remote_history_files:
-            xbmc.log(f"StreamContinuum: Deleting old remote history file {f['name']} ({f['ident']})", xbmc.LOGINFO)
-            webshare.delete_file(f['ident'])
-            time.sleep(0.5)
-            
-        # Also delete all history files from public root just in case
-        public_files = webshare.get_user_files()
-        for f in public_files:
-            name = f['name']
-            if name.startswith('streamcontinuum_history') and name.endswith('.json'):
-                xbmc.log(f"StreamContinuum: Deleting old remote history in root {name} ({f['ident']})", xbmc.LOGINFO)
-                webshare.delete_file(f['ident'])
-                time.sleep(0.5)
-                
-        # Pauza, aby Webshare stačil zpracovat smazání před nahráváním nové historie
-        time.sleep(3)
-        
-        success = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json')
-        if success:
-            # Sleep 2 seconds to allow Webshare backend indexing to complete
-            time.sleep(2)
-            moved = webshare.move_to_sync('streamcontinuum_history.json')
-            if not moved:
-                xbmc.log("StreamContinuum: Failed to move history file to StreamContinuum_Sync", xbmc.LOGERROR)
-                return False
-        else:
+        upload_res = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json', target_folder_name='StreamContinuum_Sync')
+        if not upload_res:
             xbmc.log("StreamContinuum: Failed to upload history file to Webshare", xbmc.LOGERROR)
             return False
-            
+
         xbmc.log("StreamContinuum: History sync completed successfully", xbmc.LOGINFO)
         return True
     except Exception as e:

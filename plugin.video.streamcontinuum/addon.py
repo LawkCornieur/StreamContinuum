@@ -8,7 +8,6 @@ import urllib.parse
 import re
 import datetime
 
-# Add addon root and resources/lib to sys.path
 ADDON_ROOT = os.path.dirname(__file__)
 sys.path.append(ADDON_ROOT)
 sys.path.append(os.path.join(ADDON_ROOT, 'resources', 'lib'))
@@ -113,7 +112,7 @@ def list_categories():
     main_fanart = get_asset('fa.png')
 
     items = [
-        (ADDON.getLocalizedString(30052), 'search', 'DefaultAddonsSearch.png', get_asset('fa-ws.png'), '#012a39'),
+        (ADDON.getLocalizedString(30052), 'search_prompt', 'DefaultAddonsSearch.png', get_asset('fa-ws.png'), '#012a39'),
         (ADDON.getLocalizedString(30053), 'history', 'DefaultHistory.png', get_asset('fa-history.png'), '#cc9900'),
         (ADDON.getLocalizedString(30051), 'watchlist', 'DefaultWatchlist.png', get_asset('fa-watchlist.jpg'), '#e50914')
     ]
@@ -128,12 +127,14 @@ def list_categories():
 
     for label, action, icon, fanart, color in items:
         try:
-            url = f"{sys.argv[0]}?action={action}"
             display_label = f"[COLOR {color}]{label}[/COLOR]" if color else label
             list_item = xbmcgui.ListItem(label=display_label)
             list_item.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
             
-            success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
+            url = f"{sys.argv[0]}?action={action}"
+            is_folder = False if action in ('settings', 'search_prompt') else True
+                
+            success = xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
             if success:
                 item_count += 1
             else:
@@ -163,14 +164,26 @@ def trakt_menu():
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
     xbmcplugin.endOfDirectory(HANDLE)
 
+def search_prompt():
+    keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30057))
+    keyboard.doModal()
+    if keyboard.isConfirmed():
+        query = keyboard.getText().strip()
+        if query:
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(query)})')
+
 def search(query=None):
     if not query:
         keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30057))
         keyboard.doModal()
-        if keyboard.isConfirmed():
-            query = keyboard.getText()
-        else:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        if keyboard.isConfirmed() and keyboard.getText():
+            query = keyboard.getText().strip()
+        if not query:
+            if HANDLE >= 0:
+                try:
+                    xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                except Exception:
+                    pass
             return
 
     if query:
@@ -178,13 +191,20 @@ def search(query=None):
         results = webshare.search(query)
         if not results:
             xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            if HANDLE >= 0:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
         
+        edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} ({query})...[/COLOR]"
+        edit_url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote_plus(query)}"
+        edit_item = xbmcgui.ListItem(label=edit_label)
+        edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa-ws.png')})
+        xbmcplugin.addDirectoryItem(HANDLE, edit_url, edit_item, isFolder=False)
+
         optimize_results = ADDON.getSetting('optimize_results') == 'true'
         
         for item in results:
-            url = f"{sys.argv[0]}?action=play&ident={item['ident']}&query={urllib.parse.quote(query)}&title={urllib.parse.quote(item['name'])}"
+            url = f"{sys.argv[0]}?action=play&ident={item['ident']}&query={urllib.parse.quote_plus(query)}&title={urllib.parse.quote_plus(item['name'])}"
             size_mb = item['size'] / (1024 * 1024)
             size_str = f"{round(size_mb / 1024, 2)} GB" if size_mb > 1000 else f"{round(size_mb, 2)} MB"
             
@@ -247,137 +267,212 @@ def search(query=None):
             list_item.setProperty('IsPlayable', 'true')
             xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=False)
         
-        xbmcplugin.endOfDirectory(HANDLE)
+        if HANDLE >= 0:
+            xbmcplugin.endOfDirectory(HANDLE)
+
+def _matches_season_episode(file_name, target_season, target_episode):
+    if not file_name:
+        return False
+    fn = str(file_name).lower()
+    patterns = [
+        rf'\bs0*{target_season}\s*e0*{target_episode}\b',
+        rf'\b0*{target_season}x0*{target_episode}\b',
+        rf'\b(?:série|serie|season)\s*0*{target_season}\s*(?:epizoda|díl|dil|ep|e)?\s*0*{target_episode}\b'
+    ]
+    return any(re.search(p, fn, re.IGNORECASE) for p in patterns)
 
 def play(ident, query=None, title=None, is_autoplay=False):
-    link = webshare.get_link(ident)
-    if link:
-        item_title = title or query or "StreamContinuum"
-        list_item = xbmcgui.ListItem(label=item_title, path=link)
-        info_tag = list_item.getVideoInfoTag()
-        info_tag.setTitle(item_title)
-        info_tag.setMediaType('video')
+    current_ident = ident
+    current_query = query
+    current_title = title
+    autoplay_loop = is_autoplay
 
-        if query:
-            import history
-            history.add_to_history(query)
-            
-        player = xbmc.Player()
-        monitor = xbmc.Monitor()
+    while current_ident:
+        link = webshare.get_link(current_ident)
+        if link:
+            item_title = current_title or current_query or "StreamContinuum"
+            list_item = xbmcgui.ListItem(label=item_title, path=link)
+            info_tag = list_item.getVideoInfoTag()
+            info_tag.setTitle(item_title)
+            info_tag.setMediaType('video')
 
-        resolved = False
-        if HANDLE >= 0 and not is_autoplay:
-            try:
-                xbmcplugin.setResolvedUrl(HANDLE, True, list_item)
-                resolved = True
-            except Exception as e:
-                xbmc.log(f"StreamContinuum: setResolvedUrl error: {e}", xbmc.LOGWARNING)
-
-        if not resolved:
-            if player.isPlayingVideo():
-                player.stop()
-                xbmc.sleep(300)
-
-            player.play(link, list_item)
-
-        # Wait for playback to start (max 5 seconds)
-        for _ in range(50):
-            if player.isPlayingVideo() or monitor.abortRequested():
-                break
-            xbmc.sleep(100)
-
-        total_time = 0
-        last_pos = 0
-        while not monitor.abortRequested() and player.isPlayingVideo():
-            try:
-                t = player.getTotalTime()
-                p = player.getTime()
-                if t > 0:
-                    total_time = t
-                    last_pos = p
-            except Exception:
-                pass
-            xbmc.sleep(500)
-
-        played_to_end = False
-        if total_time > 0 and (last_pos / total_time) >= 0.85:
-            played_to_end = True
-
-        autoplay_enabled = ADDON.getSettingBool('autoplay_next')
-        if played_to_end and autoplay_enabled and query:
-            ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
-            if ep_match:
-                raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
-                cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
-                season = int(ep_match.group(2) or ep_match.group(4))
-                episode = int(ep_match.group(3) or ep_match.group(5))
+            if current_query:
                 import history
-                ws_base = cleaned_base if cleaned_base else history.get_base_name(query)
-                next_ep_query = f"{ws_base} S{season:02d}E{episode+1:02d}"
+                history.add_to_history(current_query)
+                
+            player = xbmc.Player()
+            monitor = xbmc.Monitor()
 
-                hist_item = history.get_history_item(query)
-                clean_tmdb_id = hist_item.get('tmdb_id') if hist_item else None
-                has_next_ep = True
-                if clean_tmdb_id and tmdb_module:
-                    try:
-                        show_details = tmdb_module.get_show_seasons(clean_tmdb_id)
-                        if show_details and 'seasons' in show_details:
-                            seasons = show_details.get('seasons', [])
-                            curr_s_obj = next((s for s in seasons if s.get('season_number') == season), None)
-                            if curr_s_obj:
-                                max_eps = curr_s_obj.get('episode_count', 0)
-                                if max_eps > 0 and episode + 1 > max_eps:
-                                    has_next_ep = False
-                    except Exception as e:
-                        xbmc.log(f"StreamContinuum: TMDb validation error in autoplay: {e}", xbmc.LOGWARNING)
+            resolved = False
+            if HANDLE >= 0 and not autoplay_loop:
+                try:
+                    xbmcplugin.setResolvedUrl(HANDLE, True, list_item)
+                    resolved = True
+                except Exception as e:
+                    xbmc.log(f"StreamContinuum: setResolvedUrl error: {e}", xbmc.LOGWARNING)
 
-                if has_next_ep:
-                    dialog = xbmcgui.DialogProgress()
-                    dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_ep_query}")
-                    dialog.update(0, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\nVyhledávání na Webshare...")
+            if not resolved:
+                if player.isPlayingVideo():
+                    player.stop()
+                    xbmc.sleep(300)
 
-                    results = webshare.search(next_ep_query)
-                    if results and not dialog.iscanceled() and not monitor.abortRequested():
-                        selected_item = results[0]
-                        item_name = selected_item.get('name', next_ep_query)
-                        seconds = 10
-                        canceled = False
-                        for i in range(seconds * 10):
-                            if dialog.iscanceled() or monitor.abortRequested():
-                                canceled = True
-                                break
-                            percent = int(100 - (i / (seconds * 10) * 100))
-                            dialog.update(percent, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\n{item_name}\nSpuštění za {seconds - (i // 10)} s...")
-                            xbmc.sleep(100)
-                        dialog.close()
+                player.play(link, list_item)
 
-                        if not canceled and not monitor.abortRequested():
-                            play(selected_item["ident"], next_ep_query, title=item_name, is_autoplay=True)
-                            return
-                    else:
-                        dialog.close()
+            for _ in range(50):
+                if player.isPlayingVideo() or monitor.abortRequested():
+                    break
+                xbmc.sleep(100)
 
-        after = ADDON.getSetting('after_playback')
-        safe_query = urllib.parse.quote(query) if query else ""
+            total_time = 0
+            last_pos = 0
+            while not monitor.abortRequested() and player.isPlayingVideo():
+                try:
+                    t = player.getTotalTime()
+                    p = player.getTime()
+                    if t > 0:
+                        total_time = t
+                        last_pos = p
+                except Exception:
+                    pass
+                xbmc.sleep(500)
 
-        if after == '0' and query:
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
-        elif after == '1':
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search,replace)')
-        elif after == '3':
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
-        elif after == '4' and query:
-            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search_prefill&query={safe_query},replace)')
-    else:
-        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
+            for _ in range(10):
+                if not player.isPlayingVideo():
+                    break
+                xbmc.sleep(100)
+            xbmc.sleep(400)
+
+            played_to_end = False
+            if total_time > 0 and (last_pos / total_time) >= 0.85:
+                played_to_end = True
+
+            if played_to_end and current_query:
+                import history
+                history.set_watched_status(current_query, True)
+                trakt_token = ADDON.getSetting('trakt_token')
+                if trakt_token:
+                    hist_item = history.get_history_item(current_query)
+                    if hist_item and hist_item.get('tmdb_id'):
+                        tmdb_id = hist_item.get('tmdb_id')
+                        is_show = hist_item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(current_query)
+                        m_type = 'show' if is_show else 'movie'
+                        t_id = trakt.get_trakt_id_from_tmdb_id(tmdb_id, m_type)
+                        if t_id:
+                            trakt.mark_watched(m_type, t_id)
+                try:
+                    history.check_and_update_next_episodes()
+                except Exception:
+                    pass
+
+            next_ep_data = None
+            autoplay_enabled = ADDON.getSettingBool('autoplay_next')
+            if played_to_end and autoplay_enabled and current_query and not monitor.abortRequested():
+                ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', current_query, re.IGNORECASE)
+                if ep_match:
+                    raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
+                    cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
+                    season = int(ep_match.group(2) or ep_match.group(4))
+                    episode = int(ep_match.group(3) or ep_match.group(5))
+                    target_season = season
+                    target_episode = episode + 1
+                    import history
+                    ws_base = cleaned_base if cleaned_base else history.get_base_name(current_query)
+                    next_ep_query = f"{ws_base} S{target_season:02d}E{target_episode:02d}"
+
+                    hist_item = history.get_history_item(current_query)
+                    clean_tmdb_id = hist_item.get('tmdb_id') if hist_item else None
+                    if not clean_tmdb_id and tmdb_module and ws_base:
+                        try:
+                            search_res = tmdb_module.search_tmdb(ws_base)
+                            for s_item in search_res:
+                                if s_item.get('type') == 'show' and s_item.get('id'):
+                                    clean_tmdb_id = s_item.get('id')
+                                    break
+                        except Exception:
+                            pass
+
+                    has_next_ep = True
+                    if clean_tmdb_id and tmdb_module:
+                        try:
+                            show_details = tmdb_module.get_show_seasons(clean_tmdb_id)
+                            if show_details and 'seasons' in show_details:
+                                seasons = show_details.get('seasons', [])
+                                curr_s_obj = next((s for s in seasons if s.get('season_number') == target_season), None)
+                                if curr_s_obj:
+                                    max_eps = curr_s_obj.get('episode_count', 0)
+                                    if max_eps > 0 and target_episode > max_eps:
+                                        has_next_ep = False
+                        except Exception as e:
+                            xbmc.log(f"StreamContinuum: TMDb validation error in autoplay: {e}", xbmc.LOGWARNING)
+
+                    if has_next_ep:
+                        dialog = xbmcgui.DialogProgress()
+                        dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_ep_query}")
+                        try:
+                            dialog.update(0, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\nVyhledávání na Webshare...")
+                            results = webshare.search(next_ep_query)
+                            matched_results = [r for r in results if _matches_season_episode(r.get('name', ''), target_season, target_episode)] if results else []
+                            
+                            if matched_results and not dialog.iscanceled() and not monitor.abortRequested():
+                                selected_item = matched_results[0]
+                                item_name = selected_item.get('name', next_ep_query)
+                                seconds = 10
+                                canceled = False
+                                for i in range(seconds * 10):
+                                    if dialog.iscanceled() or monitor.abortRequested():
+                                        canceled = True
+                                        break
+                                    percent = int(100 - (i / (seconds * 10) * 100))
+                                    dialog.update(percent, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\n{item_name}\nSpuštění za {seconds - (i // 10)} s...")
+                                    xbmc.sleep(100)
+
+                                if not canceled and not monitor.abortRequested():
+                                    next_ep_data = (selected_item["ident"], next_ep_query, item_name)
+                            elif not matched_results and not dialog.iscanceled() and not monitor.abortRequested():
+                                xbmcgui.Dialog().notification("StreamContinuum", "Automaticky se nepovedlo vybrat správný díl, zkuste to ručně.", xbmcgui.NOTIFICATION_WARNING, 4000)
+                                xbmc.sleep(300)
+                                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(next_ep_query)},replace)')
+                                return
+                        finally:
+                            try:
+                                dialog.close()
+                            except Exception:
+                                pass
+
+            if next_ep_data:
+                current_ident, current_query, current_title = next_ep_data
+                autoplay_loop = True
+            else:
+                after = ADDON.getSetting('after_playback')
+                safe_query = urllib.parse.quote_plus(current_query) if current_query else ""
+                xbmc.sleep(400)
+
+                if after == '0' and current_query:
+                    xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={safe_query},replace)')
+                elif after == '1':
+                    xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search,replace)')
+                elif after == '3':
+                    xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
+                elif after == '4' and current_query:
+                    xbmc.executebuiltin(f'RunPlugin({sys.argv[0]}?action=search_prefill&query={safe_query})')
+                break
+        else:
+            xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
+            break
 
 def show_watchlist():
     import history
+    try:
+        history.check_and_update_next_episodes()
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Watchlist auto-sync next episodes error: {e}", xbmc.LOGWARNING)
+
     all_items = history.get_history(deduplicate=True)
     items = [item for item in all_items if not item.get('is_watched', True)]
     
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30051))
     xbmcplugin.setContent(HANDLE, 'videos')
+    xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
 
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30074), xbmcgui.NOTIFICATION_INFO, 3000)
@@ -402,8 +497,8 @@ def show_watchlist():
             e_num = int(ep_match.group(2) or ep_match.group(4))
             ep_suffix = f" S{s_num:02d}E{e_num:02d}"
 
-        if raw_title:
-            base_display = raw_title
+        if raw_title and not history.has_non_latin(raw_title):
+            base_display = history.sanitize_title(raw_title)
             label = f"{base_display} ({year}){ep_suffix}" if year else f"{base_display}{ep_suffix}"
         else:
             base_name = history.get_base_name(query)
@@ -416,17 +511,16 @@ def show_watchlist():
         )
         
         cm = [
-            (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=1)'),
-            (ADDON.getLocalizedString(30134), f'RunPlugin({sys.argv[0]}?action=watchlist_remove&query={urllib.parse.quote(query)})'),
-            (ADDON.getLocalizedString(30120), f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote(query)})'),
-            (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote(query)})'),
+            (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(query)}&watched=1&source=watchlist)'),
+            (ADDON.getLocalizedString(30134), f'RunPlugin({sys.argv[0]}?action=watchlist_remove&query={urllib.parse.quote_plus(query)})'),
+            (ADDON.getLocalizedString(30120), f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote_plus(query)})'),
+            (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote_plus(query)})'),
         ]
         list_item.addContextMenuItems(cm)
         
-        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
+        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(query)}&source=watchlist"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
 
-    # Always add catalog quick link item at bottom
     cat_label = f"[COLOR #01b4e4]+ {ADDON.getLocalizedString(30130)}[/COLOR]"
     cat_item = xbmcgui.ListItem(label=cat_label)
     cat_item.setArt({'icon': 'DefaultAddonVideo.png', 'thumb': 'DefaultAddonVideo.png', 'fanart': get_asset('fa-watchlist.jpg')})
@@ -442,16 +536,17 @@ def show_history(force_list=False):
     
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        if HANDLE >= 0:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
         return
 
-    # If setting is enabled to open the last played item directly on history entry
     if not force_list and ADDON.getSettingBool('open_last_history'):
-        history_menu(items[0].get('query', ''), show_full_history_link=True)
+        history_menu(items[0].get('query', ''), show_full_history_link=True, source='history')
         return
 
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
     xbmcplugin.setContent(HANDLE, 'videos')
+    xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
         
     for item in items:
         query = item.get('query', '')
@@ -474,8 +569,8 @@ def show_history(force_list=False):
             e_num = int(ep_match.group(2) or ep_match.group(4))
             ep_suffix = f" S{s_num:02d}E{e_num:02d}"
 
-        if raw_title:
-            base_display = raw_title
+        if raw_title and not history.has_non_latin(raw_title):
+            base_display = history.sanitize_title(raw_title)
             if year:
                 label = f"{base_display} ({year}){ep_suffix}"
             else:
@@ -493,37 +588,40 @@ def show_history(force_list=False):
             is_watched=is_watched
         )
         
-        # Context menu for history items
         cm = []
         if not is_watched:
-            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=1)'))
+            cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(query)}&watched=1)'))
         else:
-            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote(query)}&watched=0)'))
+            cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(query)}&watched=0)'))
             
         cm.extend([
-            (ADDON.getLocalizedString(30120), f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote(query)})'),
-            (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote(query)})'),
-            (ADDON.getLocalizedString(30066), f'RunPlugin({sys.argv[0]}?action=history_delete&query={urllib.parse.quote(query)})'),
+            (ADDON.getLocalizedString(30120), f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote_plus(query)})'),
+            (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote_plus(query)})'),
+            (ADDON.getLocalizedString(30066), f'RunPlugin({sys.argv[0]}?action=history_delete&query={urllib.parse.quote_plus(query)})'),
         ])
         list_item.addContextMenuItems(cm)
         
-        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote(query)}"
+        url = f"{sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
         
     xbmcplugin.endOfDirectory(HANDLE)
 
-def history_menu(query, title=None, show_full_history_link=False):
+def history_menu(query, title=None, show_full_history_link=False, source=None):
     if not query:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        if HANDLE >= 0:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
     import history
     hist_item = history.get_history_item(query)
     raw_title = (hist_item.get('title') if hist_item else None) or title
+    if raw_title and history.has_non_latin(raw_title):
+        raw_title = None
     year = hist_item.get('year') if hist_item else None
     plot = (hist_item.get('plot') if hist_item else '') or ''
     genres = hist_item.get('genres', []) if hist_item else []
     rating = hist_item.get('rating') if hist_item else None
+    runtime = hist_item.get('runtime') if hist_item else None
     poster = hist_item.get('poster') if hist_item and hist_item.get('poster') else None
     fanart = hist_item.get('fanart') if hist_item and hist_item.get('fanart') else get_asset('fa-history.png')
     is_watched = bool(hist_item.get('is_watched', True)) if hist_item else True
@@ -532,93 +630,341 @@ def history_menu(query, title=None, show_full_history_link=False):
     is_tv = (hist_item.get('media_type') in ('tvshow', 'tv', 'show') if hist_item else False) or history.is_series(query)
     media_type = 'tvshow' if is_tv else 'movie'
 
-    display_title = raw_title or history.get_base_name(query) or query
+    display_title = history.sanitize_title(raw_title) or history.get_base_name(query) or query
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {display_title}")
     xbmcplugin.setContent(HANDLE, 'movies' if media_type == 'movie' else 'tvshows')
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
 
     items = []
-    if show_full_history_link:
-        items.append((f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]", 'history_list', 'DefaultFolder.png'))
+    if show_full_history_link and source != 'watchlist':
+        items.append({
+            'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
+            'action': 'history_list_replace',
+            'icon': 'DefaultFolder.png',
+            'thumb': 'DefaultFolder.png',
+            'poster': None,
+            'fanart': fanart,
+            'plot': '',
+            'is_utility': True,
+            'is_folder': False
+        })
 
-    items.extend([
-        (ADDON.getLocalizedString(30057), f'search&query={urllib.parse.quote(query)}', 'DefaultAddonsSearch.png'),
-        (ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073), f'history_mark&query={urllib.parse.quote(query)}&watched={0 if is_watched else 1}', 'DefaultAddonVideo.png'),
-        (ADDON.getLocalizedString(30120), f'history_tmdb_identify_search&original_query={urllib.parse.quote(query)}', 'DefaultAddonVideo.png'),
-        (ADDON.getLocalizedString(30065), f'history_edit&query={urllib.parse.quote(query)}', 'DefaultEdit.png'),
-        (ADDON.getLocalizedString(30066), f'history_delete&query={urllib.parse.quote(query)}', 'DefaultDelete.png'),
-    ])
-    if trakt_token and enable_trakt_menu:
-        items.append((ADDON.getLocalizedString(30067), f'trakt_search&query={urllib.parse.quote(raw_title or query)}', 'DefaultAddonVideo.png'))
-    
-    if is_tv:
-        items.append((ADDON.getLocalizedString(30135), f'tmdb_show_seasons&title={urllib.parse.quote(display_title)}&tmdb_id={clean_tmdb_id or ""}', 'DefaultTVShows.png'))
-
-    # Robust detection of series episode numbers from original query
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+    season = None
+    episode = None
+    ws_base = None
     if ep_match:
         raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
         cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
         season = int(ep_match.group(2) or ep_match.group(4))
         episode = int(ep_match.group(3) or ep_match.group(5))
-        # Use original query base name for Webshare search to preserve user releases and tags
         ws_base = cleaned_base if cleaned_base else history.get_base_name(query)
+    else:
+        ws_base = history.get_base_name(query) if is_tv else None
 
+    if is_tv and clean_tmdb_id is None and tmdb_module:
+        try:
+            search_title = raw_title or ws_base or display_title
+            if search_title:
+                search_res = tmdb_module.search_tmdb(search_title)
+                for s_item in search_res:
+                    if s_item.get('type') == 'show' and s_item.get('id'):
+                        clean_tmdb_id = s_item.get('id')
+                        break
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: Auto TMDb lookup error in history_menu: {e}", xbmc.LOGWARNING)
+
+    cached_episodes_curr = []
+    cached_episodes_next = []
+    cached_episodes_prev = []
+    seasons_meta = []
+    today = datetime.date.today()
+
+    if clean_tmdb_id and tmdb_module and ep_match:
+        try:
+            show_details = tmdb_module.get_show_seasons(clean_tmdb_id)
+            if show_details and 'seasons' in show_details:
+                seasons_meta = show_details.get('seasons', [])
+                if not runtime and show_details.get('runtime'):
+                    runtime = show_details.get('runtime')
+            if season is not None:
+                cached_episodes_curr = tmdb_module.get_season_episodes(clean_tmdb_id, season) or []
+        except Exception as e:
+            xbmc.log(f"StreamContinuum: TMDb fetch error for history_menu: {e}", xbmc.LOGWARNING)
+
+    def _format_ep_info(ep_obj, default_label, prefix=""):
+        if not ep_obj:
+            help_text = "" if clean_tmdb_id else f"\n\n[COLOR #01b4e4]{ADDON.getLocalizedString(30120)}[/COLOR]"
+            return default_label, None, plot + help_text, year, rating, runtime
+        ep_n = ep_obj.get('episode_number', 0)
+        ep_s = ep_obj.get('season_number', season)
+        ep_t = ep_obj.get('name') or ADDON.getLocalizedString(30108).format(ep_n)
+        ep_o = ep_obj.get('overview') or plot
+        ep_still = ep_obj.get('still') or None
+        ep_r = ep_obj.get('rating') or rating
+        ep_rt = ep_obj.get('runtime') or runtime
+        air_date = ep_obj.get('air_date', '')
+        date_label = ""
+        if air_date:
+            try:
+                dt = datetime.datetime.strptime(str(air_date)[:10], '%Y-%m-%d').date()
+                formatted_date = dt.strftime('%d.%m.%Y')
+                date_label = f" [COLOR red]({formatted_date})[/COLOR]" if dt > today else f" [COLOR gray]({formatted_date})[/COLOR]"
+            except Exception:
+                date_label = f" [COLOR gray]({str(air_date)[:10]})[/COLOR]"
+        full_label = f"{prefix} (S{ep_s:02d}E{ep_n:02d} - {ep_t}){date_label}" if prefix else f"S{ep_s:02d}E{ep_n:02d} - {ep_t}{date_label}"
+        return full_label, ep_still, ep_o, str(air_date)[:4] if air_date else year, ep_r, ep_rt
+
+    if ep_match:
+        curr_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode), None)
+        search_lbl, s_still, s_plot, s_year, s_rating, s_runtime = _format_ep_info(curr_ep_obj, f"{ADDON.getLocalizedString(30057)} (S{season:02d}E{episode:02d})", ADDON.getLocalizedString(30057))
+        items.append({
+            'label': search_lbl,
+            'action': f'search&query={urllib.parse.quote_plus(query)}',
+            'icon': s_still or 'DefaultAddonsSearch.png',
+            'thumb': s_still or poster or 'DefaultAddonsSearch.png',
+            'poster': poster,
+            'fanart': fanart,
+            'plot': s_plot,
+            'year': s_year,
+            'rating': s_rating,
+            'runtime': s_runtime,
+            'is_folder': True
+        })
+    else:
+        items.append({
+            'label': ADDON.getLocalizedString(30057),
+            'action': f'search&query={urllib.parse.quote_plus(query)}',
+            'icon': 'DefaultAddonsSearch.png',
+            'thumb': poster or 'DefaultAddonsSearch.png',
+            'poster': poster,
+            'fanart': fanart,
+            'plot': plot if clean_tmdb_id else (plot + f"\n\n[COLOR #01b4e4]{ADDON.getLocalizedString(30120)}[/COLOR]"),
+            'year': year,
+            'rating': rating,
+            'runtime': runtime,
+            'is_folder': True
+        })
+
+    items.append({
+        'label': ADDON.getLocalizedString(30065),
+        'action': f'history_edit&query={urllib.parse.quote_plus(query)}',
+        'icon': 'DefaultEdit.png',
+        'thumb': 'DefaultEdit.png',
+        'poster': None,
+        'fanart': fanart,
+        'plot': '',
+        'is_utility': True,
+        'is_folder': False
+    })
+
+    if ep_match and ws_base:
         has_next_ep = True
         has_next_season = True
+        if seasons_meta:
+            curr_s_obj = next((s for s in seasons_meta if s.get('season_number') == season), None)
+            if curr_s_obj:
+                max_eps = curr_s_obj.get('episode_count', 0)
+                if max_eps > 0 and episode + 1 > max_eps:
+                    has_next_ep = False
+            has_next_season = any(s.get('season_number') == season + 1 for s in seasons_meta)
 
-        if clean_tmdb_id and tmdb_module:
-            try:
-                show_details = tmdb_module.get_show_seasons(clean_tmdb_id)
-                if show_details and 'seasons' in show_details:
-                    seasons = show_details.get('seasons', [])
-                    curr_s_obj = next((s for s in seasons if s.get('season_number') == season), None)
-                    if curr_s_obj:
-                        max_eps = curr_s_obj.get('episode_count', 0)
-                        if max_eps > 0 and episode + 1 > max_eps:
-                            has_next_ep = False
-                    has_next_season = any(s.get('season_number') == season + 1 for s in seasons)
-            except Exception as e:
-                xbmc.log(f"StreamContinuum: Error validating TMDb show details in history_menu: {e}", xbmc.LOGWARNING)
-
+        n_lbl = n_still = n_plot = n_yr = n_rt = n_dur = None
         if has_next_ep:
-            items.append((f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season:02d}E{episode+1:02d}")}', 'DefaultVideoEpisodes.png'))
+            next_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode + 1), None)
+            n_lbl, n_still, n_plot, n_yr, n_rt, n_dur = _format_ep_info(next_ep_obj, f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', ADDON.getLocalizedString(30068))
+            items.append({
+                'label': n_lbl,
+                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season:02d}E{episode+1:02d}")}',
+                'icon': n_still or 'DefaultVideoEpisodes.png',
+                'thumb': n_still or poster or 'DefaultVideoEpisodes.png',
+                'poster': poster,
+                'fanart': fanart,
+                'plot': n_plot,
+                'year': n_yr,
+                'rating': n_rt,
+                'runtime': n_dur,
+                'is_folder': True
+            })
+
+        p_lbl = p_still = p_plot = p_yr = p_rt = p_dur = None
         if episode > 1:
-            items.append((f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', f'search&query={urllib.parse.quote(f"{ws_base} S{season-1:02d}E{episode-1:02d}")}', 'DefaultVideoEpisodes.png'))
+            prev_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode - 1), None)
+            p_lbl, p_still, p_plot, p_yr, p_rt, p_dur = _format_ep_info(prev_ep_obj, f'{ADDON.getLocalizedString(30069)} (E-{episode-1:02d})', ADDON.getLocalizedString(30069))
+            items.append({
+                'label': p_lbl,
+                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season:02d}E{episode-1:02d}")}',
+                'icon': p_still or 'DefaultVideoEpisodes.png',
+                'thumb': p_still or poster or 'DefaultVideoEpisodes.png',
+                'poster': poster,
+                'fanart': fanart,
+                'plot': p_plot,
+                'year': p_yr,
+                'rating': p_rt,
+                'runtime': p_dur,
+                'is_folder': True
+            })
+
+        ns_lbl = ns_still = ns_plot = ns_yr = ns_rt = ns_dur = None
         if has_next_season:
-            items.append((f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season+1:02d}E01")}', 'DefaultVideoEpisodes.png'))
+            next_s_first_ep = None
+            if clean_tmdb_id and tmdb_module:
+                try:
+                    cached_episodes_next = tmdb_module.get_season_episodes(clean_tmdb_id, season + 1) or []
+                    next_s_first_ep = next((e for e in cached_episodes_next if e.get('episode_number') == 1), None)
+                except Exception:
+                    pass
+            ns_lbl, ns_still, ns_plot, ns_yr, ns_rt, ns_dur = _format_ep_info(next_s_first_ep, f'{ADDON.getLocalizedString(30070)} (S{season+1:02d}E01)', ADDON.getLocalizedString(30070))
+            items.append({
+                'label': ns_lbl,
+                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season+1:02d}E01")}',
+                'icon': ns_still or 'DefaultVideoEpisodes.png',
+                'thumb': ns_still or poster or 'DefaultVideoEpisodes.png',
+                'poster': poster,
+                'fanart': fanart,
+                'plot': ns_plot,
+                'year': ns_yr,
+                'rating': ns_rt,
+                'runtime': ns_dur,
+                'is_folder': True
+            })
+
+        ps_lbl = ps_still = ps_plot = ps_yr = ps_rt = ps_dur = None
         if season > 1:
-            items.append((f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', f'search&query={urllib.parse.quote(f"{ws_base} S{season-1:02d}E01")}', 'DefaultVideoEpisodes.png'))
+            prev_s_first_ep = None
+            if clean_tmdb_id and tmdb_module:
+                try:
+                    cached_episodes_prev = tmdb_module.get_season_episodes(clean_tmdb_id, season - 1) or []
+                    prev_s_first_ep = next((e for e in cached_episodes_prev if e.get('episode_number') == 1), None)
+                except Exception:
+                    pass
+            ps_lbl, ps_still, ps_plot, ps_yr, ps_rt, ps_dur = _format_ep_info(prev_s_first_ep, f'{ADDON.getLocalizedString(30071)} (S{season-1:02d}E01)', ADDON.getLocalizedString(30071))
+            items.append({
+                'label': ps_lbl,
+                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season-1:02d}E01")}',
+                'icon': ps_still or 'DefaultVideoEpisodes.png',
+                'thumb': ps_still or poster or 'DefaultVideoEpisodes.png',
+                'poster': poster,
+                'fanart': fanart,
+                'plot': ps_plot,
+                'year': ps_yr,
+                'rating': ps_rt,
+                'runtime': ps_dur,
+                'is_folder': True
+            })
+
+    if is_tv:
+        items.append({
+            'label': ADDON.getLocalizedString(30135),
+            'action': f'tmdb_show_seasons&title={urllib.parse.quote_plus(display_title)}&tmdb_id={clean_tmdb_id or ""}&ws_base={urllib.parse.quote_plus(ws_base or "")}',
+            'icon': 'DefaultTVShows.png',
+            'thumb': poster or 'DefaultTVShows.png',
+            'poster': poster,
+            'fanart': fanart,
+            'plot': plot,
+            'is_utility': True,
+            'is_folder': True
+        })
+
+    items.append({
+        'label': ADDON.getLocalizedString(30120),
+        'action': f'history_tmdb_identify_search&original_query={urllib.parse.quote_plus(query)}',
+        'icon': 'DefaultAddonVideo.png',
+        'thumb': poster or 'DefaultAddonVideo.png',
+        'poster': None,
+        'fanart': fanart,
+        'plot': '',
+        'is_utility': True,
+        'is_folder': True
+    })
+    items.append({
+        'label': ADDON.getLocalizedString(30072) if not is_watched else ADDON.getLocalizedString(30073),
+        'action': f'history_mark&query={urllib.parse.quote_plus(query)}&watched={0 if is_watched else 1}&source={source or ""}',
+        'icon': 'DefaultAddonVideo.png',
+        'thumb': poster or 'DefaultAddonVideo.png',
+        'poster': None,
+        'fanart': fanart,
+        'plot': '',
+        'is_utility': True,
+        'is_folder': False
+    })
+
+    if trakt_token and enable_trakt_menu:
+        items.append({
+            'label': ADDON.getLocalizedString(30067),
+            'action': f'trakt_search&query={urllib.parse.quote_plus(raw_title or query)}',
+            'icon': 'DefaultAddonVideo.png',
+            'thumb': poster or 'DefaultAddonVideo.png',
+            'poster': poster,
+            'fanart': fanart,
+            'plot': plot,
+            'is_folder': True
+        })
+
+    items.append({
+        'label': ADDON.getLocalizedString(30066),
+        'action': f'history_delete&query={urllib.parse.quote_plus(query)}',
+        'icon': 'DefaultDelete.png',
+        'thumb': 'DefaultDelete.png',
+        'poster': None,
+        'fanart': fanart,
+        'plot': '',
+        'is_utility': True,
+        'is_folder': False
+    })
     
-    for label, action_params, icon in [i for i in items if i]:
-        url = f"{sys.argv[0]}?action={action_params}"
-        list_item = xbmcgui.ListItem(label=label)
-        art = {'icon': icon, 'thumb': poster or icon, 'fanart': fanart}
-        if poster:
-            art['poster'] = poster
+    for it in items:
+        lbl = it['label']
+        act = it.get('action', '')
+        icn = it['icon']
+        is_utility = it.get('is_utility', False)
+        pos = it.get('poster') if not is_utility else None
+        fan = it.get('fanart') or fanart
+        plt = it.get('plot') if not is_utility else ''
+        yr = it.get('year') if not is_utility else None
+        rt = it.get('rating') if not is_utility else None
+        dur = it.get('runtime') if not is_utility else None
+        is_fld = it.get('is_folder', True)
+        thm = it.get('thumb') or pos or icn
+        
+        if it.get('custom_url'):
+            url = it['custom_url']
+        else:
+            url = f"{sys.argv[0]}?action={act}"
+        list_item = xbmcgui.ListItem(label=lbl)
+        art = {'icon': icn, 'thumb': thm, 'fanart': fan}
+        if pos:
+            art['poster'] = pos
+            art['season.poster'] = pos
+            art['tvshow.poster'] = pos
         list_item.setArt(art)
         
         info_tag = list_item.getVideoInfoTag()
-        info_tag.setTitle(label)
-        info_tag.setMediaType('movie' if media_type == 'movie' else 'tvshow')
-        if plot:
-            info_tag.setPlot(str(plot))
-        if year:
-            try:
-                info_tag.setYear(int(str(year)[:4]))
-            except (ValueError, TypeError):
-                pass
-        if rating:
-            try:
-                info_tag.setRating(float(rating))
-            except (ValueError, TypeError):
-                pass
-        if genres:
-            info_tag.setGenres(genres if isinstance(genres, list) else [genres])
+        info_tag.setTitle(lbl)
+        if not is_utility:
+            info_tag.setMediaType('movie' if media_type == 'movie' else 'tvshow')
+            if plt:
+                info_tag.setPlot(str(plt))
+            if yr:
+                try:
+                    info_tag.setYear(int(str(yr)[:4]))
+                except (ValueError, TypeError):
+                    pass
+            if rt:
+                try:
+                    info_tag.setRating(float(rt))
+                except (ValueError, TypeError):
+                    pass
+            if dur:
+                try:
+                    info_tag.setDuration(int(dur) * 60)
+                except (ValueError, TypeError):
+                    pass
+            if genres:
+                info_tag.setGenres(genres if isinstance(genres, list) else [genres])
             
-        is_folder = 'search&query=' in action_params or 'trakt_search&query=' in action_params or 'history_tmdb_identify_search' in action_params or 'tmdb_show_seasons' in action_params or action_params == 'history_list'
-        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_folder)
+        xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=is_fld)
         
     xbmcplugin.endOfDirectory(HANDLE)
 
@@ -626,10 +972,14 @@ def trakt_search(query=None):
     if not query:
         keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30067))
         keyboard.doModal()
-        if keyboard.isConfirmed():
-            query = keyboard.getText()
-        else:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        if keyboard.isConfirmed() and keyboard.getText():
+            query = keyboard.getText().strip()
+        if not query:
+            if HANDLE >= 0:
+                try:
+                    xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                except Exception:
+                    pass
             return
 
     if query:
@@ -637,7 +987,8 @@ def trakt_search(query=None):
         results = trakt.search_trakt(query)
         if not results:
             xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_INFO, 3000)
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            if HANDLE >= 0:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
         for item in results:
@@ -674,36 +1025,36 @@ def trakt_search(query=None):
             list_item = _make_media_list_item(label, year, combined_plot, genres_str, rating, runtime, poster, fanart, kodi_media_type)
             cm = []
             if trakt_id:
-                cm.append((ADDON.getLocalizedString(30133), f'RunPlugin({sys.argv[0]}?action=watchlist_add&type={media_type}&id={trakt_id}&id_type=trakt&title={urllib.parse.quote(title)}&year={year})'))
+                cm.append((ADDON.getLocalizedString(30133), f'RunPlugin({sys.argv[0]}?action=watchlist_add&type={media_type}&id={trakt_id}&id_type=trakt&title={urllib.parse.quote_plus(title)}&year={year})'))
                 cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=1)'))
                 cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={media_type}&id={trakt_id}&watched=0)'))
                 if media_type == 'show':
-                    cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(title)})'))
+                    cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(title)})'))
                 else:
                     ws_query = f"{title} {year}".strip()
-                    cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})'))
+                    cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)})'))
             list_item.addContextMenuItems(cm)
 
             if media_type == 'movie':
                 ws_query = f"{title} {year}".strip()
-                url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
+                url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
                 xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
             else:
                 url = (f"{sys.argv[0]}?action=show_seasons"
-                       f"&show_title={urllib.parse.quote(title)}"
+                       f"&show_title={urllib.parse.quote_plus(title)}"
                        f"&trakt_id={trakt_id}"
-                       f"&poster={urllib.parse.quote(poster)}"
-                       f"&fanart={urllib.parse.quote(fanart)}")
+                       f"&poster={urllib.parse.quote_plus(poster)}"
+                       f"&fanart={urllib.parse.quote_plus(fanart)}")
                 xbmcplugin.addDirectoryItem(HANDLE, url, list_item, isFolder=True)
 
-        xbmcplugin.endOfDirectory(HANDLE)
+        if HANDLE >= 0:
+            xbmcplugin.endOfDirectory(HANDLE)
 
 def show_changelog():
     changelog_path = os.path.join(ADDON_PATH, "changelog.txt")
     try:
         with open(changelog_path, 'r', encoding='utf-8') as f:
             changelog = f.read()
-    
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error reading changelog: {e}", xbmc.LOGWARNING)
         changelog = "Changelog momentálně není k dispozici."
@@ -781,7 +1132,7 @@ def show_trakt_watchlist():
         else:
             continue
             
-        url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
+        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
         trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('show', {}).get('ids', {}).get('trakt') if media_type == 'show' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None))
@@ -874,7 +1225,7 @@ def show_trakt_playback(offset=0):
         else:
             continue
             
-        url = f"{sys.argv[0]}?action=search_prefill&query={urllib.parse.quote(query)}"
+        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(query)}"
         list_item = _make_media_list_item(label=label, year=year, plot=plot, genres_str=genres_str, rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type='movie' if meta_type == 'movie' else 'tvshow')
         cm = []
         trakt_item_id = item.get('movie', {}).get('ids', {}).get('trakt') if media_type == 'movie' else (item.get('episode', {}).get('ids', {}).get('trakt') if media_type == 'episode' else None)
@@ -896,37 +1247,45 @@ def show_trakt_playback(offset=0):
     xbmcplugin.endOfDirectory(HANDLE)
 
 def search_prefill(query):
-    keyboard = xbmc.Keyboard(query, ADDON.getLocalizedString(30076))
+    keyboard = xbmc.Keyboard(query or '', ADDON.getLocalizedString(30087))
     keyboard.doModal()
     if keyboard.isConfirmed():
-        new_query = keyboard.getText()
+        new_query = keyboard.getText().strip()
         if new_query:
-            search(new_query)
-        else:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-            return
-    else:
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(new_query)},replace)')
+    if HANDLE >= 0:
+        try:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+        except Exception:
+            pass
+
+def tmdb_search_prompt():
+    keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30130))
+    keyboard.doModal()
+    if keyboard.isConfirmed():
+        query = keyboard.getText().strip()
+        if query:
+            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=tmdb_search&query={urllib.parse.quote_plus(query)})')
 
 def show_tmdb_menu():
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30099))
     fanart = get_asset('fa.png')
     items = [
-        (ADDON.getLocalizedString(30096), 'tmdb_category&category=tv_tips&offset=0', 'DefaultTVShows.png'),
-        (ADDON.getLocalizedString(30097), 'tmdb_category&category=vod&offset=0', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30098), 'tmdb_category&category=disks&offset=0', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30138), 'tmdb_category&category=top_movies&offset=0', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30139), 'tmdb_category&category=top_shows&offset=0', 'DefaultTVShows.png'),
-        (ADDON.getLocalizedString(30136), 'tmdb_genres_menu&media_type=movies', 'DefaultMovies.png'),
-        (ADDON.getLocalizedString(30137), 'tmdb_genres_menu&media_type=shows', 'DefaultTVShows.png'),
-        (ADDON.getLocalizedString(30140), 'tmdb_category&category=random_tips&offset=0', 'DefaultAddonVideo.png'),
-        (ADDON.getLocalizedString(30130), 'tmdb_search', 'DefaultAddonsSearch.png'),
+        (ADDON.getLocalizedString(30096), 'tmdb_category&category=tv_tips&offset=0', 'DefaultTVShows.png', True),
+        (ADDON.getLocalizedString(30097), 'tmdb_category&category=vod&offset=0', 'DefaultMovies.png', True),
+        (ADDON.getLocalizedString(30098), 'tmdb_category&category=disks&offset=0', 'DefaultMovies.png', True),
+        (ADDON.getLocalizedString(30138), 'tmdb_category&category=top_movies&offset=0', 'DefaultMovies.png', True),
+        (ADDON.getLocalizedString(30139), 'tmdb_category&category=top_shows&offset=0', 'DefaultTVShows.png', True),
+        (ADDON.getLocalizedString(30136), 'tmdb_genres_menu&media_type=movies', 'DefaultMovies.png', True),
+        (ADDON.getLocalizedString(30137), 'tmdb_genres_menu&media_type=shows', 'DefaultTVShows.png', True),
+        (ADDON.getLocalizedString(30140), 'tmdb_category&category=random_tips&offset=0', 'DefaultAddonVideo.png', True),
+        (ADDON.getLocalizedString(30130), 'tmdb_search_prompt', 'DefaultAddonsSearch.png', False),
     ]
-    for label, action, icon in items:
+    for label, action, icon, is_fld in items:
         url = f"{sys.argv[0]}?action={action}"
         li = xbmcgui.ListItem(label=f"[COLOR #01b4e4]{label}[/COLOR]")
         li.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
-        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
+        xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=is_fld)
     xbmcplugin.setContent(HANDLE, 'addons')
     xbmcplugin.endOfDirectory(HANDLE)
 
@@ -970,7 +1329,7 @@ def show_tmdb_genres_menu(media_type):
         
     for str_id, genre_id in genres:
         label = ADDON.getLocalizedString(str_id)
-        url = f"{sys.argv[0]}?action=tmdb_category&category=genre&media_type={media_type}&genre_id={genre_id}&genre_name={urllib.parse.quote(label)}&offset=0"
+        url = f"{sys.argv[0]}?action=tmdb_category&category=genre&media_type={media_type}&genre_id={genre_id}&genre_name={urllib.parse.quote_plus(label)}&offset=0"
         li = xbmcgui.ListItem(label=f"[COLOR #01b4e4]{label}[/COLOR]")
         li.setArt({'icon': icon, 'thumb': icon, 'fanart': fanart})
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
@@ -1051,23 +1410,23 @@ def show_tmdb_category(category, offset=0, media_type=None, genre_id=None, genre
         ws_query = f"{raw_title} {year}".strip() if not is_show else raw_title
         cm = []
         if is_show:
-            cm.append((ADDON.getLocalizedString(30135), f"Container.Update({sys.argv[0]}?action=tmdb_show_seasons&title={urllib.parse.quote(raw_title)}&year={year}&tmdb_id={tmdb_item_id or ''})"))
-            cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(raw_title)})"))
+            cm.append((ADDON.getLocalizedString(30135), f"Container.Update({sys.argv[0]}?action=tmdb_show_seasons&title={urllib.parse.quote_plus(raw_title)}&year={year}&tmdb_id={tmdb_item_id or ''})"))
+            cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(raw_title)})"))
         else:
-            cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})"))
+            cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)})"))
             
         if tmdb_item_id:
-            cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&title={urllib.parse.quote(raw_title)}&year={year})"))
+            cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&title={urllib.parse.quote_plus(raw_title)}&year={year})"))
             cm.append((ADDON.getLocalizedString(30072), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=1)"))
             cm.append((ADDON.getLocalizedString(30073), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=0)"))
         li.addContextMenuItems(cm)
 
         if is_show:
             url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
-                   f"&title={urllib.parse.quote(raw_title)}&year={year}"
+                   f"&title={urllib.parse.quote_plus(raw_title)}&year={year}"
                    f"&tmdb_id={tmdb_item_id if tmdb_item_id is not None else ''}")
         else:
-            url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
+            url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
 
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
@@ -1075,7 +1434,7 @@ def show_tmdb_category(category, offset=0, media_type=None, genre_id=None, genre
         next_offset = offset + PAGE_SIZE
         extra_params = ""
         if category == 'genre':
-            extra_params = f"&media_type={media_type}&genre_id={genre_id}&genre_name={urllib.parse.quote(genre_name or '')}"
+            extra_params = f"&media_type={media_type}&genre_id={genre_id}&genre_name={urllib.parse.quote_plus(genre_name or '')}"
         next_url = f"{sys.argv[0]}?action=tmdb_category&category={category}&offset={next_offset}{extra_params}"
         li_next = xbmcgui.ListItem(label=f"[COLOR gray]>> {ADDON.getLocalizedString(30117)} ({next_offset + 1}-{next_offset + PAGE_SIZE})[/COLOR]")
         li_next.setArt({'icon': 'DefaultFolder.png', 'thumb': 'DefaultFolder.png'})
@@ -1084,9 +1443,9 @@ def show_tmdb_category(category, offset=0, media_type=None, genre_id=None, genre
     xbmcplugin.setContent(HANDLE, content_type)
     xbmcplugin.endOfDirectory(HANDLE)
 
-def show_tmdb_show_seasons(title, year='', tmdb_id=None):
+def show_tmdb_show_seasons(title, year='', tmdb_id=None, ws_base=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{title} - {ADDON.getLocalizedString(30105)}")
-    xbmc.log(f"StreamContinuum: show_tmdb_show_seasons called for title='{title}', year='{year}', tmdb_id='{tmdb_id}'", xbmc.LOGINFO)
+    xbmc.log(f"StreamContinuum: show_tmdb_show_seasons called for title='{title}', year='{year}', tmdb_id='{tmdb_id}', ws_base='{ws_base}'", xbmc.LOGINFO)
 
     clean_tmdb_id = tmdb_id if (tmdb_id and str(tmdb_id).strip().lower() != 'none') else None
 
@@ -1107,6 +1466,7 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
             poster = seasons_data.get('poster') or ''
             fanart = seasons_data.get('fanart') or ''
             seasons = seasons_data.get('seasons', [])
+            show_runtime = seasons_data.get('runtime', 0)
             
             for season in seasons:
                 season_num = season.get('season_number', 0)
@@ -1137,6 +1497,11 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
                         info_tag.setRating(float(rating))
                     except (ValueError, TypeError):
                         pass
+                if show_runtime:
+                    try:
+                        info_tag.setDuration(int(show_runtime) * 60)
+                    except (ValueError, TypeError):
+                        pass
                 if ep_count:
                     try:
                         if hasattr(info_tag, 'setEpisodeCount'):
@@ -1145,19 +1510,20 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
                         pass
                     li.setProperty('TotalEpisodes', str(ep_count))
                     
+                extra_ws = f"&ws_base={urllib.parse.quote_plus(ws_base)}" if ws_base else ""
                 url = (f"{sys.argv[0]}?action=tmdb_show_episodes"
-                       f"&show_title={urllib.parse.quote(show_name)}"
+                       f"&show_title={urllib.parse.quote_plus(show_name)}"
                        f"&tmdb_id={clean_tmdb_id}"
                        f"&season={season_num}"
-                       f"&poster={urllib.parse.quote(season_poster)}"
-                       f"&fanart={urllib.parse.quote(fanart)}")
+                       f"&poster={urllib.parse.quote_plus(season_poster)}"
+                       f"&fanart={urllib.parse.quote_plus(fanart)}"
+                       f"{extra_ws}")
                 xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
                 
             xbmcplugin.setContent(HANDLE, 'seasons')
             xbmcplugin.endOfDirectory(HANDLE)
             return
 
-    # Fallback to Trakt if TMDb direct retrieval fails
     trakt_id = None
     if clean_tmdb_id:
         try:
@@ -1187,13 +1553,13 @@ def show_tmdb_show_seasons(title, year='', tmdb_id=None):
             poster = ''
             fanart = ''
         final_show_title = show_meta.get('title') or title
-        show_seasons(final_show_title, str(trakt_id), poster, fanart)
+        show_seasons(final_show_title, str(trakt_id), poster, fanart, ws_base=ws_base)
     else:
         ws_query = f"{title} {year}".strip()
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
-        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)},replace)')
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)},replace)')
 
-def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart=''):
+def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='', ws_base=None):
     season_num = int(season_num)
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)} {season_num}")
     
@@ -1209,6 +1575,7 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         return
         
     today = datetime.date.today()
+    search_base = ws_base if (ws_base and ws_base.strip()) else show_title
 
     for ep in episodes:
         ep_num = ep.get('episode_number', 0)
@@ -1216,7 +1583,7 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         overview = ep.get('overview', '')
         rating = ep.get('rating', 0)
         runtime = ep.get('runtime', 0)
-        still = ep.get('still') or poster
+        still = ep.get('still') or ''
         air_date = ep.get('air_date', '')
 
         formatted_date = ""
@@ -1235,18 +1602,24 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         else:
             date_label = ""
 
-        ws_query = f"{show_title} S{season_num:02d}E{ep_num:02d}"
+        ws_query = f"{search_base} S{season_num:02d}E{ep_num:02d}"
         label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
 
         li = xbmcgui.ListItem(label=label)
         art = {}
         if still:
-            art['poster'] = still
             art['thumb'] = still
             art['icon'] = still
+        elif poster:
+            art['thumb'] = poster
+            art['icon'] = poster
         else:
             art['icon'] = 'DefaultTVShows.png'
             art['thumb'] = 'DefaultTVShows.png'
+        if poster:
+            art['poster'] = poster
+            art['season.poster'] = poster
+            art['tvshow.poster'] = poster
         art['fanart'] = fanart if fanart else get_asset('fa.png')
         li.setArt(art)
 
@@ -1277,11 +1650,11 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
                 pass
 
         cm = [
-            (ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})")
+            (ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)})")
         ]
         li.addContextMenuItems(cm)
 
-        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
+        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
     xbmcplugin.setContent(HANDLE, 'episodes')
@@ -1290,16 +1663,21 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
 def show_tmdb_search(query=None):
     if tmdb_module is None:
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
-        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        if HANDLE >= 0:
+            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
 
     if not query:
         keyboard = xbmc.Keyboard('', ADDON.getLocalizedString(30130))
         keyboard.doModal()
-        if keyboard.isConfirmed():
-            query = keyboard.getText()
-        else:
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        if keyboard.isConfirmed() and keyboard.getText():
+            query = keyboard.getText().strip()
+        if not query:
+            if HANDLE >= 0:
+                try:
+                    xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+                except Exception:
+                    pass
             return
 
     if query:
@@ -1307,7 +1685,8 @@ def show_tmdb_search(query=None):
         all_items = tmdb_module.search_tmdb(query)
         if not all_items:
             xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30058), xbmcgui.NOTIFICATION_WARNING, 3000)
-            xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            if HANDLE >= 0:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
             return
 
         for item in all_items:
@@ -1331,30 +1710,31 @@ def show_tmdb_search(query=None):
             ws_query = f"{raw_title} {year}".strip() if not is_show else raw_title
             cm = []
             if is_show:
-                cm.append((ADDON.getLocalizedString(30135), f"Container.Update({sys.argv[0]}?action=tmdb_show_seasons&title={urllib.parse.quote(raw_title)}&year={year}&tmdb_id={tmdb_item_id or ''})"))
-                cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(raw_title)})"))
+                cm.append((ADDON.getLocalizedString(30135), f"Container.Update({sys.argv[0]}?action=tmdb_show_seasons&title={urllib.parse.quote_plus(raw_title)}&year={year}&tmdb_id={tmdb_item_id or ''})"))
+                cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(raw_title)})"))
             else:
-                cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})"))
-                
+                cm.append((ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)})"))
+            
             if tmdb_item_id:
-                cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&title={urllib.parse.quote(raw_title)}&year={year})"))
+                cm.append((ADDON.getLocalizedString(30133), f"RunPlugin({sys.argv[0]}?action=watchlist_add&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&title={urllib.parse.quote_plus(raw_title)}&year={year})"))
                 cm.append((ADDON.getLocalizedString(30072), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=1)"))
                 cm.append((ADDON.getLocalizedString(30073), f"RunPlugin({sys.argv[0]}?action=media_mark&type={'show' if is_show else 'movie'}&id={tmdb_item_id}&id_type=tmdb&watched=0)"))
             li.addContextMenuItems(cm)
 
             if is_show:
                 url = (f"{sys.argv[0]}?action=tmdb_show_seasons"
-                       f"&title={urllib.parse.quote(raw_title)}&year={year}"
+                       f"&title={urllib.parse.quote_plus(raw_title)}&year={year}"
                        f"&tmdb_id={tmdb_item_id if tmdb_item_id is not None else ''}")
             else:
-                url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
+                url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
 
             xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
-        xbmcplugin.setContent(HANDLE, 'movies')
-        xbmcplugin.endOfDirectory(HANDLE)
+        if HANDLE >= 0:
+            xbmcplugin.setContent(HANDLE, 'movies')
+            xbmcplugin.endOfDirectory(HANDLE)
 
-def show_seasons(show_title, trakt_id, poster='', fanart=''):
+def show_seasons(show_title, trakt_id, poster='', fanart='', ws_base=None):
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)}")
     seasons = trakt.get_seasons(trakt_id)
     if not seasons:
@@ -1398,23 +1778,25 @@ def show_seasons(show_title, trakt_id, poster='', fanart=''):
             try:
                 if hasattr(info_tag, 'setEpisodeCount'):
                     info_tag.setEpisodeCount(ep_count)
-                    
+                    info_tag.setSeason(season_num)
             except Exception:
                 pass
             li.setProperty('TotalEpisodes', str(ep_count))
 
+        extra_ws = f"&ws_base={urllib.parse.quote_plus(ws_base)}" if ws_base else ""
         url = (f"{sys.argv[0]}?action=show_episodes"
-               f"&show_title={urllib.parse.quote(show_title)}"
+               f"&show_title={urllib.parse.quote_plus(show_title)}"
                f"&trakt_id={trakt_id}"
                f"&season={season_num}"
-               f"&poster={urllib.parse.quote(poster)}"
-               f"&fanart={urllib.parse.quote(fanart)}")
+               f"&poster={urllib.parse.quote_plus(poster)}"
+               f"&fanart={urllib.parse.quote_plus(fanart)}"
+               f"{extra_ws}")
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
     xbmcplugin.setContent(HANDLE, 'seasons')
     xbmcplugin.endOfDirectory(HANDLE)
 
-def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
+def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_base=None):
     season_num = int(season_num)
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)} {season_num}")
     episodes = trakt.get_episodes(trakt_id, season_num)
@@ -1424,6 +1806,7 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
         return
 
     today = datetime.date.today()
+    search_base = ws_base if (ws_base and ws_base.strip()) else show_title
 
     for episode in episodes:
         ep_num = episode.get('number', 0)
@@ -1450,16 +1833,26 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
         else:
             date_label = ""
 
-        ws_query = f"{show_title} S{season_num:02d}E{ep_num:02d}"
+        ws_query = f"{search_base} S{season_num:02d}E{ep_num:02d}"
         label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
 
         li = xbmcgui.ListItem(label=label)
         art = {}
         if poster:
             art['poster'] = poster
+            art['season.poster'] = poster
+            art['tvshow.poster'] = poster
+        art['fanart'] = fanart if fanart else get_asset('fa.png')
+        ep_still = episode_meta.get('still') or episode_meta.get('thumb') or episode_meta.get('screenshot')
+        if ep_still:
+            art['thumb'] = ep_still
+            art['icon'] = ep_still
+        elif poster:
             art['thumb'] = poster
             art['icon'] = poster
-        art['fanart'] = fanart if fanart else get_asset('fa.png')
+        else:
+            art['icon'] = 'DefaultTVShows.png'
+            art['thumb'] = 'DefaultTVShows.png'
         li.setArt(art)
 
         info_tag = li.getVideoInfoTag()
@@ -1489,11 +1882,11 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart=''):
                 pass
 
         cm = [
-            (ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})")
+            (ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)})")
         ]
         li.addContextMenuItems(cm)
 
-        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
+        url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
         xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
     xbmcplugin.setContent(HANDLE, 'episodes')
@@ -1551,7 +1944,7 @@ def show_trakt_discover(list_type, media_type, offset=0):
     page_items = items[offset:offset + PAGE_SIZE]
     item_type_single = 'movie' if media_type == 'movies' else 'show'
     kodi_content = 'movies' if media_type == 'movies' else 'tvshows'
-    kodi_media_type = 'movie' if media_type == 'movies' else 'tvshow'
+    kodi_media_type = 'movie' if media_type == 'movie' else 'tvshow'
 
     for item in page_items:
         trakt_id = item.get('ids', {}).get('trakt')
@@ -1583,26 +1976,26 @@ def show_trakt_discover(list_type, media_type, offset=0):
         li = _make_media_list_item(label, year, combined_plot, genres_str, rating, runtime, poster, fanart, kodi_media_type)
         cm = []
         if trakt_id:
-            cm.append((ADDON.getLocalizedString(30133), f'RunPlugin({sys.argv[0]}?action=watchlist_add&type={item_type_single}&id={trakt_id}&id_type=trakt&title={urllib.parse.quote(title)}&year={year})'))
+            cm.append((ADDON.getLocalizedString(30133), f'RunPlugin({sys.argv[0]}?action=watchlist_add&type={item_type_single}&id={trakt_id}&id_type=trakt&title={urllib.parse.quote_plus(title)}&year={year})'))
             cm.append((ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={item_type_single}&id={trakt_id}&watched=1)'))
             cm.append((ADDON.getLocalizedString(30073), f'RunPlugin({sys.argv[0]}?action=trakt_mark&type={item_type_single}&id={trakt_id}&watched=0)'))
             if item_type_single == 'show':
-                cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(title)})'))
+                cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(title)})'))
             else:
                 ws_query = f"{title} {year}".strip()
-                cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)})'))
+                cm.append((ADDON.getLocalizedString(30057), f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)})'))
         li.addContextMenuItems(cm)
 
         if item_type_single == 'movie':
             ws_query = f"{title} {year}".strip()
-            url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote(ws_query)}"
+            url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
             xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
         else:
             url = (f"{sys.argv[0]}?action=show_seasons"
-                   f"&show_title={urllib.parse.quote(title)}"
+                   f"&show_title={urllib.parse.quote_plus(title)}"
                    f"&trakt_id={trakt_id}"
-                   f"&poster={urllib.parse.quote(poster)}"
-                   f"&fanart={urllib.parse.quote(fanart)}")
+                   f"&poster={urllib.parse.quote_plus(poster)}"
+                   f"&fanart={urllib.parse.quote_plus(fanart)}")
             xbmcplugin.addDirectoryItem(HANDLE, url, li, isFolder=True)
 
     if len(items) > offset + PAGE_SIZE:
@@ -1632,8 +2025,7 @@ def history_tmdb_identify_search(original_query, custom_query=None):
         xbmc.log(f"StreamContinuum: Searching TMDb fallback with raw query '{original_query}'", xbmc.LOGINFO)
         all_items = tmdb_module.search_tmdb(original_query)
 
-    # Add item at top to allow manual search term customization
-    edit_label = f"[COLOR #01b4e4]✎ {ADDON.getLocalizedString(30087)} TMDb ({search_term})...[/COLOR]"
+    edit_label = f"[COLOR #01b4e4]{ADDON.getLocalizedString(30087)} TMDb ({search_term})...[/COLOR]"
     edit_url = f"{sys.argv[0]}?action=history_tmdb_custom_search&original_query={urllib.parse.quote_plus(original_query)}&prefill={urllib.parse.quote_plus(search_term)}"
     edit_item = xbmcgui.ListItem(label=edit_label)
     edit_item.setArt({'icon': 'DefaultAddonsSearch.png', 'thumb': 'DefaultAddonsSearch.png', 'fanart': get_asset('fa.png')})
@@ -1664,6 +2056,12 @@ def history_tmdb_identify_search(original_query, custom_query=None):
             )
         
         final_title = full_tmdb_meta.get('title') or raw_title
+        if history.has_non_latin(final_title) or not final_title:
+            if raw_title and not history.has_non_latin(raw_title):
+                final_title = raw_title
+            else:
+                final_title = history.get_base_name(original_query)
+        final_title = history.sanitize_title(final_title)
         final_year = full_tmdb_meta.get('year') or year
         final_plot = full_tmdb_meta.get('overview') or plot
         final_genres = full_tmdb_meta.get('genres', [])
@@ -1706,6 +2104,11 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
     import history
     if not original_query or not tmdb_id:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30127), xbmcgui.NOTIFICATION_ERROR, 3000)
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            except Exception:
+                pass
         return
 
     trakt_media_type = 'show' if media_type in ('tvshow', 'tv', 'show') else 'movie'
@@ -1723,8 +2126,15 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
                     meta['poster'] = show_data.get('poster')
                 if not meta.get('fanart'):
                     meta['fanart'] = show_data.get('fanart')
+                if not meta.get('runtime') and show_data.get('runtime'):
+                    meta['runtime'] = show_data.get('runtime')
+                if not meta.get('genres') and show_data.get('genres'):
+                    meta['genres'] = show_data.get('genres')
 
-    title = meta.get('title')
+    raw_title = meta.get('title')
+    title = history.sanitize_title(raw_title)
+    if history.has_non_latin(title) or not title:
+        title = history.get_base_name(original_query)
     year = meta.get('year')
     plot = meta.get('overview')
     genres = meta.get('genres', [])
@@ -1749,18 +2159,27 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
     success = history.update_history_with_tmdb_data(original_query, tmdb_data)
     if success:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30126), xbmcgui.NOTIFICATION_INFO, 2000)
-        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(original_query)},replace)')
     else:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30127), xbmcgui.NOTIFICATION_ERROR, 3000)
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            except Exception:
+                pass
 
-def history_mark_watched(query, watched):
+def history_mark_watched(query, watched, source=None):
     import history
     if not query:
         return
     is_watched = bool(watched)
     history.set_watched_status(query, is_watched)
     
-    # Sync with Trakt if item is identified and Trakt is connected
     trakt_token = ADDON.getSetting('trakt_token')
     if trakt_token:
         hist_item = history.get_history_item(query)
@@ -1775,16 +2194,36 @@ def history_mark_watched(query, watched):
                 else:
                     trakt.mark_unwatched(media_type, trakt_id)
                     
+    if is_watched and source != 'watchlist':
+        try:
+            history.check_and_update_next_episodes()
+        except Exception:
+            pass
+            
     xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 1500)
-    xbmc.executebuiltin('Container.Refresh')
+    if source == 'watchlist':
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
+    else:
+        xbmc.executebuiltin('Container.Refresh')
 
 def run():
     params = dict(urllib.parse.parse_qsl(sys.argv[2][1:])) if len(sys.argv) > 2 else {}
     action = params.get('action')
 
-    # Actions that do not require an active directory handle
-    if action == 'show_changelog':
+    if action == 'play':
+        play(params.get('ident'), params.get('query'), params.get('title'))
+        return
+    elif action == 'show_changelog':
         show_changelog()
+        return
+    elif action == 'settings':
+        ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
+        ADDON.openSettings()
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            except Exception:
+                pass
         return
     elif action == 'trakt_auth':
         trakt.authenticate()
@@ -1815,6 +2254,38 @@ def run():
         except AttributeError:
             xbmcgui.Dialog().ok(ADDON.getLocalizedString(30082), ADDON.getLocalizedString(30084))
         return
+    elif action == 'speedtest':
+        dialog = xbmcgui.DialogProgress()
+        dialog.create("Webshare Speedtest", ADDON.getLocalizedString(30159))
+        try:
+            res = webshare.run_speedtest(dialog)
+            dialog.close()
+            if res:
+                avg_mbs = res['avg_mbs']
+                s_45 = (avg_mbs * 2700) / 1024.0
+                m_90 = (avg_mbs * 5400) / 1024.0
+                m_150 = (avg_mbs * 9000) / 1024.0
+                msg = (
+                    f"[B]{ADDON.getLocalizedString(30160)}[/B]\n\n"
+                    f"• {ADDON.getLocalizedString(30060)}: [COLOR green]{res['avg_mbps']:.2f} Mbps[/COLOR] ({res['avg_mbs']:.2f} MB/s)\n"
+                    f"• {ADDON.getLocalizedString(30161)}: {res['peak_mbps']:.2f} Mbps\n"
+                    f"• {ADDON.getLocalizedString(30162)}: {res['ping_ms']:.0f} ms\n"
+                    f"• {ADDON.getLocalizedString(30163)}: {res['total_bytes'] / (1024*1024):.1f} MB ({res['duration']:.1f} s)\n\n"
+                    f"[B]{ADDON.getLocalizedString(30164)}:[/B]\n"
+                    f"• {ADDON.getLocalizedString(30165)}: {ADDON.getLocalizedString(30168)} [COLOR yellow]{s_45:.1f} GB[/COLOR]\n"
+                    f"• {ADDON.getLocalizedString(30166)}: {ADDON.getLocalizedString(30168)} [COLOR yellow]{m_90:.1f} GB[/COLOR]\n"
+                    f"• {ADDON.getLocalizedString(30167)}: {ADDON.getLocalizedString(30168)} [COLOR yellow]{m_150:.1f} GB[/COLOR]"
+                )
+                xbmcgui.Dialog().ok("Webshare Speedtest", msg)
+            else:
+                xbmcgui.Dialog().notification("Webshare Speedtest", "Měření rychlosti se nezdařilo nebo bylo zrušeno.", xbmcgui.NOTIFICATION_WARNING, 3000)
+        except Exception as e:
+            try:
+                dialog.close()
+            except Exception:
+                pass
+            xbmcgui.Dialog().notification("Webshare Speedtest", f"Chyba při testu rychlosti: {e}", xbmcgui.NOTIFICATION_ERROR, 3000)
+        return
     elif action == 'sync_history':
         import sync
         if sync.sync_history():
@@ -1831,7 +2302,7 @@ def run():
             if success:
                 xbmcgui.Dialog().notification("StreamContinuum", "Nastavení exportováno", xbmcgui.NOTIFICATION_INFO)
             else:
-                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba exportu", xbmc.NOTIFICATION_ERROR)
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba exportu", xbmcgui.NOTIFICATION_ERROR)
         return
     elif action == 'import_settings':
         keyboard = xbmc.Keyboard('', 'Zadejte PIN pro dešifrování')
@@ -1842,7 +2313,7 @@ def run():
             if success:
                 xbmcgui.Dialog().notification("StreamContinuum", "Nastavení importováno", xbmcgui.NOTIFICATION_INFO)
             else:
-                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba importu", xbmc.NOTIFICATION_ERROR)
+                xbmcgui.Dialog().notification("StreamContinuum", msg or "Chyba importu", xbmcgui.NOTIFICATION_ERROR)
         return
     elif action == 'watchlist_add':
         media_type = params.get('type')
@@ -1875,6 +2346,8 @@ def run():
                         tmdb_data['plot'] = show_details.get('overview')
                         tmdb_data['poster'] = show_details.get('poster')
                         tmdb_data['fanart'] = show_details.get('fanart')
+                        tmdb_data['runtime'] = show_details.get('runtime')
+                        tmdb_data['genres'] = show_details.get('genres', [])
             history.add_to_watchlist_local(target_query, tmdb_data)
             
         if ADDON.getSetting('trakt_token'):
@@ -1893,7 +2366,7 @@ def run():
         if ADDON.getSetting('trakt_token') and item_id:
             trakt.remove_from_watchlist(media_type, item_id, id_type=id_type)
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
-        xbmc.executebuiltin('Container.Refresh')
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
         return
     elif action == 'trakt_mark' or action == 'media_mark':
         media_type = params.get('type')
@@ -1910,23 +2383,38 @@ def run():
             xbmcgui.Dialog().notification("Trakt.tv", ADDON.getLocalizedString(30086), xbmcgui.NOTIFICATION_ERROR, 2000)
         return
     elif action == 'history_mark':
-        history_mark_watched(params.get('query'), params.get('watched') == '1')
+        history_mark_watched(params.get('query'), params.get('watched') == '1', source=params.get('source'))
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
         return
     elif action == 'history_delete':
         import history
         history.delete_from_history(params.get('query'))
-        xbmc.executebuiltin('Container.Refresh')
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
         return
     elif action == 'history_edit':
         old_query = params.get('query')
         keyboard = xbmc.Keyboard(old_query or '', ADDON.getLocalizedString(30087))
         keyboard.doModal()
         if keyboard.isConfirmed():
-            new_query = keyboard.getText()
-            if new_query:
+            new_query = keyboard.getText().strip()
+            if new_query and new_query != old_query:
                 import history
                 history.update_history_item(old_query, new_query)
-                xbmc.executebuiltin('Container.Refresh')
+                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={urllib.parse.quote_plus(new_query)},replace)')
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
         return
     elif action == 'history_tmdb_custom_search':
         orig_q = params.get('original_query', '')
@@ -1934,9 +2422,14 @@ def run():
         keyboard = xbmc.Keyboard(prefill, "Hledat na TMDb pro ztotožnění")
         keyboard.doModal()
         if keyboard.isConfirmed():
-            new_search_term = keyboard.getText()
+            new_search_term = keyboard.getText().strip()
             if new_search_term:
                 xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote_plus(orig_q)}&custom_query={urllib.parse.quote_plus(new_search_term)},replace)')
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
         return
     elif action == 'assign_tmdb_data_to_history':
         assign_tmdb_data_to_history(
@@ -1945,15 +2438,28 @@ def run():
             media_type=params.get('media_type')
         )
         return
+    elif action == 'search_prompt':
+        search_prompt()
+        return
+    elif action == 'search_prefill':
+        search_prefill(params.get('query', ''))
+        return
+    elif action == 'tmdb_search_prompt':
+        tmdb_search_prompt()
+        return
+    elif action == 'history_list_replace':
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_list,replace)')
+        return
 
-    # If the action requires directory handle but handle is invalid, redirect to window
     if HANDLE < 0:
-        addon_id = ADDON.getAddonInfo('id')
-        target_url = f"plugin://{addon_id}/"
-        if len(sys.argv) > 2 and sys.argv[2]:
-            target_url += sys.argv[2]
-        xbmc.log(f"StreamContinuum: Invalid handle (< 0) for action '{action}'. Redirecting to ActivateWindow.", xbmc.LOGWARNING)
-        xbmc.executebuiltin(f'ActivateWindow(Videos, {target_url}, return)')
+        if not action:
+            addon_id = ADDON.getAddonInfo('id')
+            xbmc.executebuiltin(f'ActivateWindow(Videos, plugin://{addon_id}/, return)')
         return
 
     if action:
@@ -1972,15 +2478,8 @@ def run():
         trakt_menu()
     elif action == 'trakt_search_menu':
         trakt_search()
-    elif action == 'settings':
-        ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
-        ADDON.openSettings()
     elif action == 'search':
         search(params.get('query'))
-    elif action == 'search_prefill':
-        search_prefill(params.get('query', ''))
-    elif action == 'play':
-        play(params.get('ident'), params.get('query'), params.get('title'))
     elif action == 'trending_movies':
         xbmcgui.Dialog().ok("StreamContinuum", f"{ADDON.getLocalizedString(30055)} (WIP)")
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
@@ -1998,7 +2497,11 @@ def run():
     elif action == 'history_list':
         show_history(force_list=True)
     elif action == 'history_menu':
-        history_menu(params.get('query'))
+        history_menu(
+            params.get('query'),
+            show_full_history_link=(params.get('from_open_last') == '1' or params.get('show_full') == '1'),
+            source=params.get('source')
+        )
     elif action == 'history_tmdb_identify_search':
         history_tmdb_identify_search(params.get('original_query', ''), params.get('custom_query'))
     elif action == 'tmdb_menu':
@@ -2014,15 +2517,15 @@ def run():
             genre_name=params.get('genre_name')
         )
     elif action == 'tmdb_show_seasons':
-        show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''), params.get('tmdb_id'))
+        show_tmdb_show_seasons(params.get('title', ''), params.get('year', ''), params.get('tmdb_id'), ws_base=params.get('ws_base'))
     elif action == 'tmdb_show_episodes':
-        show_tmdb_show_episodes(params.get('show_title', ''), params.get('tmdb_id'), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
+        show_tmdb_show_episodes(params.get('show_title', ''), params.get('tmdb_id'), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''), ws_base=params.get('ws_base'))
     elif action == 'tmdb_search':
         show_tmdb_search(params.get('query'))
     elif action == 'show_seasons':
-        show_seasons(params.get('show_title', ''), params.get('trakt_id', ''), params.get('poster', ''), params.get('fanart', ''))
+        show_seasons(params.get('show_title', ''), params.get('trakt_id', ''), params.get('poster', ''), params.get('fanart', ''), ws_base=params.get('ws_base'))
     elif action == 'show_episodes':
-        show_episodes(params.get('show_title', ''), params.get('trakt_id', ''), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''))
+        show_episodes(params.get('show_title', ''), params.get('trakt_id', ''), params.get('season', 1), params.get('poster', ''), params.get('fanart', ''), ws_base=params.get('ws_base'))
     elif action == 'trakt_discover_menu':
         show_trakt_discover_menu()
     elif action == 'trakt_discover':
