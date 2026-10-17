@@ -1,3 +1,6 @@
+[B]Verze 1.5.0[/B] - 2026-10-17
+- Oprava synchronizace historie a doplnění vkládání náhrobků za smazané položky.
+
 [B]Verze 1.4.5[/B] - 2026-10-17
 - Oprava opětovného návratu smazaných položek po synchronizaci historie (Tombstones) (Issue #51).
 - Implementována evidence smazaných položek (tombstones) s časovým razítkem v profilu doplňku (history_tombstones.json) i v synchronizovaném souboru streamcontinuum_history.json na Webshare.
