@@ -2194,7 +2194,7 @@ def history_mark_watched(query, watched, source=None):
                 else:
                     trakt.mark_unwatched(media_type, trakt_id)
                     
-    if is_watched:
+    if is_watched and source != 'watchlist':
         try:
             history.check_and_update_next_episodes()
         except Exception:

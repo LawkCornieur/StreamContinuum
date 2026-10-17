@@ -6,6 +6,8 @@ import re
 import time
 import xbmc
 import datetime
+import unicodedata
+import threading
 
 try:
     import tmdb
@@ -15,6 +17,19 @@ except Exception:
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
 HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
+
+_EPISODE_PATTERN = re.compile(
+    r'^(.*?)(?:[\s._\-]+|(?<=[^\W\d_]))(?:S(\d+)\s*E(\d+)\b|\b(\d+)x(\d+)\b|\b(?:série|serie|season)\s*(\d+)\s*(?:epizoda|díl|dil|ep|e)\s*(\d+)\b)',
+    re.IGNORECASE
+)
+
+_SERIES_DETECT_PATTERN = re.compile(
+    r'(?:^|[\s._\-]|(?<=[^\W\d_]))(?:s\d+\s*e\d+\b|\bseason\s*\d+\b|\bsérie\s*\d+\b|\bserie\s*\d+\b|\bs\d+\b|\be\d+\b|\b\d+x\d+\b)',
+    re.IGNORECASE
+)
+
+_VIDEO_EXT_PATTERN = re.compile(r'\.(mkv|avi|mp4|m4v|mov|wmv|ts|flv)$', re.IGNORECASE)
+
 
 def _safe_timestamp(val):
     if not val:
@@ -32,6 +47,7 @@ def _safe_timestamp(val):
         pass
     return 0
 
+
 def has_non_latin(s):
     if not s:
         return False
@@ -40,6 +56,7 @@ def has_non_latin(s):
         if o > 0x024F and not (0x1E00 <= o <= 0x1EFF or 0x2000 <= o <= 0x206F):
             return True
     return False
+
 
 def sanitize_title(s):
     if not s:
@@ -52,24 +69,509 @@ def sanitize_title(s):
         cleaned.append(ch)
     return "".join(cleaned).strip()
 
+
+def strip_diacritics(s):
+    if not s:
+        return ""
+    norm = unicodedata.normalize('NFKD', str(s))
+    return "".join(c for c in norm if not unicodedata.combining(c))
+
+
 def is_series(query):
     if not query:
         return False
-    return bool(re.search(r'\b(s\d+\s*e\d+|season\s*\d+|série\s*\d+|serie\s*\d+|s\d+\b|e\d+\b|\d+x\d+)\b', str(query), re.IGNORECASE))
+    return bool(_SERIES_DETECT_PATTERN.search(str(query)))
+
+
+def parse_episode_info(query):
+    """
+    Vrátí n-tici (ws_base, season, episode, episode_code) z vyhledávacího dotazu.
+    Pokud dotaz neobsahuje označení epizody, vrací (get_base_name(query), None, None, None).
+    """
+    if not query:
+        return "", None, None, None
+    q_str = str(query).strip()
+    m = _EPISODE_PATTERN.search(q_str)
+    if m:
+        raw_base = (m.group(1) or "").strip()
+        cleaned_base = re.sub(r'[\s._\-]+$', '', raw_base).strip()
+        ws_base = get_base_name(cleaned_base) if cleaned_base else get_base_name(q_str)
+        season = int(m.group(2) or m.group(4) or m.group(6))
+        episode = int(m.group(3) or m.group(5) or m.group(7))
+        ep_code = f"S{season:02d}E{episode:02d}"
+        return ws_base, season, episode, ep_code
+    return get_base_name(q_str), None, None, None
+
 
 def get_base_name(query):
     if not query:
         return ""
     q = str(query)
-    q = re.sub(r'\.(mkv|avi|mp4|m4v|mov|wmv|ts|flv)$', '', q, flags=re.IGNORECASE)
+    q = _VIDEO_EXT_PATTERN.sub('', q)
     q = re.sub(r'[._]', ' ', q)
-    q = re.sub(r'\s*(?:s\d+\s*e\d+|\bseason\s*\d+|\bsérie\s*\d+|\bserie\s*\d+|\bs\d+\b|\be\d+\b|\d+x\d+).*$', '', q, flags=re.IGNORECASE).strip()
+    q = re.sub(r'(?:[\s._\-]+|(?<=[^\W\d_]))(?:s\d+\s*e\d+|\bseason\s*\d+|\bsérie\s*\d+|\bserie\s*\d+|\bs\d+\b|\be\d+\b|\b\d+x\d+\b).*$', '', q, flags=re.IGNORECASE).strip()
     q = re.sub(r'\b(2160p|1080p|720p|480p|4k|uhd|hd|hdtv|web-?dl|bluray|blu-?ray|bdrip|brrip|dvdrip|dvd|laserdisk|laserdisc|cd|vhs|remux|x264|x265|h264|hevc|aac|ac3|dts)\b.*$', '', q, flags=re.IGNORECASE).strip()
     q = re.sub(r'\b(cz|sk|en|de|czech|czdab|skdab|dabing|dab|czsub|sksub|sub|titulky|tit|cztit|sktit|repack|proper|extended|unrated)\b.*$', '', q, flags=re.IGNORECASE).strip()
     q = re.sub(r'\s*\(?\d{4}\)?$', '', q).strip()
     q = re.sub(r'[\-\–\—\s]+$', '', q).strip()
     q = re.sub(r'\s+', ' ', q).strip()
     return sanitize_title(q) if q else sanitize_title(str(query))
+
+
+def normalize_match_key(s):
+    if not s:
+        return ""
+    base = get_base_name(s)
+    ascii_s = strip_diacritics(base).lower()
+    ascii_s = re.sub(r'[:\-\–\—/\\|(),.!?\'\"]+', ' ', ascii_s)
+    ascii_s = re.sub(r'\s+', ' ', ascii_s).strip()
+    return ascii_s
+
+
+def _clean_item_title(raw_title, query, tmdb_id):
+    if not raw_title:
+        return None
+    t = sanitize_title(raw_title)
+    if not t or has_non_latin(t):
+        return None
+    if not tmdb_id:
+        if _VIDEO_EXT_PATTERN.search(t) or is_series(t):
+            return None
+        if query and t.strip().lower() == str(query).strip().lower():
+            return None
+    return t
+
+
+def normalize_history_item(item, default_ts=None):
+    if not isinstance(item, dict):
+        return None
+    raw_query = item.get('query')
+    if not raw_query or not str(raw_query).strip():
+        return None
+
+    clean_query = str(raw_query).strip()
+    now = default_ts or int(time.time())
+
+    tmdb_id = item.get('tmdb_id')
+    try:
+        tmdb_id = int(tmdb_id) if (tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0')) else None
+    except (ValueError, TypeError):
+        tmdb_id = None
+
+    s_info = item.get('series_info') if isinstance(item.get('series_info'), dict) else {}
+    ws_base, season, episode, ep_code = parse_episode_info(clean_query)
+    if season is None and item.get('season') is not None:
+        try:
+            season = int(item.get('season'))
+        except (ValueError, TypeError):
+            season = None
+    if episode is None and item.get('episode') is not None:
+        try:
+            episode = int(item.get('episode'))
+        except (ValueError, TypeError):
+            episode = None
+    if season is None and s_info.get('season') is not None:
+        try:
+            season = int(s_info.get('season'))
+        except (ValueError, TypeError):
+            season = None
+    if episode is None and s_info.get('episode') is not None:
+        try:
+            episode = int(s_info.get('episode'))
+        except (ValueError, TypeError):
+            episode = None
+
+    if season is not None and episode is not None:
+        ep_code = f"S{season:02d}E{episode:02d}"
+    else:
+        ep_code = None
+
+    is_tv = (
+        item.get('media_type') in ('tvshow', 'tv', 'show')
+        or is_series(clean_query)
+        or (season is not None and episode is not None)
+    )
+    media_type = 'tvshow' if is_tv else 'movie'
+
+    if is_tv:
+        saved_ws_base = item.get('ws_base') or s_info.get('ws_base')
+        if saved_ws_base and str(saved_ws_base).strip():
+            ws_base = get_base_name(saved_ws_base) or ws_base
+        if season is not None and episode is not None and ws_base:
+            clean_query = f"{ws_base} S{season:02d}E{episode:02d}"
+    else:
+        ws_base = get_base_name(clean_query)
+
+    title = _clean_item_title(item.get('title'), raw_query, tmdb_id)
+
+    year = item.get('year')
+    try:
+        year = int(str(year)[:4]) if year else None
+    except (ValueError, TypeError):
+        year = None
+
+    rating = item.get('rating')
+    try:
+        rating = float(rating) if rating is not None else None
+    except (ValueError, TypeError):
+        rating = None
+
+    runtime = item.get('runtime')
+    try:
+        runtime = int(runtime) if runtime is not None else None
+    except (ValueError, TypeError):
+        runtime = None
+
+    genres = item.get('genres', [])
+    if isinstance(genres, str):
+        genres = [g.strip() for g in genres.split(',') if g.strip()]
+    elif not isinstance(genres, list):
+        genres = []
+
+    added_at = _safe_timestamp(item.get('added_at')) or now
+    last_played_at = _safe_timestamp(item.get('last_played_at')) or added_at
+    updated_at = _safe_timestamp(item.get('updated_at')) or last_played_at
+    identified_at = _safe_timestamp(item.get('identified_at')) or (now if tmdb_id else None)
+    is_watched = bool(item.get('is_watched', True))
+
+    watched_eps = []
+    if is_tv:
+        raw_we = s_info.get('watched_episodes') or item.get('watched_episodes') or []
+        if isinstance(raw_we, list):
+            for code in raw_we:
+                if isinstance(code, str) and re.match(r'^S\d+E\d+$', code.strip(), re.IGNORECASE):
+                    norm_c = code.strip().upper()
+                    if norm_c not in watched_eps:
+                        watched_eps.append(norm_c)
+        if is_watched and ep_code and ep_code not in watched_eps:
+            watched_eps.append(ep_code)
+
+        last_w_s = s_info.get('last_watched_season')
+        last_w_e = s_info.get('last_watched_episode')
+        if is_watched and season is not None and episode is not None:
+            last_w_s = season
+            last_w_e = episode
+
+        series_info_obj = {
+            'ws_base': ws_base,
+            'season': season,
+            'episode': episode,
+            'episode_code': ep_code,
+            'last_watched_season': last_w_s,
+            'last_watched_episode': last_w_e,
+            'watched_episodes': sorted(watched_eps)
+        }
+    else:
+        series_info_obj = None
+
+    return {
+        'query': clean_query,
+        'title': title,
+        'year': year,
+        'plot': str(item.get('plot') or '') if item.get('plot') else '',
+        'genres': genres,
+        'rating': rating,
+        'runtime': runtime,
+        'poster': item.get('poster') or None,
+        'fanart': item.get('fanart') or None,
+        'tmdb_id': tmdb_id,
+        'media_type': media_type,
+        'ws_base': ws_base,
+        'season': season if is_tv else None,
+        'episode': episode if is_tv else None,
+        'episode_code': ep_code if is_tv else None,
+        'series_info': series_info_obj,
+        'identified_at': identified_at,
+        'is_watched': is_watched,
+        'last_played_at': last_played_at,
+        'updated_at': updated_at,
+        'added_at': added_at,
+        '_raw_title_hint': str(item.get('title') or '')
+    }
+
+
+def _extract_candidate_names(norm_item):
+    names = set()
+    for src in (norm_item.get('title'), norm_item.get('ws_base'), norm_item.get('query'), norm_item.get('_raw_title_hint')):
+        if not src:
+            continue
+        k = normalize_match_key(src)
+        if k and len(k) >= 2:
+            names.add(k)
+        # Rozdělení složených názvů typu "Zakon gangu _ Sons of Anarchy" nebo "Zákon gangu (Sons Of Anarchy)"
+        raw_base = get_base_name(src)
+        for part in re.split(r'[\(\)\[\]/_\-–—:]+', raw_base):
+            pk = normalize_match_key(part)
+            if pk and len(pk) >= 3:
+                names.add(pk)
+    return names
+
+
+def _merge_metadata(target, source):
+    """Doplní chybějící TMDb metadata ze source do target."""
+    if not source:
+        return target
+    for k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'identified_at']:
+        t_val = target.get(k)
+        s_val = source.get(k)
+        if s_val is not None and s_val != '' and s_val != []:
+            if t_val is None or t_val == '' or t_val == []:
+                target[k] = s_val
+    return target
+
+
+def consolidate_history_items(raw_items):
+    """
+    Sjednotí, deduplikuje a strukturovaně seskupí položky historie a watchlistu.
+    - Filmy: 1 záznam na film (nejnovější stav podle updated_at/last_played_at, zachování TMDb metadat).
+    - Seriály: seskupení všech epizod téhož seriálu (podle tmdb_id i normalizovaných názvů/dotazů),
+      sloučení stavu totožných epizod (SxxExx), zachování nejvyšší/nejnovější zhlédnuté epizody v historii
+      a nejvýše jedné nezhlédnuté následující epizody (pokud je > poslední zhlédnutá epizoda a již byla vysílána).
+    """
+    if not raw_items or not isinstance(raw_items, list):
+        return []
+
+    now = int(time.time())
+    current_year = datetime.date.today().year
+    normalized = []
+    for idx, it in enumerate(raw_items):
+        n = normalize_history_item(it, default_ts=now - idx)
+        if n:
+            normalized.append(n)
+
+    if not normalized:
+        return []
+
+    # Union-Find seskupení zvlášť pro seriály a pro filmy
+    def _group_items(sub_list):
+        n_len = len(sub_list)
+        parent = list(range(n_len))
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a, b):
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[rb] = ra
+
+        key_owner = {}
+        item_names = []
+        for i, it in enumerate(sub_list):
+            keys = set()
+            tid = it.get('tmdb_id')
+            if tid:
+                keys.add(f"tmdb:{tid}")
+            c_names = _extract_candidate_names(it)
+            item_names.append(c_names)
+            for cn in c_names:
+                keys.add(f"name:{cn}")
+
+            for k in keys:
+                if k in key_owner:
+                    union(key_owner[k], i)
+                else:
+                    key_owner[k] = i
+
+        # Doplňkové prefixové propojení pro neztotožněné položky (např. "star trek podivne" -> "star trek podivne nove svety")
+        for i in range(n_len):
+            if sub_list[i].get('tmdb_id'):
+                continue
+            for j in range(n_len):
+                if i == j or find(i) == find(j):
+                    continue
+                if not sub_list[j].get('tmdb_id'):
+                    continue
+                for ni in item_names[i]:
+                    if len(ni) < 6:
+                        continue
+                    for nj in item_names[j]:
+                        if len(nj) >= 6 and (nj.startswith(ni + ' ') or ni.startswith(nj + ' ')):
+                            union(j, i)
+                            break
+
+        groups = {}
+        for i, it in enumerate(sub_list):
+            r = find(i)
+            groups.setdefault(r, []).append(it)
+        return list(groups.values())
+
+    tv_items = [it for it in normalized if it.get('media_type') == 'tvshow']
+    movie_items = [it for it in normalized if it.get('media_type') != 'tvshow']
+
+    result_items = []
+
+    # 1. Konsolidace filmů
+    for m_group in _group_items(movie_items):
+        # Seřadit podle (updated_at, last_played_at, is_watched) sestupně
+        m_group.sort(
+            key=lambda x: (
+                _safe_timestamp(x.get('updated_at')),
+                _safe_timestamp(x.get('last_played_at')),
+                1 if x.get('is_watched', True) else 0,
+                1 if x.get('tmdb_id') else 0
+            ),
+            reverse=True
+        )
+        winner = dict(m_group[0])
+        for other in m_group[1:]:
+            _merge_metadata(winner, other)
+        winner.pop('_raw_title_hint', None)
+        winner['series_info'] = None
+        result_items.append(winner)
+
+    # 2. Konsolidace seriálů
+    for s_group in _group_items(tv_items):
+        # Nejlepší metadata ze skupiny
+        meta_template = {}
+        identified_candidates = sorted(
+            [x for x in s_group if x.get('tmdb_id')],
+            key=lambda x: (
+                1 if x.get('plot') else 0,
+                1 if x.get('poster') else 0,
+                _safe_timestamp(x.get('identified_at')),
+                _safe_timestamp(x.get('updated_at'))
+            ),
+            reverse=True
+        )
+        for cand in identified_candidates + s_group:
+            _merge_metadata(meta_template, cand)
+
+        # Preferovaný čistý ws_base (z nejnovější ztotožněné nebo nejnovější položky)
+        preferred_ws_base = None
+        for cand in sorted(s_group, key=lambda x: (1 if x.get('tmdb_id') else 0, _safe_timestamp(x.get('updated_at'))), reverse=True):
+            wb = cand.get('ws_base')
+            if wb and not _VIDEO_EXT_PATTERN.search(wb):
+                preferred_ws_base = wb
+                break
+        if not preferred_ws_base:
+            preferred_ws_base = meta_template.get('title') or s_group[0].get('ws_base') or get_base_name(s_group[0].get('query', ''))
+
+        # Seskupit podle epizody (season, episode)
+        ep_map = {}
+        all_watched_codes = set()
+        for it in s_group:
+            s_info = it.get('series_info') or {}
+            for wc in s_info.get('watched_episodes', []):
+                all_watched_codes.add(wc)
+            s_num = it.get('season')
+            e_num = it.get('episode')
+            ep_key = (s_num if s_num is not None else 0, e_num if e_num is not None else 0)
+            ep_map.setdefault(ep_key, []).append(it)
+
+        consolidated_eps = {}
+        for ep_key, ep_list in ep_map.items():
+            # Pro stejnou epizodu vyhrává nejnovější updated_at; při shodě vyhrává is_watched=True
+            ep_list.sort(
+                key=lambda x: (
+                    _safe_timestamp(x.get('updated_at')),
+                    _safe_timestamp(x.get('last_played_at')),
+                    1 if x.get('is_watched', True) else 0,
+                    1 if x.get('tmdb_id') else 0
+                ),
+                reverse=True
+            )
+            ep_winner = dict(ep_list[0])
+            for other_ep in ep_list[1:]:
+                _merge_metadata(ep_winner, other_ep)
+            _merge_metadata(ep_winner, meta_template)
+            if ep_winner.get('is_watched', True) and ep_winner.get('episode_code'):
+                all_watched_codes.add(ep_winner['episode_code'])
+            consolidated_eps[ep_key] = ep_winner
+
+        watched_eps = [ep for ep in consolidated_eps.values() if ep.get('is_watched', True)]
+        unwatched_eps = [ep for ep in consolidated_eps.values() if not ep.get('is_watched', True)]
+
+        best_watched = None
+        max_w_tuple = (-1, -1)
+        max_w_updated = 0
+        if watched_eps:
+            watched_eps.sort(
+                key=lambda x: (
+                    x.get('season') or 0,
+                    x.get('episode') or 0,
+                    _safe_timestamp(x.get('updated_at')),
+                    _safe_timestamp(x.get('last_played_at'))
+                ),
+                reverse=True
+            )
+            best_watched = dict(watched_eps[0])
+            for w_ep in watched_eps[1:]:
+                _merge_metadata(best_watched, w_ep)
+            max_w_tuple = (best_watched.get('season') or 0, best_watched.get('episode') or 0)
+            max_w_updated = max(_safe_timestamp(x.get('updated_at')) for x in watched_eps)
+            max_w_played = max(_safe_timestamp(x.get('last_played_at')) for x in watched_eps)
+            best_watched['last_played_at'] = max_w_played
+            best_watched['updated_at'] = max(max_w_updated, max_w_played)
+            ws_b = best_watched.get('ws_base') or preferred_ws_base
+            best_watched['ws_base'] = ws_b
+            if best_watched.get('season') is not None and best_watched.get('episode') is not None and ws_b:
+                best_watched['query'] = f"{ws_b} S{best_watched['season']:02d}E{best_watched['episode']:02d}"
+            best_watched['series_info'] = {
+                'ws_base': ws_b,
+                'season': best_watched.get('season'),
+                'episode': best_watched.get('episode'),
+                'episode_code': best_watched.get('episode_code'),
+                'last_watched_season': best_watched.get('season'),
+                'last_watched_episode': best_watched.get('episode'),
+                'watched_episodes': sorted(all_watched_codes)
+            }
+            best_watched.pop('_raw_title_hint', None)
+            result_items.append(best_watched)
+
+        # Nezhlédnutá epizoda (Watchlist): pouze pokud je > max_w_tuple a nemá budoucí rok vydání
+        valid_unwatched = []
+        for u_ep in unwatched_eps:
+            u_tuple = (u_ep.get('season') or 0, u_ep.get('episode') or 0)
+            u_year = u_ep.get('year')
+            if u_year and isinstance(u_year, int) and u_year > current_year:
+                continue
+            if u_ep.get('episode_code') and u_ep.get('episode_code') in all_watched_codes:
+                continue
+            if best_watched is None or u_tuple > max_w_tuple:
+                valid_unwatched.append(u_ep)
+
+        if valid_unwatched:
+            valid_unwatched.sort(
+                key=lambda x: (
+                    _safe_timestamp(x.get('updated_at')),
+                    _safe_timestamp(x.get('last_played_at')),
+                    x.get('season') or 0,
+                    x.get('episode') or 0
+                ),
+                reverse=True
+            )
+            best_unwatched = dict(valid_unwatched[0])
+            _merge_metadata(best_unwatched, meta_template)
+            ws_b = best_unwatched.get('ws_base') or preferred_ws_base
+            best_unwatched['ws_base'] = ws_b
+            if best_unwatched.get('season') is not None and best_unwatched.get('episode') is not None and ws_b:
+                best_unwatched['query'] = f"{ws_b} S{best_unwatched['season']:02d}E{best_unwatched['episode']:02d}"
+            best_unwatched['series_info'] = {
+                'ws_base': ws_b,
+                'season': best_unwatched.get('season'),
+                'episode': best_unwatched.get('episode'),
+                'episode_code': best_unwatched.get('episode_code'),
+                'last_watched_season': best_watched.get('season') if best_watched else None,
+                'last_watched_episode': best_watched.get('episode') if best_watched else None,
+                'watched_episodes': sorted(all_watched_codes)
+            }
+            best_unwatched.pop('_raw_title_hint', None)
+            result_items.append(best_unwatched)
+
+    result_items.sort(
+        key=lambda x: max(
+            _safe_timestamp(x.get('updated_at')),
+            _safe_timestamp(x.get('last_played_at')),
+            _safe_timestamp(x.get('added_at'))
+        ),
+        reverse=True
+    )
+    return result_items[:60]
+
 
 def get_history(deduplicate=True):
     if not os.path.exists(PROFILE_DIR):
@@ -84,165 +586,30 @@ def get_history(deduplicate=True):
             items = json.load(f)
             if not isinstance(items, list):
                 return []
-            
-            now = int(time.time())
-            for idx, item in enumerate(items):
-                if 'is_watched' not in item:
-                    item['is_watched'] = True
-                if not item.get('added_at'):
-                    item['added_at'] = now - idx
-                if not item.get('last_played_at'):
-                    item['last_played_at'] = item['added_at']
-                if item.get('title'):
-                    item['title'] = sanitize_title(item['title'])
-            
-            items.sort(key=lambda x: max(_safe_timestamp(x.get('last_played_at')), _safe_timestamp(x.get('added_at'))), reverse=True)
-            
             if not deduplicate:
-                return items
-
-            def _dedup_list(sub_items):
-                series_map = {}
-                movie_map = {}
-                for item in sub_items:
-                    q = item.get('query', '')
-                    tmdb_id = item.get('tmdb_id')
-                    t_title = item.get('title', '')
-                    t_base = get_base_name(t_title).lower().strip() if (t_title and not has_non_latin(t_title)) else ''
-                    q_base = get_base_name(q).lower().strip()
-                    is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
-
-                    if is_tv:
-                        if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                            key = f"tmdb_{tmdb_id}"
-                            if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
-                                series_map[key] = item
-                        if t_base:
-                            key = f"title_{t_base}"
-                            if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
-                                series_map[key] = item
-                        if q_base:
-                            key = f"query_{q_base}"
-                            if key not in series_map or (not series_map[key].get('tmdb_id') and tmdb_id):
-                                series_map[key] = item
-                            # Pokud název obsahuje složené části oddělené lomítkem/pomlčkou, indexovat i první část
-                            parts = re.split(r'\s*[/\-–—_]\s*', q_base)
-                            if len(parts) > 1 and len(parts[0].strip()) >= 3:
-                                p_key = f"query_{parts[0].strip()}"
-                                if p_key not in series_map:
-                                    series_map[p_key] = item
-                    else:
-                        if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                            key = f"movie_tmdb_{tmdb_id}"
-                            if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
-                                movie_map[key] = item
-                        if t_base:
-                            key = f"movie_title_{t_base}"
-                            if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
-                                movie_map[key] = item
-                        if q_base:
-                            key = f"movie_query_{q_base}"
-                            if key not in movie_map or (not movie_map[key].get('tmdb_id') and tmdb_id):
-                                movie_map[key] = item
-
-                seen_keys = set()
-                unique_items = []
-                for item in sub_items:
-                    q = item.get('query', '')
-                    tmdb_id = item.get('tmdb_id')
-                    title = item.get('title')
-                    is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
-                    
-                    q_base = get_base_name(q).lower().strip()
-                    t_base = get_base_name(title).lower().strip() if (title and not has_non_latin(title)) else ''
-
-                    if is_tv:
-                        matched_source = None
-                        if tmdb_id and f"tmdb_{tmdb_id}" in series_map:
-                            matched_source = series_map[f"tmdb_{tmdb_id}"]
-                        elif t_base and f"title_{t_base}" in series_map:
-                            matched_source = series_map[f"title_{t_base}"]
-                        elif q_base and f"query_{q_base}" in series_map:
-                            matched_source = series_map[f"query_{q_base}"]
-                        else:
-                            parts = re.split(r'\s*[/\-–—_]\s*', q_base)
-                            if len(parts) > 1 and len(parts[0].strip()) >= 3 and f"query_{parts[0].strip()}" in series_map:
-                                matched_source = series_map[f"query_{parts[0].strip()}"]
-
-                        if matched_source and matched_source is not item:
-                            for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
-                                if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
-                                    item[meta_k] = matched_source[meta_k]
-                            tmdb_id = item.get('tmdb_id')
-                            title = item.get('title')
-                            if title:
-                                t_base = get_base_name(title).lower().strip() if not has_non_latin(title) else t_base
-
-                        keys = []
-                        if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                            keys.append(f"tmdb_{tmdb_id}")
-                        if title and not has_non_latin(title):
-                            tb = get_base_name(title).lower().strip()
-                            if tb:
-                                keys.append(f"title_{tb}")
-                        if q_base:
-                            keys.append(f"query_{q_base}")
-                            parts = re.split(r'\s*[/\-–—_]\s*', q_base)
-                            if len(parts) > 1 and len(parts[0].strip()) >= 3:
-                                keys.append(f"query_{parts[0].strip()}")
-
-                        if keys and any(k in seen_keys for k in keys):
-                            continue
-                        for k in keys:
-                            seen_keys.add(k)
-                    else:
-                        matched_source = None
-                        if tmdb_id and f"movie_tmdb_{tmdb_id}" in movie_map:
-                            matched_source = movie_map[f"movie_tmdb_{tmdb_id}"]
-                        elif t_base and f"movie_title_{t_base}" in movie_map:
-                            matched_source = movie_map[f"movie_title_{t_base}"]
-                        elif q_base and f"movie_query_{q_base}" in movie_map:
-                            matched_source = movie_map[f"movie_query_{q_base}"]
-
-                        if matched_source and matched_source is not item:
-                            for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
-                                if matched_source.get(meta_k) is not None and item.get(meta_k) is None:
-                                    item[meta_k] = matched_source[meta_k]
-                            tmdb_id = item.get('tmdb_id')
-                            title = item.get('title')
-
-                        m_keys = []
-                        if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                            m_keys.append(f"movie_tmdb_{tmdb_id}")
-                        if title and not has_non_latin(title):
-                            tb = get_base_name(title).lower().strip()
-                            if tb:
-                                m_keys.append(f"movie_title_{tb}")
-                        q_norm = str(q).strip().lower()
-                        if q_norm:
-                            m_keys.append(f"movie_q_{q_norm}")
-                        if q_base:
-                            m_keys.append(f"movie_query_{q_base}")
-
-                        if m_keys and any(k in seen_keys for k in m_keys):
-                            continue
-                        for k in m_keys:
-                            seen_keys.add(k)
-
-                    unique_items.append(item)
-                return unique_items
-
-            watched_items = _dedup_list([it for it in items if it.get('is_watched', True)])
-            unwatched_items = _dedup_list([it for it in items if not it.get('is_watched', True)])
-            combined = watched_items + unwatched_items
-            combined.sort(key=lambda x: max(_safe_timestamp(x.get('last_played_at')), _safe_timestamp(x.get('added_at'))), reverse=True)
-            return combined
+                now = int(time.time())
+                norm_list = []
+                for idx, it in enumerate(items):
+                    n = normalize_history_item(it, default_ts=now - idx)
+                    if n:
+                        n.pop('_raw_title_hint', None)
+                        norm_list.append(n)
+                norm_list.sort(
+                    key=lambda x: max(
+                        _safe_timestamp(x.get('updated_at')),
+                        _safe_timestamp(x.get('last_played_at')),
+                        _safe_timestamp(x.get('added_at'))
+                    ),
+                    reverse=True
+                )
+                return norm_list
+            return consolidate_history_items(items)
     except json.JSONDecodeError as jde:
         xbmc.log(f"StreamContinuum History: Corrupted history.json detected: {jde}", xbmc.LOGERROR)
         try:
             bak_file = HISTORY_FILE + '.corrupted'
             if os.path.exists(HISTORY_FILE):
-                os.rename(HISTORY_FILE, bak_file)
+                os.replace(HISTORY_FILE, bak_file)
         except Exception:
             pass
         return []
@@ -250,262 +617,216 @@ def get_history(deduplicate=True):
         xbmc.log(f"StreamContinuum History: Error loading history.json: {e}", xbmc.LOGERROR)
         return []
 
+
 def get_history_item(query):
     if not query:
         return None
-    items = get_history(deduplicate=False)
+    items = get_history(deduplicate=True)
     norm_q = str(query).strip().lower()
     for item in items:
         if item.get('query') == query or str(item.get('query', '')).strip().lower() == norm_q:
             return item
-    q_base = get_base_name(query).strip().lower()
-    if q_base:
+    q_match = normalize_match_key(query)
+    if q_match:
         for item in items:
             item_q = item.get('query', '')
-            if (is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')) and get_base_name(item_q).strip().lower() == q_base:
+            if (is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')) and normalize_match_key(item_q) == q_match:
                 return item
     return None
+
 
 def _save_history(history_list):
     try:
         if not os.path.exists(PROFILE_DIR):
             os.makedirs(PROFILE_DIR)
-        temp_file = HISTORY_FILE + '.tmp'
+        consolidated = consolidate_history_items(history_list)
+        temp_file = f"{HISTORY_FILE}.{os.getpid()}.{threading.get_ident()}.tmp"
         with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(history_list, f, ensure_ascii=False, indent=4)
-        if os.path.exists(HISTORY_FILE):
-            os.remove(HISTORY_FILE)
-        os.rename(temp_file, HISTORY_FILE)
+            json.dump(consolidated, f, ensure_ascii=False, indent=4)
+        os.replace(temp_file, HISTORY_FILE)
     except Exception as e:
         xbmc.log(f"StreamContinuum History: Error saving history.json: {e}", xbmc.LOGERROR)
+
 
 def add_to_history(query):
     if not query:
         return
     query_str = str(query).strip()
-    history_items = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=True)
     now = int(time.time())
-    
-    new_item_template = {
+    ws_base, season, episode, ep_code = parse_episode_info(query_str)
+    query_is_series = is_series(query_str) or (season is not None and episode is not None)
+
+    new_item = {
         'query': query_str,
         'title': None,
         'year': None,
-        'plot': None,
+        'plot': '',
         'genres': [],
         'rating': None,
         'runtime': None,
         'poster': None,
         'fanart': None,
         'tmdb_id': None,
-        'media_type': None,
+        'media_type': 'tvshow' if query_is_series else 'movie',
+        'ws_base': ws_base,
+        'season': season if query_is_series else None,
+        'episode': episode if query_is_series else None,
+        'episode_code': ep_code if query_is_series else None,
         'identified_at': None,
         'is_watched': True,
         'last_played_at': now,
+        'updated_at': now,
         'added_at': now
     }
 
-    query_is_series = is_series(query_str)
-    query_base = get_base_name(query_str).lower().strip()
-
-    existing_item = None
-    matching_tmdb_item = None
-    remaining_history = []
-    for item in history_items:
-        item_q = item.get('query', '')
-        item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')
-        item_base = get_base_name(item_q).lower().strip()
-        
-        is_same_exact = (item_q == query_str)
-        is_same_series_watched = (query_is_series or item.get('media_type') in ('tvshow', 'tv', 'show')) and item_is_series and item.get('is_watched', True) and (
-            (query_base and item_base and query_base == item_base) or
-            (item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base)
-        )
-        
-        if is_same_exact or is_same_series_watched:
-            if not existing_item:
-                existing_item = item
-        else:
-            remaining_history.append(item)
-            
-        if item_is_series and item.get('tmdb_id') and not matching_tmdb_item:
-            if query_base and item_base == query_base:
-                matching_tmdb_item = item
-            elif item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base:
-                matching_tmdb_item = item
-    
-    history_items = remaining_history
-    
-    if existing_item:
-        existing_item['query'] = query_str
-        existing_item['is_watched'] = True
-        existing_item['last_played_at'] = now
-        if 'added_at' not in existing_item or not existing_item['added_at']:
-            existing_item['added_at'] = now
-        if not existing_item.get('tmdb_id') and matching_tmdb_item:
-            for k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
-                if matching_tmdb_item.get(k) is not None:
-                    existing_item[k] = matching_tmdb_item[k]
-        item_to_add = existing_item
-    else:
-        item_to_add = new_item_template
-        if matching_tmdb_item:
-            for k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
-                if matching_tmdb_item.get(k) is not None:
-                    item_to_add[k] = matching_tmdb_item[k]
-        
-    history_items.insert(0, item_to_add)
-    history_items = history_items[:60]
+    history_items.insert(0, new_item)
     _save_history(history_items)
+
 
 def add_to_watchlist_local(query, tmdb_data=None):
     if not query:
         return
     query_str = str(query).strip()
-    history_items = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=True)
     now = int(time.time())
-    
-    query_is_series = is_series(query_str) or (tmdb_data and tmdb_data.get('media_type') in ('tvshow', 'tv', 'show'))
-    query_base = get_base_name(query_str).lower().strip()
-    
-    existing_item = None
-    remaining_history = []
-    for item in history_items:
-        item_q = item.get('query', '')
-        item_is_series = is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')
-        item_base = get_base_name(item_q).lower().strip()
-        item_watched = item.get('is_watched', True)
-        
-        is_same_exact_unwatched = (item_q == query_str and not item_watched)
-        is_same_series_unwatched = query_is_series and item_is_series and (not item_watched) and (
-            (query_base and item_base and query_base == item_base) or
-            (item.get('title') and not has_non_latin(item.get('title')) and get_base_name(item.get('title')).lower().strip() == query_base)
-        )
-        
-        if is_same_exact_unwatched or is_same_series_unwatched:
-            if not existing_item:
-                existing_item = item
-        else:
-            remaining_history.append(item)
-            
-    history_items = remaining_history
-    
-    if existing_item:
-        existing_item['query'] = query_str
-        existing_item['is_watched'] = False
-        existing_item['last_played_at'] = now
-        if tmdb_data:
-            for k in ['title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'tmdb_id', 'media_type']:
-                if k in tmdb_data and tmdb_data[k] is not None:
-                    val = tmdb_data[k]
-                    if k == 'title':
-                        val = sanitize_title(val)
-                    existing_item[k] = val
-        item_to_add = existing_item
-    else:
-        item_to_add = {
-            'query': query_str,
-            'title': sanitize_title(tmdb_data.get('title')) if tmdb_data else None,
-            'year': tmdb_data.get('year') if tmdb_data else None,
-            'plot': tmdb_data.get('plot', '') if tmdb_data else '',
-            'genres': tmdb_data.get('genres', []) if tmdb_data else [],
-            'rating': tmdb_data.get('rating') if tmdb_data else None,
-            'runtime': tmdb_data.get('runtime') if tmdb_data else None,
-            'poster': tmdb_data.get('poster') if tmdb_data else None,
-            'fanart': tmdb_data.get('fanart') if tmdb_data else None,
-            'tmdb_id': tmdb_data.get('tmdb_id') if tmdb_data else None,
-            'media_type': tmdb_data.get('media_type') if tmdb_data else ('tvshow' if query_is_series else 'movie'),
-            'identified_at': now if (tmdb_data and tmdb_data.get('tmdb_id')) else None,
-            'is_watched': False,
-            'last_played_at': now,
-            'added_at': now
-        }
-        
+    ws_base, season, episode, ep_code = parse_episode_info(query_str)
+    query_is_series = is_series(query_str) or (tmdb_data and tmdb_data.get('media_type') in ('tvshow', 'tv', 'show')) or (season is not None and episode is not None)
+
+    item_to_add = {
+        'query': query_str,
+        'title': sanitize_title(tmdb_data.get('title')) if (tmdb_data and tmdb_data.get('title')) else None,
+        'year': tmdb_data.get('year') if tmdb_data else None,
+        'plot': tmdb_data.get('plot', '') if tmdb_data else '',
+        'genres': tmdb_data.get('genres', []) if tmdb_data else [],
+        'rating': tmdb_data.get('rating') if tmdb_data else None,
+        'runtime': tmdb_data.get('runtime') if tmdb_data else None,
+        'poster': tmdb_data.get('poster') if tmdb_data else None,
+        'fanart': tmdb_data.get('fanart') if tmdb_data else None,
+        'tmdb_id': tmdb_data.get('tmdb_id') if tmdb_data else None,
+        'media_type': tmdb_data.get('media_type') if (tmdb_data and tmdb_data.get('media_type')) else ('tvshow' if query_is_series else 'movie'),
+        'ws_base': ws_base,
+        'season': season if query_is_series else None,
+        'episode': episode if query_is_series else None,
+        'episode_code': ep_code if query_is_series else None,
+        'identified_at': now if (tmdb_data and tmdb_data.get('tmdb_id')) else None,
+        'is_watched': False,
+        'last_played_at': now,
+        'updated_at': now,
+        'added_at': now
+    }
+
     history_items.insert(0, item_to_add)
-    history_items = history_items[:60]
     _save_history(history_items)
+
 
 def set_watched_status(query, is_watched):
     if not query:
         return False
-    history_items = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=True)
+    now = int(time.time())
     norm_q = str(query).strip().lower()
-    q_base = get_base_name(query).strip().lower()
-    q_is_tv = is_series(query)
-    
+    q_match = normalize_match_key(query)
+    _, q_season, q_episode, q_ep_code = parse_episode_info(query)
+    q_is_tv = is_series(query) or (q_season is not None and q_episode is not None)
+
     target_tmdb_id = None
+    exact_matched = False
     for it in history_items:
         it_q = str(it.get('query', '')).strip().lower()
-        if it_q == norm_q:
+        if it_q == norm_q or (q_ep_code and it.get('episode_code') == q_ep_code and normalize_match_key(it_q) == q_match):
             target_tmdb_id = it.get('tmdb_id')
-            break
-            
-    updated = False
-    for item in history_items:
-        item_query = str(item.get('query', '')).strip().lower()
-        item_base = get_base_name(item.get('query', '')).strip().lower()
-        item_is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(item.get('query', ''))
-        item_tmdb_id = item.get('tmdb_id')
-        
-        matches = (item_query == norm_q)
-        if not matches and (q_is_tv or item_is_tv):
-            if target_tmdb_id and item_tmdb_id and target_tmdb_id == item_tmdb_id:
-                matches = True
-            elif q_base and item_base and q_base == item_base:
-                matches = True
-                
-        if matches:
-            item['is_watched'] = bool(is_watched)
-            updated = True
-            
+            it['is_watched'] = bool(is_watched)
+            it['updated_at'] = now
+            if is_watched:
+                it['last_played_at'] = now
+            else:
+                # Pokud uživatel ručně odznačil epizodu jako nezhlédnutou, odebrat ji ze seznamu watched_episodes
+                s_info = it.get('series_info')
+                if isinstance(s_info, dict) and q_ep_code and q_ep_code in s_info.get('watched_episodes', []):
+                    s_info['watched_episodes'] = [c for c in s_info['watched_episodes'] if c != q_ep_code]
+            exact_matched = True
+
+    updated = exact_matched
+    if not exact_matched:
+        for item in history_items:
+            item_query = str(item.get('query', '')).strip().lower()
+            item_match = normalize_match_key(item_query)
+            item_is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(item_query)
+            item_tmdb_id = item.get('tmdb_id')
+
+            matches = (item_query == norm_q)
+            if not matches:
+                if target_tmdb_id and item_tmdb_id and target_tmdb_id == item_tmdb_id:
+                    matches = True
+                elif q_match and item_match and q_match == item_match and (q_is_tv == item_is_tv):
+                    matches = True
+
+            if matches:
+                item['is_watched'] = bool(is_watched)
+                item['updated_at'] = now
+                if is_watched:
+                    item['last_played_at'] = now
+                updated = True
+
     if updated:
         _save_history(history_items)
     return updated
+
 
 def delete_from_history(query):
     if not query:
         return
     history_items = get_history(deduplicate=False)
-    history_items = [item for item in history_items if item.get('query') != query]
+    norm_q = str(query).strip().lower()
+    history_items = [item for item in history_items if str(item.get('query', '')).strip().lower() != norm_q]
     _save_history(history_items)
+
 
 def update_history_item(old_query, new_query):
     if not old_query or not new_query:
         return
-    history_items = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=True)
     now = int(time.time())
     norm_old = str(old_query).strip().lower()
-    old_base = get_base_name(old_query).strip().lower()
-    
+    old_match = normalize_match_key(old_query)
+    ws_base, season, episode, ep_code = parse_episode_info(new_query)
+
     updated = False
     for item in history_items:
         item_q = str(item.get('query', '')).strip()
-        item_q_lower = item_q.lower()
-        item_base = get_base_name(item_q).strip().lower()
-        if item_q == str(old_query).strip() or item_q_lower == norm_old or (old_base and item_base == old_base):
+        if item_q == str(old_query).strip() or item_q.lower() == norm_old or (old_match and normalize_match_key(item_q) == old_match):
             item['query'] = new_query
+            item['ws_base'] = ws_base
+            item['season'] = season
+            item['episode'] = episode
+            item['episode_code'] = ep_code
             item['last_played_at'] = now
+            item['updated_at'] = now
             updated = True
             break
     if updated:
         _save_history(history_items)
-    
+
+
 def update_history_with_tmdb_data(original_query, tmdb_data):
     if not original_query:
         return False
-    history_items = get_history(deduplicate=False)
+    history_items = get_history(deduplicate=True)
     updated = False
     now = int(time.time())
     norm_orig = str(original_query).strip().lower()
-    orig_base = get_base_name(original_query).strip().lower()
-    
+    orig_match = normalize_match_key(original_query)
+    orig_base = get_base_name(original_query).strip()
+
     clean_title = sanitize_title(tmdb_data.get('title'))
     if has_non_latin(clean_title) or not clean_title:
         clean_title = orig_base or original_query
 
-    for i, item in enumerate(history_items):
+    for item in history_items:
         item_query = str(item.get('query', '')).strip().lower()
-        item_base = get_base_name(item.get('query', '')).strip().lower()
-        if item_query == norm_orig or str(item.get('query', '')).strip() == str(original_query).strip() or (orig_base and item_base == orig_base):
+        item_match = normalize_match_key(item.get('query', ''))
+        if item_query == norm_orig or str(item.get('query', '')).strip() == str(original_query).strip() or (orig_match and item_match == orig_match):
             item['title'] = clean_title
             item['year'] = tmdb_data.get('year')
             item['plot'] = tmdb_data.get('plot')
@@ -517,9 +838,11 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
             item['tmdb_id'] = tmdb_data.get('tmdb_id')
             item['media_type'] = tmdb_data.get('media_type')
             item['identified_at'] = now
+            item['updated_at'] = now
             updated = True
-            
+
     if not updated and original_query:
+        ws_base, season, episode, ep_code = parse_episode_info(original_query)
         new_item = {
             'query': original_query,
             'title': clean_title,
@@ -532,101 +855,95 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
             'fanart': tmdb_data.get('fanart'),
             'tmdb_id': tmdb_data.get('tmdb_id'),
             'media_type': tmdb_data.get('media_type'),
+            'ws_base': ws_base,
+            'season': season,
+            'episode': episode,
+            'episode_code': ep_code,
             'identified_at': now,
             'is_watched': True,
             'last_played_at': now,
+            'updated_at': now,
             'added_at': now
         }
         history_items.insert(0, new_item)
-        history_items = history_items[:60]
         updated = True
     if updated:
         _save_history(history_items)
     return updated
 
+
 def check_and_update_next_episodes():
     if tmdb is None:
         return False
     try:
-        all_items = get_history(deduplicate=False)
+        all_items = get_history(deduplicate=True)
         if not all_items:
             return False
-        
-        watched_series = {}
+
+        # Mapa seriálů, které už mají nezhlédnutou epizodu ve Watchlistu
+        unwatched_series_keys = set()
         for item in all_items:
-            q = item.get('query', '')
-            is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(q)
-            if not is_tv:
-                continue
-                
-            ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', q, re.IGNORECASE)
-            if not ep_match:
-                continue
-                
-            raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
-            cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
-            season = int(ep_match.group(2) or ep_match.group(4))
-            episode = int(ep_match.group(3) or ep_match.group(5))
-            ws_base = cleaned_base if cleaned_base else get_base_name(q)
-            
-            key = str(item.get('tmdb_id')) if item.get('tmdb_id') else ws_base.lower()
-            is_watched = bool(item.get('is_watched', True))
-            
-            if key not in watched_series:
-                watched_series[key] = {
-                    'item': item,
-                    'ws_base': ws_base,
-                    'max_season': season,
-                    'max_episode': episode,
-                    'is_watched': is_watched,
-                    'tmdb_id': item.get('tmdb_id')
-                }
-            else:
-                curr = watched_series[key]
-                if (season > curr['max_season']) or (season == curr['max_season'] and episode > curr['max_episode']):
-                    curr['max_season'] = season
-                    curr['max_episode'] = episode
-                    curr['item'] = item
-                    curr['is_watched'] = is_watched
-                if item.get('tmdb_id') and not curr.get('tmdb_id'):
-                    curr['tmdb_id'] = item.get('tmdb_id')
+            if item.get('media_type') == 'tvshow' and not item.get('is_watched', True):
+                if item.get('tmdb_id'):
+                    unwatched_series_keys.add(f"tmdb:{item.get('tmdb_id')}")
+                wb = normalize_match_key(item.get('ws_base') or item.get('query'))
+                if wb:
+                    unwatched_series_keys.add(f"name:{wb}")
 
         today = datetime.date.today()
         updated_any = False
-        
-        for key, s_info in watched_series.items():
-            if not s_info['is_watched']:
+        items_modified_meta = False
+
+        for item in all_items:
+            if item.get('media_type') != 'tvshow' or not item.get('is_watched', True):
                 continue
-                
-            tmdb_id = s_info.get('tmdb_id')
-            ws_base = s_info['ws_base']
-            last_s = s_info['max_season']
-            last_e = s_info['max_episode']
-            
+
+            last_s = item.get('season')
+            last_e = item.get('episode')
+            if last_s is None or last_e is None:
+                continue
+
+            ws_base = item.get('ws_base') or get_base_name(item.get('query', ''))
+            tmdb_id = item.get('tmdb_id')
+            s_key_tmdb = f"tmdb:{tmdb_id}" if tmdb_id else None
+            s_key_name = f"name:{normalize_match_key(ws_base)}" if ws_base else None
+
+            if (s_key_tmdb and s_key_tmdb in unwatched_series_keys) or (s_key_name and s_key_name in unwatched_series_keys):
+                continue
+
             if not tmdb_id:
-                search_title = s_info['item'].get('title') or ws_base
-                try:
-                    res = tmdb.search_tmdb(search_title)
-                    for r in res:
-                        if r.get('type') == 'show' and r.get('id'):
-                            tmdb_id = r.get('id')
-                            break
-                except Exception:
-                    pass
-                    
+                search_title = item.get('title') or ws_base
+                if search_title:
+                    try:
+                        res = tmdb.search_tmdb(search_title)
+                        for r in res:
+                            if r.get('type') == 'show' and r.get('id'):
+                                tmdb_id = r.get('id')
+                                item['tmdb_id'] = tmdb_id
+                                item['identified_at'] = int(time.time())
+                                if r.get('clean_title') or r.get('title'):
+                                    ct = sanitize_title(r.get('clean_title') or r.get('title'))
+                                    if ct and not has_non_latin(ct):
+                                        item['title'] = ct
+                                items_modified_meta = True
+                                _save_history(all_items)
+                                break
+                    except Exception:
+                        pass
+
             if not tmdb_id:
                 continue
-                
+
             try:
                 show_details = tmdb.get_show_seasons(tmdb_id)
                 if not show_details or 'seasons' not in show_details:
                     continue
-                    
+
                 curr_season_eps = tmdb.get_season_episodes(tmdb_id, last_s) or []
                 next_ep_obj = next((e for e in curr_season_eps if e.get('episode_number') == last_e + 1), None)
                 target_season = last_s
                 target_episode = last_e + 1
-                
+
                 if not next_ep_obj:
                     next_season_obj = next((s for s in show_details.get('seasons', []) if s.get('season_number') == last_s + 1), None)
                     if next_season_obj:
@@ -634,51 +951,48 @@ def check_and_update_next_episodes():
                         next_ep_obj = next((e for e in next_season_eps if e.get('episode_number') == 1), None)
                         target_season = last_s + 1
                         target_episode = 1
-                        
+
                 if next_ep_obj:
                     air_date_str = next_ep_obj.get('air_date')
-                    is_aired = True
-                    if air_date_str:
+                    # Epizoda je vysílána POUZE pokud má platné datum vysílání <= dnes
+                    is_aired = False
+                    if air_date_str and len(str(air_date_str).strip()) >= 10:
                         try:
-                            air_dt = datetime.datetime.strptime(str(air_date_str)[:10], '%Y-%m-%d').date()
-                            if air_dt > today:
-                                is_aired = False
+                            air_dt = datetime.datetime.strptime(str(air_date_str).strip()[:10], '%Y-%m-%d').date()
+                            if air_dt <= today:
+                                is_aired = True
                         except Exception:
-                            pass
-                            
-                    if is_aired:
-                        next_query = f"{ws_base} S{target_season:02d}E{target_episode:02d}"
-                        already_in_hist = any(
-                            (it.get('query') == next_query or str(it.get('query', '')).strip().lower() == next_query.lower())
-                            for it in all_items
-                        )
-                        if not already_in_hist:
-                            ep_title = next_ep_obj.get('name') or f"Epizoda {target_episode}"
-                            full_show_title = show_details.get('title') or s_info['item'].get('title') or ws_base
-                            plot_text = next_ep_obj.get('overview') or show_details.get('overview') or ''
-                            ep_runtime = next_ep_obj.get('runtime') or show_details.get('runtime') or s_info['item'].get('runtime')
-                            tmdb_data = {
-                                'tmdb_id': tmdb_id,
-                                'media_type': 'tvshow',
-                                'title': full_show_title,
-                                'year': int(str(air_date_str)[:4]) if (air_date_str and len(str(air_date_str)) >= 4) else show_details.get('year'),
-                                'plot': plot_text,
-                                'poster': show_details.get('poster') or s_info['item'].get('poster'),
-                                'fanart': show_details.get('fanart'),
-                                'rating': next_ep_obj.get('rating') or show_details.get('rating'),
-                                'runtime': ep_runtime,
-                                'genres': show_details.get('genres', [])
-                            }
-                            add_to_watchlist_local(next_query, tmdb_data)
-                            all_items = get_history(deduplicate=False)
-                            updated_any = True
+                            is_aired = False
+
+                    target_code = f"S{target_season:02d}E{target_episode:02d}"
+                    watched_codes = (item.get('series_info') or {}).get('watched_episodes', [])
+                    if is_aired and target_code not in watched_codes:
+                        next_query = f"{ws_base} {target_code}"
+                        full_show_title = show_details.get('title') or item.get('title') or ws_base
+                        plot_text = next_ep_obj.get('overview') or show_details.get('overview') or ''
+                        ep_runtime = next_ep_obj.get('runtime') or show_details.get('runtime') or item.get('runtime')
+                        tmdb_data = {
+                            'tmdb_id': tmdb_id,
+                            'media_type': 'tvshow',
+                            'title': full_show_title,
+                            'year': int(str(air_date_str)[:4]) if (air_date_str and len(str(air_date_str)) >= 4) else show_details.get('year'),
+                            'plot': plot_text,
+                            'poster': show_details.get('poster') or item.get('poster'),
+                            'fanart': show_details.get('fanart') or item.get('fanart'),
+                            'rating': next_ep_obj.get('rating') or show_details.get('rating'),
+                            'runtime': ep_runtime,
+                            'genres': show_details.get('genres', [])
+                        }
+                        add_to_watchlist_local(next_query, tmdb_data)
+                        updated_any = True
             except Exception as check_e:
                 xbmc.log(f"StreamContinuum History: Error checking next episode for {ws_base}: {check_e}", xbmc.LOGWARNING)
-                
+
         return updated_any
     except Exception as e:
         xbmc.log(f"StreamContinuum History: check_and_update_next_episodes failed: {e}", xbmc.LOGERROR)
         return False
+
 
 def clear_history():
     if os.path.exists(HISTORY_FILE):
@@ -687,3 +1001,4 @@ def clear_history():
             xbmc.log(f"StreamContinuum History: Cleared history file: {HISTORY_FILE}", xbmc.LOGINFO)
         except Exception as e:
             xbmc.log(f"StreamContinuum History: Error clearing history file: {e}", xbmc.LOGERROR)
+

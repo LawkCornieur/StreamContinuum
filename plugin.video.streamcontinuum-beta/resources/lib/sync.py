@@ -49,75 +49,10 @@ def decrypt_data(data, pin):
     return pt.decode('utf-8')
 
 def validate_history_item(item):
-    if not isinstance(item, dict):
-        return None
-    query = item.get('query')
-    if not query or not str(query).strip():
-        return None
-    
-    clean_query = str(query).strip()
-    is_watched = bool(item.get('is_watched', True))
-    
-    now = int(time.time())
-    added_at = history._safe_timestamp(item.get('added_at')) or now
-    last_played_at = history._safe_timestamp(item.get('last_played_at')) or added_at
-    
-    raw_title = item.get('title')
-    title = history.sanitize_title(raw_title) if raw_title else None
-    if title and history.has_non_latin(title):
-        title = None
-        
-    year = item.get('year')
-    try:
-        year = int(str(year)[:4]) if year else None
-    except (ValueError, TypeError):
-        year = None
-
-    rating = item.get('rating')
-    try:
-        rating = float(rating) if rating is not None else None
-    except (ValueError, TypeError):
-        rating = None
-
-    runtime = item.get('runtime')
-    try:
-        runtime = int(runtime) if runtime is not None else None
-    except (ValueError, TypeError):
-        runtime = None
-
-    tmdb_id = item.get('tmdb_id')
-    try:
-        tmdb_id = int(tmdb_id) if (tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0')) else None
-    except (ValueError, TypeError):
-        tmdb_id = None
-
-    genres = item.get('genres', [])
-    if isinstance(genres, str):
-        genres = [g.strip() for g in genres.split(',') if g.strip()]
-    elif not isinstance(genres, list):
-        genres = []
-
-    media_type = item.get('media_type')
-    if not media_type:
-        media_type = 'tvshow' if history.is_series(clean_query) else 'movie'
-
-    return {
-        'query': clean_query,
-        'title': title,
-        'year': year,
-        'plot': str(item.get('plot') or '') if item.get('plot') else '',
-        'genres': genres,
-        'rating': rating,
-        'runtime': runtime,
-        'poster': item.get('poster') or None,
-        'fanart': item.get('fanart') or None,
-        'tmdb_id': tmdb_id,
-        'media_type': media_type,
-        'identified_at': history._safe_timestamp(item.get('identified_at')) or (now if tmdb_id else None),
-        'is_watched': is_watched,
-        'last_played_at': last_played_at,
-        'added_at': added_at
-    }
+    norm = history.normalize_history_item(item)
+    if norm:
+        norm.pop('_raw_title_hint', None)
+    return norm
 
 def export_settings(pin):
     try:
@@ -148,20 +83,19 @@ def export_settings(pin):
             f.write(encrypted)
             
         old_files = webshare.get_sync_files('streamcontinuum_settings')
-        upload_res = webshare.upload_file(filepath, 'streamcontinuum_settings.enc', target_folder_name='StreamContinuum_Sync')
-        if not upload_res:
-            return False, "Nahrávání nastavení na Webshare selhalo. Zkontrolujte přihlášení."
-
-        uploaded_ident = str(upload_res) if (isinstance(upload_res, str) and upload_res not in ('True', '1')) else None
         for f in old_files:
             ident = f.get('ident')
-            if ident and ident != uploaded_ident:
-                xbmc.log(f"StreamContinuum: Cleaning old settings file {f.get('name')} ({ident})", xbmc.LOGINFO)
+            if ident:
+                xbmc.log(f"StreamContinuum: Cleaning old settings file {f.get('name')} ({ident}) before upload", xbmc.LOGINFO)
                 deleted = webshare.delete_file(ident)
                 if deleted:
                     xbmc.log(f"StreamContinuum: Deleted old settings file {ident}", xbmc.LOGINFO)
                 else:
                     xbmc.log(f"StreamContinuum: Failed to delete old settings file {ident}", xbmc.LOGWARNING)
+
+        upload_res = webshare.upload_file(filepath, 'streamcontinuum_settings.enc', target_folder_name='StreamContinuum_Sync')
+        if not upload_res:
+            return False, "Nahrávání nastavení na Webshare selhalo. Zkontrolujte přihlášení."
             
         xbmc.log("StreamContinuum: Export settings successful", xbmc.LOGINFO)
         return True, None
@@ -249,12 +183,6 @@ def sync_history():
                     xbmc.log(f"StreamContinuum: Error loading local history: {e}", xbmc.LOGWARNING)
                     raw_local = []
                     
-        local_history = []
-        for it in raw_local:
-            v = validate_history_item(it)
-            if v:
-                local_history.append(v)
-                    
         remote_files = webshare.get_sync_files('streamcontinuum_history')
         xbmc.log(f"StreamContinuum: Found {len(remote_files)} remote history files across Webshare", xbmc.LOGINFO)
 
@@ -276,77 +204,30 @@ def sync_history():
                             data = json.loads(resp.text)
                         if isinstance(data, list):
                             for r_it in data:
-                                val_r = validate_history_item(r_it)
-                                if val_r:
-                                    remote_history.append(val_r)
+                                if isinstance(r_it, dict) and r_it.get('query'):
+                                    remote_history.append(r_it)
                 except Exception as read_err:
                     xbmc.log(f"StreamContinuum: Error reading remote history from {name}: {read_err}", xbmc.LOGERROR)
                     
-        merged_map = {}
-        for item in local_history + remote_history:
-            if not isinstance(item, dict):
-                continue
-            q = item.get('query', '')
-            t_title = item.get('title', '')
-            tmdb_id = item.get('tmdb_id')
-            is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(q)
-            is_watched_flag = bool(item.get('is_watched', True))
-            status_suffix = "_w" if is_watched_flag else "_uw"
-            
-            if is_tv:
-                base = history.get_base_name(t_title if (t_title and not history.has_non_latin(t_title)) else q).lower().strip()
-                if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
-                    key = f"tv_tmdb_{tmdb_id}{status_suffix}"
-                elif base:
-                    key = f"tv_base_{base}{status_suffix}"
-                else:
-                    key = f"{q or t_title}{status_suffix}"
-            else:
-                key = f"{q or t_title}{status_suffix}"
-                
-            if not key:
-                continue
-                
-            if key not in merged_map:
-                merged_map[key] = item
-            else:
-                existing_time = history._safe_timestamp(merged_map[key].get('last_played_at')) or history._safe_timestamp(merged_map[key].get('added_at'))
-                item_time = history._safe_timestamp(item.get('last_played_at')) or history._safe_timestamp(item.get('added_at'))
-                if item_time >= existing_time:
-                    for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
-                        if item.get(meta_k) is None and merged_map[key].get(meta_k) is not None:
-                            item[meta_k] = merged_map[key][meta_k]
-                    merged_map[key] = item
-                else:
-                    for meta_k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'media_type', 'identified_at']:
-                        if merged_map[key].get(meta_k) is None and item.get(meta_k) is not None:
-                            merged_map[key][meta_k] = item[meta_k]
-                
-        final_history = list(merged_map.values())
-        final_history.sort(key=lambda x: (history._safe_timestamp(x.get('last_played_at')) or history._safe_timestamp(x.get('added_at')) or 0), reverse=True)
-        final_history = final_history[:60]
-        
-        if not os.path.exists(PROFILE_DIR):
-            os.makedirs(PROFILE_DIR)
-            
-        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-            json.dump(final_history, f, ensure_ascii=False, indent=4)
-            
-        upload_res = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json', target_folder_name='StreamContinuum_Sync')
-        if not upload_res:
-            xbmc.log("StreamContinuum: Failed to upload history file to Webshare", xbmc.LOGERROR)
-            return False
+        final_history = history.consolidate_history_items(raw_local + remote_history)
+        history._save_history(final_history)
 
-        uploaded_ident = str(upload_res) if (isinstance(upload_res, str) and upload_res not in ('True', '1')) else None
+        # Nejprve smazat staré soubory historie na Webshare, aby při nahrání nového souboru
+        # nedocházelo ke kolizi názvu (přejmenování na streamcontinuum_history(ident).json) a selhání move_file
         for f in remote_files:
             ident = f.get('ident')
-            if ident and ident != uploaded_ident:
+            if ident:
                 xbmc.log(f"StreamContinuum: Cleaning old remote history file {f.get('name')} ({ident})", xbmc.LOGINFO)
                 deleted = webshare.delete_file(ident)
                 if deleted:
                     xbmc.log(f"StreamContinuum: Deleted old remote history file {ident}", xbmc.LOGINFO)
                 else:
                     xbmc.log(f"StreamContinuum: Failed to delete old remote history file {ident}", xbmc.LOGWARNING)
+            
+        upload_res = webshare.upload_file(HISTORY_FILE, 'streamcontinuum_history.json', target_folder_name='StreamContinuum_Sync')
+        if not upload_res:
+            xbmc.log("StreamContinuum: Failed to upload history file to Webshare", xbmc.LOGERROR)
+            return False
 
         xbmc.log("StreamContinuum: History sync completed successfully", xbmc.LOGINFO)
         return True

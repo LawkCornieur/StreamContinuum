@@ -503,17 +503,19 @@ def get_sync_files(filename_pattern=None):
         # Query user's actual files via /api/files/ endpoint (NOT public search)
         # 1. Target folder /StreamContinuum_Sync/
         for priv_flag in (1, 0):
-            folder_files = list_files(path='/StreamContinuum_Sync/', private=priv_flag, search=search_term, limit=100)
-            _add_candidates(folder_files)
             all_folder_files = list_files(path='/StreamContinuum_Sync/', private=priv_flag, limit=100)
             _add_candidates(all_folder_files)
+            if len(all_folder_files) >= 100:
+                folder_files = list_files(path='/StreamContinuum_Sync/', private=priv_flag, search=search_term, limit=100)
+                _add_candidates(folder_files)
 
         # 2. Root folder /
         for priv_flag in (1, 0):
-            root_files = list_files(path='/', private=priv_flag, search=search_term, limit=100)
-            _add_candidates(root_files)
             all_root_files = list_files(path='/', private=priv_flag, limit=100)
             _add_candidates(all_root_files)
+            if len(all_root_files) >= 100:
+                root_files = list_files(path='/', private=priv_flag, search=search_term, limit=100)
+                _add_candidates(root_files)
 
         # 3. Check any other subfolders found under root
         user_folders = get_user_folders(path='/', private=1) + get_user_folders(path='/', private=0)
@@ -599,7 +601,18 @@ def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
                     
                     if target_path and target_path != '/':
                         create_folder(target_path, private=1)
-                        move_file(src=f"/{filename}", dest=target_path, private=1)
+                        moved = move_file(src=f"/{filename}", dest=target_path, private=1)
+                        if not moved and uploaded_ident:
+                            # Webshare renames uploaded files to name(ident).ext when a collision exists
+                            base_name, ext = os.path.splitext(filename)
+                            alt_src = f"/{base_name}({uploaded_ident}){ext}"
+                            moved = move_file(src=alt_src, dest=target_path, private=1)
+                            if not moved:
+                                root_items = list_files(path='/', private=1, limit=100)
+                                for r_item in root_items:
+                                    if r_item.get('ident') == uploaded_ident and r_item.get('name'):
+                                        move_file(src=f"/{r_item.get('name')}", dest=target_path, private=1)
+                                        break
                         
                     return uploaded_ident if uploaded_ident else True
                 else:
