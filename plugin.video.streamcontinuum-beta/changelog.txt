@@ -1,3 +1,13 @@
+[B]Verze 1.4.5[/B] - 2026-10-17
+- Oprava opětovného návratu smazaných položek po synchronizaci historie (Tombstones) (Issue #51).
+- Implementována evidence smazaných položek (tombstones) s časovým razítkem v profilu doplňku (history_tombstones.json) i v synchronizovaném souboru streamcontinuum_history.json na Webshare.
+- Rozšíření funkce delete_from_history o důsledné odstranění všech souvisejících variant seriálu či filmu (včetně epizod a neztotožněných dotazů).
+- Obousměrná propagace smazání mezi zařízeními přes Webshare a zamezení nechtěné obnově dříve smazaných titulů.
+- Automatické zrušení náhrobku v případě nového přehrání titulu uživatelem.
+
+[B]Verze 1.4.4[/B] - 2026-10-17
+- Oprava struktury historie pro seriály, zachování stavu zhlédnutí při synchronizaci a přesun souboru do /StreamContinuum_Sync/ (Issue #51).
+
 [B]Verze 1.4.3[/B] - 2026-10-17
 - Kompletní oprava synchronizace dle oficiální Webshare API dokumentace (Issue #51)
 - ahrazen neexistující endpoint user_files správným cestovním endpointem files/ (procházení /StreamContinuum_Sync/ a kořene /), Odstraněno veřejné vyhledávání search/, které načítalo cizí veřejné soubory z celého Webshare. Implementována správa složek create_folder a přesun move_file po nahrání. Opravena detekce chybového stavu FATAL a mazání souborů přes remove_file.

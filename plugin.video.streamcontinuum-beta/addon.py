@@ -902,9 +902,12 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             'is_folder': True
         })
 
+    delete_act = f'history_delete&query={urllib.parse.quote_plus(query)}'
+    if source:
+        delete_act += f'&source={urllib.parse.quote_plus(source)}'
     items.append({
         'label': ADDON.getLocalizedString(30066),
-        'action': f'history_delete&query={urllib.parse.quote_plus(query)}',
+        'action': delete_act,
         'icon': 'DefaultDelete.png',
         'thumb': 'DefaultDelete.png',
         'poster': None,
@@ -2393,7 +2396,9 @@ def run():
     elif action == 'history_delete':
         import history
         history.delete_from_history(params.get('query'))
-        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
+        src = params.get('source')
+        target_action = 'watchlist' if src == 'watchlist' else 'history'
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action={target_action},replace)')
         if HANDLE >= 0:
             try:
                 xbmcplugin.endOfDirectory(HANDLE, succeeded=True)

@@ -17,6 +17,8 @@ except Exception:
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
 HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
+TOMBSTONES_FILE = os.path.join(PROFILE_DIR, 'history_tombstones.json')
+TOMBSTONE_EXPIRATION_DAYS = 30
 
 _EPISODE_PATTERN = re.compile(
     r'^(.*?)(?:[\s._\-]+|(?<=[^\W\d_]))(?:S(\d+)\s*E(\d+)\b|\b(\d+)x(\d+)\b|\b(?:série|serie|season)\s*(\d+)\s*(?:epizoda|díl|dil|ep|e)\s*(\d+)\b)',
@@ -144,6 +146,8 @@ def _clean_item_title(raw_title, query, tmdb_id):
 
 def normalize_history_item(item, default_ts=None):
     if not isinstance(item, dict):
+        return None
+    if item.get('is_deleted'):
         return None
     raw_query = item.get('query')
     if not raw_query or not str(raw_query).strip():
@@ -573,6 +577,263 @@ def consolidate_history_items(raw_items):
     return result_items[:60]
 
 
+def load_tombstones():
+    """Načte lokálně uložené náhrobky ze souboru history_tombstones.json."""
+    if not os.path.exists(TOMBSTONES_FILE):
+        return []
+    try:
+        with open(TOMBSTONES_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                now = int(time.time())
+                cutoff = now - (TOMBSTONE_EXPIRATION_DAYS * 86400)
+                valid = []
+                for t in data:
+                    if isinstance(t, dict) and t.get('is_deleted') and _safe_timestamp(t.get('deleted_at')) > cutoff:
+                        valid.append(t)
+                return valid
+    except Exception as e:
+        xbmc.log(f"StreamContinuum History: Error loading tombstones: {e}", xbmc.LOGWARNING)
+    return []
+
+
+def save_tombstones(tombstones):
+    """Uloží náhrobky do history_tombstones.json."""
+    if not os.path.exists(PROFILE_DIR):
+        try:
+            os.makedirs(PROFILE_DIR)
+        except Exception:
+            pass
+    try:
+        temp_file = f"{TOMBSTONES_FILE}.{os.getpid()}.{threading.get_ident()}.tmp"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(tombstones, f, ensure_ascii=False, indent=4)
+        os.replace(temp_file, TOMBSTONES_FILE)
+    except Exception as e:
+        xbmc.log(f"StreamContinuum History: Error saving tombstones: {e}", xbmc.LOGWARNING)
+
+
+def item_matches_tombstone(item, tombstone):
+    """
+    Ověří, zda daná položka historie odpovídá náhrobku smazání.
+    Vrací True, pokud položka odpovídá náhrobku a její čas změny/přehrání <= tombstone.deleted_at.
+    """
+    if not isinstance(item, dict) or not isinstance(tombstone, dict):
+        return False
+    if not tombstone.get('is_deleted'):
+        return False
+
+    del_time = _safe_timestamp(tombstone.get('deleted_at'))
+    if del_time <= 0:
+        return False
+
+    # Pokud byla položka přehrána nebo upravena PO čase smazání, náhrobek ji nesmí smazat (uživatel ji znovu vyhledal/přidal)
+    item_time = max(
+        _safe_timestamp(item.get('updated_at')),
+        _safe_timestamp(item.get('last_played_at')),
+        _safe_timestamp(item.get('added_at'))
+    )
+    if item_time > del_time:
+        return False
+
+    t_tmdb = tombstone.get('tmdb_id')
+    try:
+        t_tmdb = int(t_tmdb) if t_tmdb and str(t_tmdb).strip().lower() not in ('none', '', '0') else None
+    except (ValueError, TypeError):
+        t_tmdb = None
+
+    i_tmdb = item.get('tmdb_id')
+    try:
+        i_tmdb = int(i_tmdb) if i_tmdb and str(i_tmdb).strip().lower() not in ('none', '', '0') else None
+    except (ValueError, TypeError):
+        i_tmdb = None
+
+    if t_tmdb and i_tmdb and t_tmdb == i_tmdb:
+        return True
+
+    # Klíče a normalizované názvy náhrobku
+    t_keys = set(tombstone.get('match_keys') or [])
+    t_del_q = tombstone.get('deleted_query') or tombstone.get('query') or ''
+    if t_del_q:
+        k = normalize_match_key(t_del_q)
+        if k:
+            t_keys.add(k)
+    t_ws = tombstone.get('ws_base')
+    if t_ws:
+        k = normalize_match_key(t_ws)
+        if k:
+            t_keys.add(k)
+
+    # Klíče položky
+    i_keys = set(_extract_candidate_names(item))
+    i_q = item.get('query') or ''
+    if i_q:
+        k = normalize_match_key(i_q)
+        if k:
+            i_keys.add(k)
+    i_ws = item.get('ws_base')
+    if i_ws:
+        k = normalize_match_key(i_ws)
+        if k:
+            i_keys.add(k)
+
+    # Přímá textová shoda původního query
+    if t_del_q and i_q and str(t_del_q).strip().lower() == str(i_q).strip().lower():
+        return True
+
+    # Shoda v klíčích
+    if t_keys and i_keys and bool(t_keys & i_keys):
+        t_type = tombstone.get('media_type')
+        i_type = item.get('media_type')
+        if not t_type or not i_type or t_type == i_type:
+            return True
+
+    return False
+
+
+def remove_matching_tombstones(item_or_query):
+    """Odstraní náhrobek, pokud uživatel položku znovu přidal/přehrál."""
+    tombstones = load_tombstones()
+    if not tombstones:
+        return
+    norm_item = None
+    if isinstance(item_or_query, dict):
+        norm_item = item_or_query
+    else:
+        q_str = str(item_or_query).strip()
+        ws_base, season, episode, _ = parse_episode_info(q_str)
+        norm_item = {
+            'query': q_str,
+            'ws_base': ws_base,
+            'media_type': 'tvshow' if is_series(q_str) or season is not None else 'movie'
+        }
+
+    item_keys = set(_extract_candidate_names(norm_item))
+    if norm_item.get('query'):
+        k = normalize_match_key(norm_item['query'])
+        if k:
+            item_keys.add(k)
+    if norm_item.get('ws_base'):
+        k = normalize_match_key(norm_item['ws_base'])
+        if k:
+            item_keys.add(k)
+
+    item_tmdb = norm_item.get('tmdb_id')
+    try:
+        item_tmdb = int(item_tmdb) if item_tmdb and str(item_tmdb).strip().lower() not in ('none', '', '0') else None
+    except (ValueError, TypeError):
+        item_tmdb = None
+
+    kept_tombstones = []
+    changed = False
+    for t in tombstones:
+        t_tmdb = t.get('tmdb_id')
+        try:
+            t_tmdb = int(t_tmdb) if t_tmdb and str(t_tmdb).strip().lower() not in ('none', '', '0') else None
+        except (ValueError, TypeError):
+            t_tmdb = None
+
+        matched = False
+        if item_tmdb and t_tmdb and item_tmdb == t_tmdb:
+            matched = True
+        else:
+            t_keys = set(t.get('match_keys') or [])
+            if t.get('deleted_query'):
+                k = normalize_match_key(t['deleted_query'])
+                if k:
+                    t_keys.add(k)
+            if t.get('ws_base'):
+                k = normalize_match_key(t['ws_base'])
+                if k:
+                    t_keys.add(k)
+            if item_keys and t_keys and bool(item_keys & t_keys):
+                t_type = t.get('media_type')
+                i_type = norm_item.get('media_type')
+                if not t_type or not i_type or t_type == i_type:
+                    matched = True
+
+        if matched:
+            changed = True
+        else:
+            kept_tombstones.append(t)
+
+    if changed:
+        save_tombstones(kept_tombstones)
+
+
+def merge_tombstones(list_a, list_b):
+    """
+    Sloučí dva seznamy náhrobků (např. lokální a vzdálený z Webshare),
+    odstraní duplicity (ponechá nejnovější deleted_at) a vyfiltruje expirované.
+    """
+    now = int(time.time())
+    cutoff = now - (TOMBSTONE_EXPIRATION_DAYS * 86400)
+    all_raw = (list_a or []) + (list_b or [])
+    merged_map = {}
+
+    for t in all_raw:
+        if not isinstance(t, dict) or not t.get('is_deleted'):
+            continue
+        del_at = _safe_timestamp(t.get('deleted_at'))
+        if del_at <= cutoff:
+            continue
+
+        tmdb_id = t.get('tmdb_id')
+        try:
+            tmdb_id = int(tmdb_id) if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0') else None
+        except (ValueError, TypeError):
+            tmdb_id = None
+
+        ws_base = normalize_match_key(t.get('ws_base') or '')
+        del_q = normalize_match_key(t.get('deleted_query') or t.get('query') or '')
+        m_type = t.get('media_type') or ''
+
+        if tmdb_id:
+            key = f"tmdb:{tmdb_id}"
+        elif ws_base:
+            key = f"ws:{m_type}:{ws_base}"
+        elif del_q:
+            key = f"q:{del_q}"
+        else:
+            continue
+
+        if key in merged_map:
+            existing = merged_map[key]
+            if del_at > _safe_timestamp(existing.get('deleted_at')):
+                all_keys = sorted(list(set((existing.get('match_keys') or []) + (t.get('match_keys') or []))))
+                t_copy = dict(t)
+                t_copy['match_keys'] = all_keys
+                merged_map[key] = t_copy
+            else:
+                existing['match_keys'] = sorted(list(set((existing.get('match_keys') or []) + (t.get('match_keys') or []))))
+        else:
+            t_copy = dict(t)
+            t_copy['match_keys'] = sorted(list(set(t_copy.get('match_keys') or [])))
+            merged_map[key] = t_copy
+
+    return list(merged_map.values())
+
+
+def filter_items_by_tombstones(items, tombstones):
+    """Vyfiltruje ze seznamu položek ty, které odpovídají platným náhrobkům."""
+    if not items:
+        return []
+    if not tombstones:
+        return [it for it in items if isinstance(it, dict) and not it.get('is_deleted')]
+    alive = []
+    for item in items:
+        if not isinstance(item, dict) or item.get('is_deleted'):
+            continue
+        deleted = False
+        for t in tombstones:
+            if item_matches_tombstone(item, t):
+                deleted = True
+                break
+        if not deleted:
+            alive.append(item)
+    return alive
+
+
 def get_history(deduplicate=True):
     if not os.path.exists(PROFILE_DIR):
         try:
@@ -586,10 +847,11 @@ def get_history(deduplicate=True):
             items = json.load(f)
             if not isinstance(items, list):
                 return []
+            raw_active = [it for it in items if isinstance(it, dict) and not it.get('is_deleted') and str(it.get('query', '')).strip()]
             if not deduplicate:
                 now = int(time.time())
                 norm_list = []
-                for idx, it in enumerate(items):
+                for idx, it in enumerate(raw_active):
                     n = normalize_history_item(it, default_ts=now - idx)
                     if n:
                         n.pop('_raw_title_hint', None)
@@ -603,7 +865,7 @@ def get_history(deduplicate=True):
                     reverse=True
                 )
                 return norm_list
-            return consolidate_history_items(items)
+            return consolidate_history_items(raw_active)
     except json.JSONDecodeError as jde:
         xbmc.log(f"StreamContinuum History: Corrupted history.json detected: {jde}", xbmc.LOGERROR)
         try:
@@ -630,19 +892,31 @@ def get_history_item(query):
     if q_match:
         for item in items:
             item_q = item.get('query', '')
-            if (is_series(item_q) or item.get('media_type') in ('tvshow', 'tv', 'show')) and normalize_match_key(item_q) == q_match:
+            if normalize_match_key(item_q) == q_match or q_match in _extract_candidate_names(item):
                 return item
     return None
 
 
-def _save_history(history_list):
+def _save_history(history_list, tombstones=None):
     try:
         if not os.path.exists(PROFILE_DIR):
-            os.makedirs(PROFILE_DIR)
-        consolidated = consolidate_history_items(history_list)
+            try:
+                os.makedirs(PROFILE_DIR)
+            except Exception:
+                pass
+        current_tombstones = load_tombstones()
+        if tombstones:
+            current_tombstones = merge_tombstones(current_tombstones, tombstones)
+            save_tombstones(current_tombstones)
+
+        raw_active = [it for it in (history_list or []) if isinstance(it, dict) and not it.get('is_deleted') and str(it.get('query', '')).strip()]
+        filtered = filter_items_by_tombstones(raw_active, current_tombstones)
+        consolidated = consolidate_history_items(filtered)
+
+        full_output = consolidated + current_tombstones
         temp_file = f"{HISTORY_FILE}.{os.getpid()}.{threading.get_ident()}.tmp"
         with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(consolidated, f, ensure_ascii=False, indent=4)
+            json.dump(full_output, f, ensure_ascii=False, indent=4)
         os.replace(temp_file, HISTORY_FILE)
     except Exception as e:
         xbmc.log(f"StreamContinuum History: Error saving history.json: {e}", xbmc.LOGERROR)
@@ -652,6 +926,7 @@ def add_to_history(query):
     if not query:
         return
     query_str = str(query).strip()
+    remove_matching_tombstones(query_str)
     history_items = get_history(deduplicate=True)
     now = int(time.time())
     ws_base, season, episode, ep_code = parse_episode_info(query_str)
@@ -688,6 +963,7 @@ def add_to_watchlist_local(query, tmdb_data=None):
     if not query:
         return
     query_str = str(query).strip()
+    remove_matching_tombstones(query_str)
     history_items = get_history(deduplicate=True)
     now = int(time.time())
     ws_base, season, episode, ep_code = parse_episode_info(query_str)
@@ -777,15 +1053,111 @@ def set_watched_status(query, is_watched):
 def delete_from_history(query):
     if not query:
         return
-    history_items = get_history(deduplicate=False)
-    norm_q = str(query).strip().lower()
-    history_items = [item for item in history_items if str(item.get('query', '')).strip().lower() != norm_q]
-    _save_history(history_items)
+    query_str = str(query).strip()
+    norm_q = query_str.lower()
+
+    # 1. Zjistit cíl a metadata
+    target_item = get_history_item(query_str)
+    q_ws_base, q_season, q_episode, _ = parse_episode_info(query_str)
+
+    target_tmdb_id = target_item.get('tmdb_id') if target_item else None
+    try:
+        target_tmdb_id = int(target_tmdb_id) if target_tmdb_id and str(target_tmdb_id).strip().lower() not in ('none', '', '0') else None
+    except (ValueError, TypeError):
+        target_tmdb_id = None
+
+    target_media_type = (target_item.get('media_type') if target_item else None) or ('tvshow' if is_series(query_str) or q_season is not None else 'movie')
+    target_ws_base = (target_item.get('ws_base') if target_item else None) or q_ws_base or get_base_name(query_str)
+
+    target_keys = set()
+    if target_item:
+        target_keys.update(_extract_candidate_names(target_item))
+    if query_str:
+        k = normalize_match_key(query_str)
+        if k:
+            target_keys.add(k)
+    if target_ws_base:
+        k = normalize_match_key(target_ws_base)
+        if k:
+            target_keys.add(k)
+
+    # 2. Načíst všechny surové položky z HISTORY_FILE
+    raw_items = []
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                loaded = json.load(f)
+                if isinstance(loaded, list):
+                    raw_items = loaded
+        except Exception as e:
+            xbmc.log(f"StreamContinuum History: Error reading history file in delete_from_history: {e}", xbmc.LOGWARNING)
+            raw_items = []
+
+    remaining_items = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        if item.get('is_deleted'):
+            continue
+
+        it_q = str(item.get('query', '')).strip()
+        norm_it_q = it_q.lower()
+        it_tmdb = item.get('tmdb_id')
+        try:
+            it_tmdb = int(it_tmdb) if it_tmdb and str(it_tmdb).strip().lower() not in ('none', '', '0') else None
+        except (ValueError, TypeError):
+            it_tmdb = None
+
+        it_type = item.get('media_type')
+        it_ws = item.get('ws_base') or get_base_name(it_q)
+
+        matches = False
+        if norm_it_q == norm_q:
+            matches = True
+        elif target_tmdb_id and it_tmdb and target_tmdb_id == it_tmdb:
+            matches = True
+        elif (target_media_type == 'tvshow' or it_type == 'tvshow' or is_series(it_q) or is_series(query_str)):
+            if target_ws_base and it_ws and normalize_match_key(target_ws_base) == normalize_match_key(it_ws):
+                matches = True
+            elif target_keys and bool(target_keys & set(_extract_candidate_names(item))):
+                matches = True
+            elif normalize_match_key(it_q) and normalize_match_key(query_str) and normalize_match_key(it_q) == normalize_match_key(query_str):
+                matches = True
+        else:
+            if target_keys and bool(target_keys & set(_extract_candidate_names(item))):
+                matches = True
+            elif normalize_match_key(it_q) and normalize_match_key(query_str) and normalize_match_key(it_q) == normalize_match_key(query_str):
+                matches = True
+
+        if not matches:
+            remaining_items.append(item)
+
+    # 3. Zaznamenat náhrobek
+    now = int(time.time())
+    new_tombstone = {
+        'is_deleted': True,
+        'deleted_at': now,
+        'query': '',
+        'deleted_query': query_str,
+        'ws_base': target_ws_base or get_base_name(query_str),
+        'tmdb_id': target_tmdb_id,
+        'media_type': target_media_type,
+        'match_keys': sorted(list(target_keys))
+    }
+
+    current_tombstones = load_tombstones()
+    updated_tombstones = merge_tombstones(current_tombstones, [new_tombstone])
+    save_tombstones(updated_tombstones)
+
+    # 4. Uložit pročištěnou historii včetně náhrobků
+    _save_history(remaining_items, tombstones=updated_tombstones)
+    xbmc.log(f"StreamContinuum History: Deleted '{query_str}' from history (recorded tombstone at {now})", xbmc.LOGINFO)
 
 
 def update_history_item(old_query, new_query):
     if not old_query or not new_query:
         return
+    remove_matching_tombstones(new_query)
     history_items = get_history(deduplicate=True)
     now = int(time.time())
     norm_old = str(old_query).strip().lower()
@@ -1001,4 +1373,10 @@ def clear_history():
             xbmc.log(f"StreamContinuum History: Cleared history file: {HISTORY_FILE}", xbmc.LOGINFO)
         except Exception as e:
             xbmc.log(f"StreamContinuum History: Error clearing history file: {e}", xbmc.LOGERROR)
+    if os.path.exists(TOMBSTONES_FILE):
+        try:
+            os.remove(TOMBSTONES_FILE)
+            xbmc.log(f"StreamContinuum History: Cleared tombstones file: {TOMBSTONES_FILE}", xbmc.LOGINFO)
+        except Exception as e:
+            xbmc.log(f"StreamContinuum History: Error clearing tombstones file: {e}", xbmc.LOGERROR)
 

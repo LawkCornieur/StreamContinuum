@@ -23,7 +23,7 @@ except Exception:
 
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
-HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
+HISTORY_FILE = history.HISTORY_FILE
 
 def get_ssl_verify():
     try:
@@ -183,10 +183,17 @@ def sync_history():
                     xbmc.log(f"StreamContinuum: Error loading local history: {e}", xbmc.LOGWARNING)
                     raw_local = []
                     
+        local_active = [it for it in raw_local if isinstance(it, dict) and not it.get('is_deleted') and str(it.get('query', '')).strip()]
+        local_tombstones = history.merge_tombstones(
+            history.load_tombstones(),
+            [it for it in raw_local if isinstance(it, dict) and it.get('is_deleted')]
+        )
+                    
         remote_files = webshare.get_sync_files('streamcontinuum_history')
         xbmc.log(f"StreamContinuum: Found {len(remote_files)} remote history files across Webshare", xbmc.LOGINFO)
 
         remote_history = []
+        remote_tombstones = []
         for f in remote_files:
             ident = f.get('ident')
             name = f.get('name', 'streamcontinuum_history.json')
@@ -204,13 +211,29 @@ def sync_history():
                             data = json.loads(resp.text)
                         if isinstance(data, list):
                             for r_it in data:
-                                if isinstance(r_it, dict) and r_it.get('query'):
-                                    remote_history.append(r_it)
+                                if isinstance(r_it, dict):
+                                    if r_it.get('is_deleted'):
+                                        remote_tombstones.append(r_it)
+                                    elif str(r_it.get('query', '')).strip():
+                                        remote_history.append(r_it)
                 except Exception as read_err:
                     xbmc.log(f"StreamContinuum: Error reading remote history from {name}: {read_err}", xbmc.LOGERROR)
-                    
-        final_history = history.consolidate_history_items(raw_local + remote_history)
-        history._save_history(final_history)
+
+        # 1. Sloučit a vyčistit náhrobky ze všech zdrojů
+        all_tombstones = history.merge_tombstones(local_tombstones, remote_tombstones)
+        xbmc.log(f"StreamContinuum: Active tombstones for sync: {len(all_tombstones)}", xbmc.LOGINFO)
+
+        # 2. Sloučit aktivní položky z lokálního disku i vzdáleného úložiště
+        all_active_candidates = local_active + remote_history
+
+        # 3. Vyřadit položky, které odpovídají platným náhrobkům smazání
+        filtered_items = history.filter_items_by_tombstones(all_active_candidates, all_tombstones)
+
+        # 4. Konsolidovat a deduplikovat výsledné položky
+        final_history = history.consolidate_history_items(filtered_items)
+
+        # 5. Uložit historii i s platnými náhrobky
+        history._save_history(final_history, tombstones=all_tombstones)
 
         # Nejprve smazat staré soubory historie na Webshare, aby při nahrání nového souboru
         # nedocházelo ke kolizi názvu (přejmenování na streamcontinuum_history(ident).json) a selhání move_file
