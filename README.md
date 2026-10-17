@@ -56,6 +56,12 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.4.3** - 2026-10-17
+- Kompletní oprava synchronizace dle oficiální Webshare API dokumentace (Issue #51)
+- ahrazen neexistující endpoint user_files správným cestovním endpointem files/ (procházení /StreamContinuum_Sync/ a kořene /), Odstraněno veřejné vyhledávání search/, které načítalo cizí veřejné soubory z celého Webshare. Implementována správa složek create_folder a přesun move_file po nahrání. Opravena detekce chybového stavu FATAL a mazání souborů přes remove_file.
+- Předělání sychronizace a robusnějšího ukládání parametrů pro seriály pro lepší deduplikaci.
+- Přidání testu rychlosti. Přidání informací o jednotlivých dílech. Přidání automatického načítání nových epizod pro seznam shlédnutí.
+
 **Verze 1.4.2** - 2026-08-26
 - Oprava funkce autoplay. Přidání procházení do seznamu k zhlédnutí.
 
