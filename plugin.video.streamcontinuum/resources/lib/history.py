@@ -302,12 +302,31 @@ def _extract_candidate_names(norm_item):
         k = normalize_match_key(src)
         if k and len(k) >= 2:
             names.add(k)
-        # Rozdělení složených názvů typu "Zakon gangu _ Sons of Anarchy" nebo "Zákon gangu (Sons Of Anarchy)"
         raw_base = get_base_name(src)
-        for part in re.split(r'[\(\)\[\]/_\-–—:]+', raw_base):
-            pk = normalize_match_key(part)
-            if pk and len(pk) >= 3:
-                names.add(pk)
+        # Rozdělení složených názvů typu "Zakon gangu / Sons of Anarchy" nebo "Zákon gangu | Sons of Anarchy"
+        # Dvojtečka (:) a pomlčky (-/–/—) se nesmí dělit, protože jsou legitimní součástí názvu a podtitulu!
+        parts = re.split(r'\s*[/\\|]+\s*', raw_base)
+        if len(parts) > 1:
+            for part in parts:
+                pk = normalize_match_key(part)
+                if pk and len(pk) >= 2 and not pk.isdigit():
+                    names.add(pk)
+
+        # Alternativní názvy v závorkách typu "Zákon gangu (Sons of Anarchy)" nebo doplňky "(st ds9)"
+        m = re.match(r'^(.*?)\s*[\(\[](.*?)[\)\]]\s*$', raw_base)
+        if m:
+            main_p = m.group(1).strip()
+            paren_p = m.group(2).strip()
+            k_main = normalize_match_key(main_p)
+            if k_main and len(k_main) >= 2 and not k_main.isdigit():
+                names.add(k_main)
+            k_paren = normalize_match_key(paren_p)
+            ignored_tags = {
+                'cz', 'sk', 'en', 'de', 'fr', 'ru', 'pl', 'hu', 'it', 'es',
+                'dab', 'dabing', 'tit', 'titulky', 'sub', 'subs', 'czdab', 'skdab', 'cztit', 'sktit'
+            }
+            if k_paren and len(k_paren) >= 2 and not k_paren.isdigit() and k_paren not in ignored_tags:
+                names.add(k_paren)
     return names
 
 
@@ -350,6 +369,14 @@ def consolidate_history_items(raw_items):
     def _group_items(sub_list):
         n_len = len(sub_list)
         parent = list(range(n_len))
+        root_tmdb = {}
+        for i, it in enumerate(sub_list):
+            tid = it.get('tmdb_id')
+            try:
+                tid = int(tid) if (tid and str(tid).strip().lower() not in ('none', '', '0')) else None
+            except (ValueError, TypeError):
+                tid = None
+            root_tmdb[i] = tid
 
         def find(x):
             while parent[x] != x:
@@ -360,42 +387,35 @@ def consolidate_history_items(raw_items):
         def union(a, b):
             ra, rb = find(a), find(b)
             if ra != rb:
+                t_a = root_tmdb.get(ra)
+                t_b = root_tmdb.get(rb)
+                if t_a is not None and t_b is not None and t_a != t_b:
+                    # Striktní ochrana: Různá autoritativní TMDb ID představují odlišná díla a nesmí být sloučena!
+                    return False
                 parent[rb] = ra
+                root_tmdb[ra] = t_a if t_a is not None else t_b
+                return True
+            return False
 
-        key_owner = {}
-        item_names = []
+        # 1. Spojení podle shodného TMDb ID
+        tmdb_owner = {}
         for i, it in enumerate(sub_list):
-            keys = set()
-            tid = it.get('tmdb_id')
+            tid = root_tmdb.get(i)
             if tid:
-                keys.add(f"tmdb:{tid}")
-            c_names = _extract_candidate_names(it)
-            item_names.append(c_names)
-            for cn in c_names:
-                keys.add(f"name:{cn}")
-
-            for k in keys:
-                if k in key_owner:
-                    union(key_owner[k], i)
+                if tid in tmdb_owner:
+                    union(tmdb_owner[tid], i)
                 else:
-                    key_owner[k] = i
+                    tmdb_owner[tid] = i
 
-        # Doplňkové prefixové propojení pro neztotožněné položky (např. "star trek podivne" -> "star trek podivne nove svety")
-        for i in range(n_len):
-            if sub_list[i].get('tmdb_id'):
-                continue
-            for j in range(n_len):
-                if i == j or find(i) == find(j):
-                    continue
-                if not sub_list[j].get('tmdb_id'):
-                    continue
-                for ni in item_names[i]:
-                    if len(ni) < 6:
-                        continue
-                    for nj in item_names[j]:
-                        if len(nj) >= 6 and (nj.startswith(ni + ' ') or ni.startswith(nj + ' ')):
-                            union(j, i)
-                            break
+        # 2. Spojení podle shody kandidátních názvů (např. varianty dotazů nebo dual-titles)
+        name_owner = {}
+        for i, it in enumerate(sub_list):
+            c_names = _extract_candidate_names(it)
+            for cn in c_names:
+                if cn in name_owner:
+                    union(name_owner[cn], i)
+                else:
+                    name_owner[cn] = i
 
         groups = {}
         for i, it in enumerate(sub_list):
@@ -648,8 +668,10 @@ def item_matches_tombstone(item, tombstone):
     except (ValueError, TypeError):
         i_tmdb = None
 
-    if t_tmdb and i_tmdb and t_tmdb == i_tmdb:
-        return True
+    if t_tmdb and i_tmdb:
+        if t_tmdb == i_tmdb:
+            return True
+        return False
 
     # Klíče a normalizované názvy náhrobku
     t_keys = set(tombstone.get('match_keys') or [])
@@ -1033,8 +1055,8 @@ def set_watched_status(query, is_watched):
 
             matches = (item_query == norm_q)
             if not matches:
-                if target_tmdb_id and item_tmdb_id and target_tmdb_id == item_tmdb_id:
-                    matches = True
+                if target_tmdb_id and item_tmdb_id:
+                    matches = (target_tmdb_id == item_tmdb_id)
                 elif q_match and item_match and q_match == item_match and (q_is_tv == item_is_tv):
                     matches = True
 
@@ -1114,8 +1136,8 @@ def delete_from_history(query):
         matches = False
         if norm_it_q == norm_q:
             matches = True
-        elif target_tmdb_id and it_tmdb and target_tmdb_id == it_tmdb:
-            matches = True
+        elif target_tmdb_id and it_tmdb:
+            matches = (target_tmdb_id == it_tmdb)
         elif (target_media_type == 'tvshow' or it_type == 'tvshow' or is_series(it_q) or is_series(query_str)):
             if target_ws_base and it_ws and normalize_match_key(target_ws_base) == normalize_match_key(it_ws):
                 matches = True
