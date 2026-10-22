@@ -56,6 +56,9 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.5.1** - 2026-10-22
+- Oprava deduplikace seriálu a filmů z frančíz
+
 **Verze 1.5.0** - 2026-10-17
 - Oprava synchronizace historie a doplnění vkládání náhrobků za smazané položky.
 
