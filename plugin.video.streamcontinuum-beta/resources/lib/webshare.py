@@ -748,6 +748,70 @@ def get_sync_files(filename_pattern=None):
         xbmc.log(f"Webshare get_sync_files error: {e}", xbmc.LOGWARNING)
         return []
 
+def purge_sync_files(pattern='streamcontinuum_history', max_verify_retries=4, delay=0.5):
+    """
+    Spolehlivě smaže všechny soubory odpovídající pattern na Webshare a ověří,
+    že byly skutečně z disku odstraněny před nahráním nového souboru.
+    Vrací True, pokud po skončení nezbývá žádný soubor.
+    """
+    try:
+        xbmc.log(f"Webshare: purge_sync_files zahájeno pro vzor '{pattern}'", xbmc.LOGINFO)
+        for attempt in range(max_verify_retries):
+            files = get_sync_files(pattern)
+            if not files:
+                xbmc.log(f"Webshare: purge_sync_files('{pattern}') ověřeno - 0 souborů na disku.", xbmc.LOGINFO)
+                return True
+                
+            xbmc.log(f"Webshare: purge_sync_files('{pattern}') pokus {attempt + 1}/{max_verify_retries} - mazání {len(files)} souborů", xbmc.LOGINFO)
+            for f in files:
+                ident = f.get('ident')
+                if ident:
+                    delete_file(ident)
+            time.sleep(delay)
+
+        remaining = get_sync_files(pattern)
+        if not remaining:
+            xbmc.log(f"Webshare: purge_sync_files('{pattern}') ověřeno při závěrečné kontrole.", xbmc.LOGINFO)
+            return True
+
+        xbmc.log(f"Webshare: purge_sync_files('{pattern}') varování - po {max_verify_retries} pokusech stále zbývá {len(remaining)} souborů", xbmc.LOGWARNING)
+        return False
+    except Exception as e:
+        xbmc.log(f"Webshare: purge_sync_files error: {e}", xbmc.LOGERROR)
+        return False
+
+def prune_sync_duplicates(pattern='streamcontinuum_history', keep_ident=None):
+    """
+    Zkontroluje výskyt duplicitních souborů na Webshare.
+    Pokud je předán keep_ident, ponechá pouze soubor s tímto identem a ostatní smaže.
+    Pokud keep_ident není předán a existuje více souborů, ponechá první a ostatní odstraní.
+    """
+    try:
+        files = get_sync_files(pattern)
+        if not files or len(files) <= 1:
+            return True
+
+        xbmc.log(f"Webshare: prune_sync_duplicates nalezl {len(files)} souborů pro '{pattern}' (keep_ident={keep_ident})", xbmc.LOGINFO)
+        kept = False
+        for f in files:
+            ident = f.get('ident')
+            if not ident:
+                continue
+            if keep_ident:
+                if ident == keep_ident:
+                    kept = True
+                    continue
+            else:
+                if not kept:
+                    kept = True
+                    continue
+            xbmc.log(f"Webshare: Mazání duplicitního souboru {f.get('name')} ({ident})", xbmc.LOGINFO)
+            delete_file(ident)
+        return True
+    except Exception as e:
+        xbmc.log(f"Webshare: prune_sync_duplicates error: {e}", xbmc.LOGWARNING)
+        return False
+
 def upload_file(filepath, filename, target_folder_name='StreamContinuum_Sync'):
     token = get_token()
     if not token:

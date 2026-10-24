@@ -603,3 +603,7 @@ msgctxt "#30179"
 msgid "VIP subscription expired! Streams may not play."
 msgstr "VIP členství vypršelo! Přehrávání streamů nebude fungovat."
 
+msgctxt "#30180"
+msgid "Automatic history synchronization"
+msgstr "Automatická synchronizace historie"
+
