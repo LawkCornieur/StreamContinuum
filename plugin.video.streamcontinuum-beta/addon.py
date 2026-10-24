@@ -566,6 +566,14 @@ def show_watchlist():
 
     all_items = history.get_history(deduplicate=True)
     items = [item for item in all_items if not item.get('is_watched', True)]
+    # Řazení watchlistu podle času přidání / aktualizace sestupně
+    items.sort(
+        key=lambda x: max(
+            history._safe_timestamp(x.get('updated_at')),
+            history._safe_timestamp(x.get('added_at'))
+        ),
+        reverse=True
+    )
     
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30051))
     xbmcplugin.setContent(HANDLE, 'videos')
@@ -656,6 +664,13 @@ def show_history(force_list=False):
     import history
     all_items = history.get_history(deduplicate=not force_list)
     items = [item for item in all_items if item.get('is_watched', True)]
+    # Řazení historie podle data shlédnutí poslední epizody / díla sestupně
+    items.sort(
+        key=lambda x: (
+            history._safe_timestamp(x.get('last_played_at')) or history._safe_timestamp(x.get('added_at'))
+        ),
+        reverse=True
+    )
     
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30062), xbmcgui.NOTIFICATION_INFO, 3000)
@@ -2284,6 +2299,12 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
     
     success = history.update_history_with_tmdb_data(original_query, tmdb_data)
     if success:
+        # Okamžitě prověřit navazující epizodu pro nově ztotožněný seriál a zařadit do watchlistu
+        try:
+            target_id = tmdb_data.get('tmdb_id')
+            history.check_and_update_next_episodes(force=True, target_tmdb_id=target_id)
+        except Exception as _sync_ep_err:
+            xbmc.log(f"StreamContinuum: Error checking next episodes after TMDb identify: {_sync_ep_err}", xbmc.LOGWARNING)
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30126), xbmcgui.NOTIFICATION_INFO, 2000)
         if HANDLE >= 0:
             try:
