@@ -574,6 +574,7 @@ def show_watchlist():
     if not items:
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30074), xbmcgui.NOTIFICATION_INFO, 3000)
         
+    items_meta_updated = False
     for item in items:
         query = item.get('query', '')
         raw_title = item.get('title')
@@ -586,6 +587,25 @@ def show_watchlist():
         fanart = item.get('fanart')
         is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
         media_type = 'tvshow' if is_tv else 'movie'
+
+        # Pokud u položky chybí délka (runtime), zkusit ji spolehlivě dohledat z TMDb
+        if (not runtime or runtime == 0) and item.get('tmdb_id') and tmdb_module:
+            try:
+                t_id = item.get('tmdb_id')
+                if media_type == 'tvshow':
+                    s_details = tmdb_module.get_show_seasons(t_id)
+                    if s_details and s_details.get('runtime'):
+                        runtime = s_details.get('runtime')
+                        item['runtime'] = runtime
+                        items_meta_updated = True
+                else:
+                    m_details = tmdb_module.get_movie_details(t_id) if hasattr(tmdb_module, 'get_movie_details') else None
+                    if m_details and m_details.get('runtime'):
+                        runtime = m_details.get('runtime')
+                        item['runtime'] = runtime
+                        items_meta_updated = True
+            except Exception:
+                pass
         
         ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
         ep_suffix = ""
@@ -624,6 +644,12 @@ def show_watchlist():
     cat_url = f"{sys.argv[0]}?action=tmdb_menu"
     xbmcplugin.addDirectoryItem(HANDLE, cat_url, cat_item, isFolder=True)
         
+    if items_meta_updated:
+        try:
+            history._save_history(all_items)
+        except Exception:
+            pass
+
     xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
 
 def show_history(force_list=False):
@@ -2463,7 +2489,7 @@ def run():
                 'year': int(year) if (year and str(year).isdigit()) else None
             }
             if tmdb_id_val and tmdb_module:
-                if media_type == 'show':
+                if media_type in ('show', 'tv', 'tvshow'):
                     show_details = tmdb_module.get_show_seasons(tmdb_id_val)
                     if show_details:
                         tmdb_data['title'] = show_details.get('title') or title
@@ -2472,6 +2498,15 @@ def run():
                         tmdb_data['fanart'] = show_details.get('fanart')
                         tmdb_data['runtime'] = show_details.get('runtime')
                         tmdb_data['genres'] = show_details.get('genres', [])
+                elif media_type == 'movie' and hasattr(tmdb_module, 'get_movie_details'):
+                    movie_details = tmdb_module.get_movie_details(tmdb_id_val)
+                    if movie_details:
+                        tmdb_data['title'] = movie_details.get('title') or title
+                        tmdb_data['plot'] = movie_details.get('overview')
+                        tmdb_data['poster'] = movie_details.get('poster')
+                        tmdb_data['fanart'] = movie_details.get('fanart')
+                        tmdb_data['runtime'] = movie_details.get('runtime')
+                        tmdb_data['genres'] = movie_details.get('genres', [])
             history.add_to_watchlist_local(target_query, tmdb_data)
             
         if ADDON.getSetting('trakt_token'):
