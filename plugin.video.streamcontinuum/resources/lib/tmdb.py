@@ -355,10 +355,23 @@ def get_show_seasons(tmdb_id):
             fanart = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
             
             ep_runtimes = data.get('episode_run_time', [])
-            runtime = ep_runtimes[0] if (ep_runtimes and isinstance(ep_runtimes, list)) else 0
+            runtime = ep_runtimes[0] if (ep_runtimes and isinstance(ep_runtimes, list) and ep_runtimes[0]) else 0
+            if not runtime:
+                last_ep = data.get('last_episode_to_air') or {}
+                if isinstance(last_ep, dict) and last_ep.get('runtime'):
+                    runtime = last_ep.get('runtime', 0)
+            if not runtime:
+                next_ep = data.get('next_episode_to_air') or {}
+                if isinstance(next_ep, dict) and next_ep.get('runtime'):
+                    runtime = next_ep.get('runtime', 0)
             genres = [g.get('name') for g in data.get('genres', []) if g.get('name')]
             rating = data.get('vote_average', 0)
-            year = _extract_year(data, 'first_air_date')
+            year_str = _extract_year(data, 'first_air_date')
+            try:
+                year = int(year_str) if year_str and year_str.isdigit() else None
+            except (ValueError, TypeError):
+                year = None
+            status = data.get('status', '')
             
             raw_seasons = data.get('seasons', [])
             seasons = []
@@ -383,10 +396,64 @@ def get_show_seasons(tmdb_id):
                 'rating': rating,
                 'poster': poster,
                 'fanart': fanart,
+                'status': status,
+                'first_air_date': data.get('first_air_date', ''),
                 'seasons': seasons
             }
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching TMDb show details for ID {tmdb_id}: {e}", xbmc.LOGERROR)
+    return None
+
+def get_movie_details(tmdb_id):
+    if not tmdb_id or str(tmdb_id).strip().lower() in ('none', '', '0'):
+        return None
+    xbmc.log(f"StreamContinuum: Fetching movie details for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
+    url_template = f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
+    try:
+        res = make_tmdb_request(url_template)
+        if res and res.status_code == 200:
+            data = res.json()
+            title = data.get('title') or data.get('original_title', '')
+            if _has_non_latin(title) and data.get('original_title') and not _has_non_latin(data.get('original_title')):
+                title = data.get('original_title')
+            title = _sanitize_string(title)
+            overview = data.get('overview', '')
+            if not overview:
+                try:
+                    res_en = make_tmdb_request(f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={{api_key}}&language=en-US")
+                    if res_en and res_en.status_code == 200:
+                        overview = res_en.json().get('overview', '')
+                except Exception:
+                    pass
+            poster_path = data.get('poster_path')
+            backdrop_path = data.get('backdrop_path')
+            poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ''
+            fanart = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else ''
+            runtime = data.get('runtime', 0) or 0
+            genres = [g.get('name') for g in data.get('genres', []) if g.get('name')]
+            rating = data.get('vote_average', 0)
+            year_str = _extract_year(data, 'release_date')
+            try:
+                year = int(year_str) if year_str and year_str.isdigit() else None
+            except (ValueError, TypeError):
+                year = None
+            return {
+                'id': data.get('id'),
+                'title': title,
+                'clean_title': _extract_title(data, 'movie'),
+                'year': year,
+                'overview': overview,
+                'plot': overview,
+                'runtime': runtime,
+                'genres': genres,
+                'rating': rating,
+                'poster': poster,
+                'fanart': fanart,
+                'media_type': 'movie',
+                'type': 'movie'
+            }
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error fetching movie details for ID {tmdb_id}: {e}", xbmc.LOGERROR)
     return None
 
 def get_season_episodes(tmdb_id, season_number):
@@ -399,6 +466,15 @@ def get_season_episodes(tmdb_id, season_number):
         if res and res.status_code == 200:
             data = res.json()
             raw_episodes = data.get('episodes', [])
+            
+            # Zjistit, zda v této řadě existuje alespoň jedna epizoda s nenulovým runtime
+            known_runtime = 0
+            for ep in raw_episodes:
+                r_val = ep.get('runtime')
+                if r_val and isinstance(r_val, (int, float)) and r_val > 0:
+                    known_runtime = int(r_val)
+                    break
+                    
             episodes = []
             for ep in raw_episodes:
                 still_path = ep.get('still_path')
@@ -407,12 +483,21 @@ def get_season_episodes(tmdb_id, season_number):
                 if _has_non_latin(ep_name):
                     ep_name = f"Episode {ep.get('episode_number', 0)}"
                 ep_name = _sanitize_string(ep_name)
+                
+                ep_rt = ep.get('runtime')
+                try:
+                    ep_rt = int(ep_rt) if ep_rt is not None else 0
+                except (ValueError, TypeError):
+                    ep_rt = 0
+                if ep_rt <= 0 and known_runtime > 0:
+                    ep_rt = known_runtime
+
                 episodes.append({
                     'episode_number': ep.get('episode_number', 0),
                     'season_number': ep.get('season_number', season_number),
                     'name': ep_name,
                     'overview': ep.get('overview', ''),
-                    'runtime': ep.get('runtime', 0),
+                    'runtime': ep_rt,
                     'still': still,
                     'rating': ep.get('vote_average', 0),
                     'air_date': ep.get('air_date', '')
