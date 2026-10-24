@@ -56,6 +56,11 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.5.2** - 2026-10-24
+- Úprava implementace API Webshare pro zobrazování podrobností o VIP členství.
+- Přidání diagnostiky a chybových hlášení při chybě přehrávání z důvodu vypršeného VIP členství, chybných přihlašovacích údajů a jejich překladů
+- Přidáno automatické upozornění po spuštění doplňku, když je hodnota VIP členství na Webshare menší než 10 dní.
+
 **Verze 1.5.1** - 2026-10-22
 - Oprava deduplikace seriálu a filmů z franšíz
 
