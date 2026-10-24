@@ -16,6 +16,13 @@
         <setting id="ws_password" type="text" label="30013" option="hidden" default="" />
         <setting id="ws_pass_paste" type="action" label="30047" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=paste_from_clipboard&amp;target=ws_password)" />
         <setting id="ws_token" type="text" label="" visible="false" default="" />
+        <setting id="ws_status" type="text" label="30170" default="30048" enable="false" />
+        <setting id="ws_vip_days" type="text" label="30171" default="-" enable="false" />
+        <setting id="ws_vip_last_check" type="text" label="30172" default="-" enable="false" />
+        <setting id="ws_refresh_status" type="action" label="30173" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=ws_refresh_status)" />
+        <setting id="ws_vip_days_num" type="text" label="" visible="false" default="0" />
+        <setting id="ws_vip_is_active" type="bool" label="" visible="false" default="false" />
+        <setting id="ws_vip_last_check_ts" type="text" label="" visible="false" default="0" />
         <setting id="ws_speedtest" type="action" label="30158" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=speedtest)" />
         <setting id="ws_sync_history" type="action" label="Synchronizovat historii na Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=sync_history)" />
         <setting id="ws_export_settings" type="action" label="Exportovat nastavení na Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=export_settings)" />

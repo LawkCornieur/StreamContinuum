@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 import xbmc
 import xbmcgui
 import xbmcplugin
@@ -101,6 +102,84 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
         except (ValueError, TypeError):
             pass
     return list_item
+
+def check_vip_warning():
+    """
+    Ověří stav Webshare VIP při spuštění doplňku (vstupu do hlavní nabídky).
+    Pokud zbývá méně než 10 dní nebo VIP již vypršelo, zobrazí varovnou notifikaci.
+    Zahrnuje ochranu proti opakovanému zobrazování při návratech do menu v jedné relaci.
+    """
+    try:
+        username = ADDON.getSetting('ws_username')
+        password = ADDON.getSetting('ws_password')
+        if not username or not password:
+            return
+
+        window = xbmcgui.Window(10000)
+        now = time.time()
+        last_warn = window.getProperty('streamcontinuum_vip_warn_time')
+        if last_warn:
+            try:
+                # Nezobrazovat častěji než jednou za 2 hodiny v rámci běžícího Kodi
+                if 0 <= now - float(last_warn) < 7200:
+                    return
+            except (ValueError, TypeError):
+                pass
+
+        # Zkontrolujeme, zda máme čerstvý stav v nastavení (mladší 4 hodin), jinak se dotážeme API
+        last_check_ts = ADDON.getSetting('ws_vip_last_check_ts')
+        need_fetch = True
+        if last_check_ts:
+            try:
+                if 0 <= now - float(last_check_ts) < 14400:
+                    need_fetch = False
+            except (ValueError, TypeError):
+                need_fetch = True
+
+        if need_fetch:
+            info = webshare.check_vip_status()
+        else:
+            is_vip = ADDON.getSettingBool('ws_vip_is_active')
+            try:
+                days = int(ADDON.getSetting('ws_vip_days_num') or '0')
+            except (ValueError, TypeError):
+                days = 0
+            info = {
+                'status': 'ok' if is_vip else 'expired',
+                'logged_in': True,
+                'vip': is_vip,
+                'vip_days': days,
+                'vip_until': ''
+            }
+
+        st = info.get('status')
+        if st == 'auth_failed':
+            window.setProperty('streamcontinuum_vip_warn_time', str(now))
+            xbmcgui.Dialog().notification("Webshare", ADDON.getLocalizedString(30176), xbmcgui.NOTIFICATION_ERROR, 5000)
+            return
+
+        vip_active = info.get('vip', False)
+        vip_days = info.get('vip_days', 0)
+
+        if not vip_active or vip_days <= 0:
+            window.setProperty('streamcontinuum_vip_warn_time', str(now))
+            xbmcgui.Dialog().notification(
+                "Webshare VIP",
+                ADDON.getLocalizedString(30178),
+                xbmcgui.NOTIFICATION_ERROR,
+                7000
+            )
+        elif vip_days < 10:
+            window.setProperty('streamcontinuum_vip_warn_time', str(now))
+            msg = f"{ADDON.getLocalizedString(30177)} ({vip_days} dní)"
+            xbmcgui.Dialog().notification(
+                "Webshare VIP",
+                msg,
+                xbmcgui.NOTIFICATION_WARNING,
+                6000
+            )
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: check_vip_warning error: {e}", xbmc.LOGWARNING)
 
 def list_categories():
     xbmc.log(f"StreamContinuum: list_categories started.", xbmc.LOGINFO)
@@ -457,7 +536,25 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     xbmc.executebuiltin(f'RunPlugin({sys.argv[0]}?action=search_prefill&query={safe_query})')
                 break
         else:
-            xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
+            # Ověření, zda selhání nebylo způsobeno vypršeným VIP členstvím
+            is_vip_active = ADDON.getSettingBool('ws_vip_is_active')
+            vip_days_num = 0
+            try:
+                vip_days_num = int(ADDON.getSetting('ws_vip_days_num') or '0')
+            except (ValueError, TypeError):
+                pass
+
+            if not is_vip_active or vip_days_num <= 0:
+                try:
+                    vinfo = webshare.check_vip_status(force_refresh=True)
+                    if not vinfo.get('vip'):
+                        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30179), xbmcgui.NOTIFICATION_ERROR, 5000)
+                    else:
+                        xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
+                except Exception:
+                    xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30179), xbmcgui.NOTIFICATION_ERROR, 5000)
+            else:
+                xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30061), xbmcgui.NOTIFICATION_ERROR, 3000)
             break
 
 def show_watchlist():
@@ -2221,12 +2318,36 @@ def run():
         return
     elif action == 'settings':
         ADDON.setSetting('about_version', ADDON.getAddonInfo('version'))
+        try:
+            last_check_ts = ADDON.getSetting('ws_vip_last_check_ts')
+            now = time.time()
+            if not last_check_ts or (now - float(last_check_ts) > 3600):
+                webshare.check_vip_status()
+        except Exception:
+            pass
         ADDON.openSettings()
         if HANDLE >= 0:
             try:
                 xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
             except Exception:
                 pass
+        return
+    elif action == 'ws_refresh_status':
+        info = webshare.check_vip_status(force_refresh=True)
+        st = info.get('status')
+        if st == 'unconfigured':
+            xbmcgui.Dialog().notification("Webshare", ADDON.getLocalizedString(30048), xbmcgui.NOTIFICATION_WARNING, 3000)
+        elif st == 'auth_failed':
+            xbmcgui.Dialog().notification("Webshare", ADDON.getLocalizedString(30176), xbmcgui.NOTIFICATION_ERROR, 4000)
+        elif st == 'ok':
+            if info.get('vip'):
+                days = info.get('vip_days', 0)
+                until = f" (do {info.get('vip_until')})" if info.get('vip_until') else ""
+                xbmcgui.Dialog().notification("Webshare VIP", f"{ADDON.getLocalizedString(30174)}: {days} dní{until}", xbmcgui.NOTIFICATION_INFO, 4000)
+            else:
+                xbmcgui.Dialog().notification("Webshare VIP", ADDON.getLocalizedString(30175), xbmcgui.NOTIFICATION_WARNING, 4000)
+        else:
+            xbmcgui.Dialog().notification("Webshare", str(info.get('message', 'Chyba')), xbmcgui.NOTIFICATION_ERROR, 3000)
         return
     elif action == 'trakt_auth':
         trakt.authenticate()
@@ -2476,6 +2597,7 @@ def run():
                 ADDON.setSetting('trakt_username', user_info.get('username', ADDON.getLocalizedString(30077)))
 
     if not action:
+        check_vip_warning()
         list_categories()
     elif action == 'watchlist':
         show_watchlist()

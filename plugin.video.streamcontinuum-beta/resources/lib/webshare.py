@@ -1,5 +1,6 @@
 import requests
 import time
+from datetime import datetime
 import json
 import os
 import xbmc
@@ -228,6 +229,221 @@ def get_token(force_refresh=False):
     if not token:
         token = login(force=True)
     return token
+
+def get_user_data(force_refresh=False):
+    """
+    Zavolá endpoint /api/user_data/ pro zjištění stavu účtu a VIP členství.
+    Vrací slovník s informacemi:
+    {
+        'status': 'ok' | 'auth_failed' | 'unconfigured' | 'error',
+        'logged_in': bool,
+        'vip': bool,
+        'vip_days': int,
+        'vip_hours': int,
+        'vip_minutes': int,
+        'vip_until': str,
+        'username': str,
+        'email': str,
+        'points': int,
+        'money': int,
+        'message': str
+    }
+    """
+    username = ADDON.getSetting('ws_username')
+    password = ADDON.getSetting('ws_password')
+    if not username or not password:
+        return {
+            'status': 'unconfigured',
+            'logged_in': False,
+            'vip': False,
+            'vip_days': 0,
+            'vip_hours': 0,
+            'vip_minutes': 0,
+            'vip_until': '',
+            'username': '',
+            'email': '',
+            'points': 0,
+            'money': 0,
+            'message': 'Nepřipojeno (nevyplněné údaje)'
+        }
+
+    token = get_token(force_refresh=force_refresh)
+    if not token:
+        return {
+            'status': 'auth_failed',
+            'logged_in': False,
+            'vip': False,
+            'vip_days': 0,
+            'vip_hours': 0,
+            'vip_minutes': 0,
+            'vip_until': '',
+            'username': username,
+            'email': '',
+            'points': 0,
+            'money': 0,
+            'message': 'Chyba přihlášení (neplatné heslo nebo jméno)'
+        }
+
+    url = BASE_URL + 'user_data/'
+    data = {'wst': token}
+
+    try:
+        response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+        if response.status_code == 200:
+            if _is_token_error(response):
+                token = get_token(force_refresh=True)
+                if token:
+                    data['wst'] = token
+                    response = requests.post(url, data=data, headers=HEADERS, timeout=10, verify=get_ssl_verify())
+
+            root = ElementTree.fromstring(response.content)
+            status_node = root.find('status')
+            status_text = status_node.text.strip().upper() if (status_node is not None and status_node.text) else ''
+
+            if status_text == 'OK':
+                vip_val = (root.findtext('vip') or '').strip()
+                is_vip = (vip_val == '1')
+
+                def _parse_int(tag, default=0):
+                    val = root.findtext(tag)
+                    if val:
+                        try:
+                            return int(val.strip())
+                        except ValueError:
+                            pass
+                    return default
+
+                vip_days = _parse_int('vip_days', 0)
+                vip_hours = _parse_int('vip_hours', 0)
+                vip_minutes = _parse_int('vip_minutes', 0)
+                vip_until = (root.findtext('vip_until') or '').strip()
+                resp_user = (root.findtext('username') or username).strip()
+                email = (root.findtext('email') or '').strip()
+                points = _parse_int('points', 0)
+                money = _parse_int('money', 0)
+
+                if not is_vip:
+                    vip_days = 0
+                    vip_hours = 0
+                    vip_minutes = 0
+
+                return {
+                    'status': 'ok',
+                    'logged_in': True,
+                    'vip': is_vip,
+                    'vip_days': vip_days,
+                    'vip_hours': vip_hours,
+                    'vip_minutes': vip_minutes,
+                    'vip_until': vip_until,
+                    'username': resp_user,
+                    'email': email,
+                    'points': points,
+                    'money': money,
+                    'message': 'OK'
+                }
+            else:
+                code_node = root.find('code')
+                msg = code_node.text.strip() if (code_node is not None and code_node.text) else 'Chyba API'
+                return {
+                    'status': 'error',
+                    'logged_in': False,
+                    'vip': False,
+                    'vip_days': 0,
+                    'vip_hours': 0,
+                    'vip_minutes': 0,
+                    'vip_until': '',
+                    'username': username,
+                    'email': '',
+                    'points': 0,
+                    'money': 0,
+                    'message': msg
+                }
+    except Exception as e:
+        xbmc.log(f"Webshare get_user_data error: {e}", xbmc.LOGERROR)
+        return {
+            'status': 'error',
+            'logged_in': False,
+            'vip': False,
+            'vip_days': 0,
+            'vip_hours': 0,
+            'vip_minutes': 0,
+            'vip_until': '',
+            'username': username,
+            'email': '',
+            'points': 0,
+            'money': 0,
+            'message': str(e)
+        }
+
+def check_vip_status(force_refresh=False):
+    """
+    Zkontroluje stav VIP a synchronizuje hodnoty do nastavení doplňku (settings):
+    - ws_status: Přihlášen (VIP aktivní) / Přihlášen (VIP vypršelo) / Chyba / Nepřipojeno
+    - ws_vip_days: X dní (do DD.MM.YYYY) / Vypršelo (0 dní) / -
+    - ws_vip_last_check: DD.MM.YYYY HH:MM
+    - ws_vip_days_num: int v řetězci
+    - ws_vip_is_active: bool
+    - ws_vip_last_check_ts: timestamp
+    """
+    data = get_user_data(force_refresh=force_refresh)
+    now = time.time()
+    date_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+    status_str = ""
+    days_str = "-"
+    vip_active = False
+    days_num = 0
+
+    if data.get('status') == 'unconfigured':
+        try:
+            status_str = ADDON.getLocalizedString(30048)
+        except Exception:
+            status_str = "Nepřipojeno"
+        days_str = "-"
+    elif data.get('status') == 'auth_failed':
+        try:
+            status_str = ADDON.getLocalizedString(30176)
+        except Exception:
+            status_str = "Chyba přihlášení k Webshare"
+        days_str = "-"
+    elif data.get('status') == 'ok':
+        vip_active = bool(data.get('vip'))
+        days_num = int(data.get('vip_days', 0))
+        uname = data.get('username') or ADDON.getSetting('ws_username')
+        if vip_active:
+            try:
+                vip_label = ADDON.getLocalizedString(30174)
+            except Exception:
+                vip_label = "VIP aktivní"
+            status_str = f"{uname} ({vip_label})"
+            until = data.get('vip_until')
+            if until:
+                days_str = f"{days_num} dní (do {until})"
+            else:
+                days_str = f"{days_num} dní"
+        else:
+            try:
+                vip_expired_label = ADDON.getLocalizedString(30175)
+            except Exception:
+                vip_expired_label = "VIP vypršelo"
+            status_str = f"{uname} ({vip_expired_label})"
+            days_str = "Vypršelo (0 dní)"
+    else:
+        status_str = f"Chyba: {data.get('message', 'Neznámá')}"
+        days_str = "-"
+
+    try:
+        ADDON.setSetting('ws_status', status_str)
+        ADDON.setSetting('ws_vip_days', days_str)
+        ADDON.setSetting('ws_vip_last_check', date_str)
+        ADDON.setSetting('ws_vip_days_num', str(days_num))
+        ADDON.setSettingBool('ws_vip_is_active', vip_active)
+        ADDON.setSetting('ws_vip_last_check_ts', str(int(now)))
+    except Exception as e:
+        xbmc.log(f"Webshare check_vip_status setSetting error: {e}", xbmc.LOGWARNING)
+
+    return data
+
 
 def search(query):
     if not query:
