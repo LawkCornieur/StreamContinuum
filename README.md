@@ -56,6 +56,11 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.5.3** - 2026-10-24
+- Chronologické řazení historie podle data shlédnutí
+- Oprava zobrazení délky epizod a filmů v listu historie
+- Oprava zobrazení dostupných dílů v seznamu k zhlédnutí
+
 **Verze 1.5.2** - 2026-10-24
 - Úprava implementace API Webshare pro zobrazování podrobností o VIP členství.
 - Přidání diagnostiky a chybových hlášení při chybě přehrávání z důvodu vypršeného VIP členství, chybných přihlašovacích údajů a jejich překladů
