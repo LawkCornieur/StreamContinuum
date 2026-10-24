@@ -9,8 +9,17 @@ sys.path.append(ADDON_ROOT)
 sys.path.append(os.path.join(ADDON_ROOT, 'resources', 'lib'))
 
 import history
+import webshare
 
 ADDON = xbmcaddon.Addon()
+
+def check_webshare_vip_bg():
+    try:
+        if ADDON.getSetting('ws_username') and ADDON.getSetting('ws_password'):
+            xbmc.log("StreamContinuum Service: Updating Webshare VIP status in background...", xbmc.LOGDEBUG)
+            webshare.check_vip_status()
+    except Exception as e:
+        xbmc.log(f"StreamContinuum Service: Background Webshare VIP check failed: {e}", xbmc.LOGWARNING)
 
 def check_new_episodes_bg():
     try:
@@ -46,8 +55,10 @@ if __name__ == '__main__':
 
         if not monitor.waitForAbort(5):
             check_new_episodes_bg()
+            check_webshare_vip_bg()
 
         while not monitor.abortRequested():
             if monitor.waitForAbort(14400):
                 break
             check_new_episodes_bg()
+            check_webshare_vip_bg()

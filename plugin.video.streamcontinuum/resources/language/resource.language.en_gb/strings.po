@@ -562,3 +562,44 @@ msgstr "Feature Film (~2h 30m)"
 msgctxt "#30168"
 msgid "up to"
 msgstr "up to"
+
+msgctxt "#30170"
+msgid "Webshare account status"
+msgstr "Webshare account status"
+
+msgctxt "#30171"
+msgid "VIP validity"
+msgstr "VIP validity"
+
+msgctxt "#30172"
+msgid "Last status check"
+msgstr "Last status check"
+
+msgctxt "#30173"
+msgid "Check / refresh Webshare status"
+msgstr "Check / refresh Webshare status"
+
+msgctxt "#30174"
+msgid "VIP active"
+msgstr "VIP active"
+
+msgctxt "#30175"
+msgid "VIP expired"
+msgstr "VIP expired"
+
+msgctxt "#30176"
+msgid "Webshare login error"
+msgstr "Webshare login error"
+
+msgctxt "#30177"
+msgid "Webshare VIP expires soon!"
+msgstr "Webshare VIP expires soon!"
+
+msgctxt "#30178"
+msgid "Webshare VIP subscription expired!"
+msgstr "Webshare VIP subscription expired!"
+
+msgctxt "#30179"
+msgid "VIP subscription expired! Streams may not play."
+msgstr "VIP subscription expired! Streams may not play."
+

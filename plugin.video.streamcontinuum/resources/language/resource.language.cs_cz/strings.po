@@ -562,3 +562,44 @@ msgstr "Celovečerní film (~2h 30m)"
 msgctxt "#30168"
 msgid "up to"
 msgstr "do"
+
+msgctxt "#30170"
+msgid "Webshare account status"
+msgstr "Stav účtu Webshare"
+
+msgctxt "#30171"
+msgid "VIP validity"
+msgstr "Platnost VIP členství"
+
+msgctxt "#30172"
+msgid "Last status check"
+msgstr "Poslední kontrola údajů"
+
+msgctxt "#30173"
+msgid "Check / refresh Webshare status"
+msgstr "Ověřit a aktualizovat stav Webshare"
+
+msgctxt "#30174"
+msgid "VIP active"
+msgstr "VIP aktivní"
+
+msgctxt "#30175"
+msgid "VIP expired"
+msgstr "VIP vypršelo"
+
+msgctxt "#30176"
+msgid "Webshare login error"
+msgstr "Chyba přihlášení k Webshare"
+
+msgctxt "#30177"
+msgid "Webshare VIP expires soon!"
+msgstr "Platnost Webshare VIP brzy vyprší!"
+
+msgctxt "#30178"
+msgid "Webshare VIP subscription expired!"
+msgstr "Webshare VIP předplatné vypršelo!"
+
+msgctxt "#30179"
+msgid "VIP subscription expired! Streams may not play."
+msgstr "VIP členství vypršelo! Přehrávání streamů nebude fungovat."
+

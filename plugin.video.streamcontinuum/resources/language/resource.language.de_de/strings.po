@@ -562,3 +562,44 @@ msgstr "Spielfilm (~2h 30m)"
 msgctxt "#30168"
 msgid "up to"
 msgstr "bis zu"
+
+msgctxt "#30170"
+msgid "Webshare account status"
+msgstr "Webshare-Kontostatus"
+
+msgctxt "#30171"
+msgid "VIP validity"
+msgstr "VIP-Gültigkeit"
+
+msgctxt "#30172"
+msgid "Last status check"
+msgstr "Letzte Statusprüfung"
+
+msgctxt "#30173"
+msgid "Check / refresh Webshare status"
+msgstr "Webshare-Status prüfen und aktualisieren"
+
+msgctxt "#30174"
+msgid "VIP active"
+msgstr "VIP aktiv"
+
+msgctxt "#30175"
+msgid "VIP expired"
+msgstr "VIP abgelaufen"
+
+msgctxt "#30176"
+msgid "Webshare login error"
+msgstr "Webshare-Anmeldefehler"
+
+msgctxt "#30177"
+msgid "Webshare VIP expires soon!"
+msgstr "Webshare-VIP läuft bald ab!"
+
+msgctxt "#30178"
+msgid "Webshare VIP subscription expired!"
+msgstr "Webshare-VIP-Abonnement ist abgelaufen!"
+
+msgctxt "#30179"
+msgid "VIP subscription expired! Streams may not play."
+msgstr "VIP-Abonnement ist abgelaufen! Streams können nicht abgespielt werden."
+
