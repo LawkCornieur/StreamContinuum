@@ -5,8 +5,8 @@
         <setting id="autoplay_countdown" type="number" label="30191" default="10" subsetting="true" enable="eq(-1,true)" />
         <setting id="autoplay_continue_btn" type="bool" label="30192" default="true" subsetting="true" enable="eq(-2,true)" />
         <setting id="optimize_results" type="bool" label="30088" default="true" />
-        <setting id="after_playback" type="enum" label="30090" lvalues="30091|30092|30093|30094|30095" default="2" />
-        <setting id="open_last_history" type="bool" label="30132" default="false" />
+        <setting id="after_playback" type="enum" label="30090" lvalues="30091|30092|30093|30094|30095|30051" default="2" />
+        <setting id="open_last_history" type="bool" label="30132" default="false" subsetting="true" enable="eq(-1,3) | eq(-1,5)" />
         <setting id="enable_trakt_menu" type="bool" label="30119" default="false" />
         <setting id="watchlist_check_interval" type="enum" label="30181" lvalues="30182|30183|30184|30185|30186" default="3" />
         <setting id="watchlist_last_check_ts" type="text" label="" visible="false" default="0" />

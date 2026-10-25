@@ -579,6 +579,7 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     pass
                 after = ADDON.getSetting('after_playback')
                 safe_query = urllib.parse.quote_plus(current_query) if current_query else ""
+                open_detail = ADDON.getSettingBool('open_last_history')
                 xbmc.sleep(400)
 
                 if after == '0' and current_query:
@@ -586,9 +587,37 @@ def play(ident, query=None, title=None, is_autoplay=False):
                 elif after == '1':
                     xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search,replace)')
                 elif after == '3':
-                    xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
+                    if open_detail and current_query:
+                        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={safe_query}&source=history,replace)')
+                    else:
+                        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history,replace)')
                 elif after == '4' and current_query:
                     xbmc.executebuiltin(f'RunPlugin({sys.argv[0]}?action=search_prefill&query={safe_query})')
+                elif after == '5':
+                    if open_detail:
+                        target_wl_query = None
+                        try:
+                            import history
+                            wl_items = [it for it in history.get_history(deduplicate=True) if not it.get('is_watched', True)]
+                            if current_query:
+                                wb, s, e, _ = history.parse_episode_info(current_query)
+                                for cand in wl_items:
+                                    c_wb, c_s, c_e, _ = history.parse_episode_info(cand.get('query', ''))
+                                    if wb and c_wb and history.normalize_match_key(wb) == history.normalize_match_key(c_wb):
+                                        target_wl_query = cand.get('query')
+                                        break
+                            if not target_wl_query and wl_items:
+                                target_wl_query = wl_items[0].get('query')
+                        except Exception:
+                            target_wl_query = None
+
+                        if target_wl_query:
+                            safe_wl_query = urllib.parse.quote_plus(target_wl_query)
+                            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={safe_wl_query}&source=watchlist,replace)')
+                        else:
+                            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
+                    else:
+                        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
                 break
         else:
             # Ověření, zda selhání nebylo způsobeno vypršeným VIP členstvím
@@ -759,10 +788,6 @@ def show_history(force_list=False):
             xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
         return
 
-    if not force_list and ADDON.getSettingBool('open_last_history'):
-        history_menu(items[0].get('query', ''), show_full_history_link=True, source='history')
-        return
-
     xbmcplugin.setPluginCategory(HANDLE, ADDON.getLocalizedString(30053))
     xbmcplugin.setContent(HANDLE, 'videos')
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
@@ -870,18 +895,31 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
 
     items = []
-    if show_full_history_link and source != 'watchlist':
-        items.append({
-            'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
-            'action': 'history_list_replace',
-            'icon': 'DefaultFolder.png',
-            'thumb': 'DefaultFolder.png',
-            'poster': None,
-            'fanart': fanart,
-            'plot': '',
-            'is_utility': True,
-            'is_folder': False
-        })
+    if show_full_history_link:
+        if source == 'watchlist':
+            items.append({
+                'label': f"[COLOR #e50914]{ADDON.getLocalizedString(30051)}[/COLOR]",
+                'action': 'watchlist_list_replace',
+                'icon': 'DefaultFolder.png',
+                'thumb': 'DefaultFolder.png',
+                'poster': None,
+                'fanart': fanart,
+                'plot': '',
+                'is_utility': True,
+                'is_folder': False
+            })
+        else:
+            items.append({
+                'label': f"[COLOR #cc9900]{ADDON.getLocalizedString(30131)}[/COLOR]",
+                'action': 'history_list_replace',
+                'icon': 'DefaultFolder.png',
+                'thumb': 'DefaultFolder.png',
+                'poster': None,
+                'fanart': fanart,
+                'plot': '',
+                'is_utility': True,
+                'is_folder': False
+            })
 
     ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
     season = None
@@ -2754,7 +2792,12 @@ def run():
             except Exception:
                 pass
             xbmc.log(f"StreamContinuum: Manual watchlist refresh error: {e}", xbmc.LOGWARNING)
-        xbmc.executebuiltin("Container.Refresh")
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+            except Exception:
+                pass
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
         return
     elif action == 'trakt_mark' or action == 'media_mark':
         media_type = params.get('type')
@@ -2849,6 +2892,14 @@ def run():
             except Exception:
                 pass
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_list,replace)')
+        return
+    elif action == 'watchlist_list_replace':
+        if HANDLE >= 0:
+            try:
+                xbmcplugin.endOfDirectory(HANDLE, succeeded=True)
+            except Exception:
+                pass
+        xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
         return
 
     if HANDLE < 0:

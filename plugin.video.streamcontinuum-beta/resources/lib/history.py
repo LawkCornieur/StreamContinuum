@@ -1506,15 +1506,45 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
         return False
 
     now_ts = int(time.time())
-    # Throttling / mezipaměť: pokud nejde o vynucenou kontrolu ani o konkrétní ID, nespouštět častěji než zvolený interval
+    # Throttling / mezipaměť: pokud nejde o vynucenou kontrolu ani o konkrétní ID, nespouštět častěji než zvolený interval.
+    # Pokud však v historii existuje aktivní zhlédnutý seriál, který dosud nemá žádný navazující díl ve watchlistu,
+    # throttling se vynechá a kontrola se provede okamžitě.
     if not force and target_tmdb_id is None:
-        last_check_ts = _get_last_watchlist_check_ts()
-        if last_check_ts <= 0:
-            last_check_ts = _last_check_next_episodes_time
-        interval = _get_watchlist_check_interval()
-        if (now_ts - last_check_ts) < interval:
-            xbmc.log(f"StreamContinuum History: Watchlist check throttled by cache (last check: {now_ts - last_check_ts}s ago, interval: {interval}s)", xbmc.LOGDEBUG)
-            return False
+        has_missing_next = False
+        try:
+            cached_history = get_history(deduplicate=True)
+            watched_series = [
+                it for it in cached_history
+                if (it.get('media_type') in ('tvshow', 'tv', 'show') or is_series(it.get('query')) or (it.get('season') is not None and it.get('episode') is not None))
+                and it.get('is_watched', True)
+                and not it.get('is_series_completed')
+            ]
+            unwatched_series = [
+                it for it in cached_history
+                if (it.get('media_type') in ('tvshow', 'tv', 'show') or is_series(it.get('query')))
+                and not it.get('is_watched', True)
+            ]
+            unwatched_ids = {it.get('tmdb_id') for it in unwatched_series if it.get('tmdb_id')}
+            unwatched_names = {normalize_match_key(it.get('ws_base') or it.get('query')) for it in unwatched_series if (it.get('ws_base') or it.get('query'))}
+
+            for ws in watched_series:
+                w_tid = ws.get('tmdb_id')
+                w_name = normalize_match_key(ws.get('ws_base') or ws.get('query'))
+                if (w_tid and w_tid in unwatched_ids) or (w_name and w_name in unwatched_names):
+                    continue
+                has_missing_next = True
+                break
+        except Exception:
+            has_missing_next = False
+
+        if not has_missing_next:
+            last_check_ts = _get_last_watchlist_check_ts()
+            if last_check_ts <= 0:
+                last_check_ts = _last_check_next_episodes_time
+            interval = _get_watchlist_check_interval()
+            if (now_ts - last_check_ts) < interval:
+                xbmc.log(f"StreamContinuum History: Watchlist check throttled by cache (last check: {now_ts - last_check_ts}s ago, interval: {interval}s)", xbmc.LOGDEBUG)
+                return False
 
     try:
         all_items = get_history(deduplicate=True)
@@ -1827,6 +1857,17 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
                     'added_at': now_ts
                 }
                 current_history.insert(0, item_obj)
+            if items_modified_meta:
+                for c_it in current_history:
+                    for a_it in all_items:
+                        if c_it.get('query') == a_it.get('query'):
+                            if a_it.get('tmdb_id') and not c_it.get('tmdb_id'):
+                                c_it['tmdb_id'] = a_it.get('tmdb_id')
+                                c_it['identified_at'] = a_it.get('identified_at')
+                            if a_it.get('title') and not c_it.get('title'):
+                                c_it['title'] = a_it.get('title')
+                            if a_it.get('is_series_completed'):
+                                c_it['is_series_completed'] = True
             _save_history(current_history)
             if target_tmdb_id is None:
                 _set_last_watchlist_check_ts(now_ts)

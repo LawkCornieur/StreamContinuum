@@ -315,7 +315,7 @@ def sync_history(silent=False, force=False, reason=""):
 
             # 8. Vyhodnotit a doplnit nově navazující epizody ve watchlistu na základě synchronizovaného stavu
             try:
-                history.check_and_update_next_episodes()
+                history.check_and_update_next_episodes(force=True)
             except Exception as ep_err:
                 xbmc.log(f"StreamContinuum: check_and_update_next_episodes after sync error: {ep_err}", xbmc.LOGWARNING)
 
