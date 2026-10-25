@@ -56,6 +56,11 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.5.6** - 2026-10-25
+- Oprava zobrazování seznamu ke zhlédnut před synchronizací historie
+- Změna zobrazení plakátů a obrázků epizody a dalších informací v podrobnostech či při procházení sérií
+- Oprava drobných chyb, zarovnání dialogu autoplay, kostičky před aktualizací a fallbacku při nenalezení epizody
+
 **Verze 1.5.5** - 2026-10-25
 - Oprava přechodu na další díl na konci serie
 - Oprava aktualizování seznamu k zhlédnutí
