@@ -416,8 +416,8 @@ msgid "Show full history"
 msgstr "Zobrazit celou historii"
 
 msgctxt "#30132"
-msgid "Open last played item on history entry"
-msgstr "Při otevření historie otevřít detail posledního záznamu"
+msgid "Open item detail after playback"
+msgstr "Po přehrání otevřít detail položky"
 
 msgctxt "#30133"
 msgid "Add to Watchlist"
@@ -646,5 +646,25 @@ msgstr "Kontrola nových dílů..."
 msgctxt "#30190"
 msgid "Watchlist is up to date."
 msgstr "Seznam k zhlédnutí je aktuální."
+
+msgctxt "#30191"
+msgid "Autoplay countdown (seconds)"
+msgstr "Doba odpočtu před spuštěním (vteřiny)"
+
+msgctxt "#30192"
+msgid "Show continue button during countdown"
+msgstr "Zobrazit tlačítko pro okamžité spuštění (Pokračovat)"
+
+msgctxt "#30193"
+msgid "Play now"
+msgstr "Přehrát nyní"
+
+msgctxt "#30194"
+msgid "Cancel"
+msgstr "Zrušit"
+
+msgctxt "#30195"
+msgid "Starting in {0} s..."
+msgstr "Spuštění za {0} s..."
 
 

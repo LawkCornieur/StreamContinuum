@@ -416,8 +416,8 @@ msgid "Show full history"
 msgstr "Vollständigen Verlauf anzeigen"
 
 msgctxt "#30132"
-msgid "Open last played item on history entry"
-msgstr "Beim Öffnen des Verlaufs das zuletzt abgespielte Element öffnen"
+msgid "Open item detail after playback"
+msgstr "Nach der Wiedergabe Elementdetails öffnen"
 
 msgctxt "#30133"
 msgid "Add to Watchlist"
@@ -646,5 +646,25 @@ msgstr "Suche nach neuen Episoden..."
 msgctxt "#30190"
 msgid "Watchlist is up to date."
 msgstr "Watchlist ist aktuell."
+
+msgctxt "#30191"
+msgid "Autoplay countdown (seconds)"
+msgstr "Autoplay-Countdown (Sekunden)"
+
+msgctxt "#30192"
+msgid "Show continue button during countdown"
+msgstr "Schaltfläche zum Fortsetzen anzeigen"
+
+msgctxt "#30193"
+msgid "Play now"
+msgstr "Jetzt abspielen"
+
+msgctxt "#30194"
+msgid "Cancel"
+msgstr "Abbrechen"
+
+msgctxt "#30195"
+msgid "Starting in {0} s..."
+msgstr "Start in {0} s..."
 
 

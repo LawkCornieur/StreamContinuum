@@ -483,12 +483,20 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
         backdrop_path_cs = tmdb_data_cs.get('backdrop_path')
         poster_path_en = tmdb_data_en.get('poster_path')
         backdrop_path_en = tmdb_data_en.get('backdrop_path')
+        still_path_cs = tmdb_data_cs.get('still_path')
+        still_path_en = tmdb_data_en.get('still_path')
         
         final_poster_path = poster_path_cs or poster_path_en
         final_backdrop_path = backdrop_path_cs or backdrop_path_en
+        final_still_path = still_path_cs or still_path_en
 
         result['poster'] = f"https://image.tmdb.org/t/p/w500{final_poster_path}" if final_poster_path else ''
         result['fanart'] = f"https://image.tmdb.org/t/p/original{final_backdrop_path}" if final_backdrop_path else ''
+        result['still'] = f"https://image.tmdb.org/t/p/w500{final_still_path}" if final_still_path else ''
+        if media_type == 'episode' and result['still']:
+            result['thumb'] = result['still']
+            if not result['poster']:
+                result['poster'] = result['still']
         
         if media_type in ('movie', 'show'):
             result['genres'] = [g.get('name') for g in tmdb_data_cs.get('genres', []) if g.get('name')] or \
