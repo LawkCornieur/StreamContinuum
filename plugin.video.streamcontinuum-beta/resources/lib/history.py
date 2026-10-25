@@ -974,6 +974,57 @@ def get_history_item(query):
     return None
 
 
+def get_watched_episodes_set(tmdb_id=None, ws_base=None):
+    """
+    Vrátí množinu kódů zhlédnutých epizod (např. {'S01E01', 'S01E02'}) pro daný seriál.
+    """
+    watched_set = set()
+    try:
+        clean_tid = None
+        if tmdb_id and str(tmdb_id).strip().lower() not in ('none', '', '0'):
+            try:
+                clean_tid = int(tmdb_id)
+            except (ValueError, TypeError):
+                clean_tid = None
+
+        norm_wb = normalize_match_key(ws_base) if ws_base else None
+        all_items = get_history(deduplicate=False)
+        for it in all_items:
+            it_tid = it.get('tmdb_id')
+            try:
+                it_tid = int(it_tid) if it_tid and str(it_tid).strip().lower() not in ('none', '', '0') else None
+            except (ValueError, TypeError):
+                it_tid = None
+
+            matched = False
+            if clean_tid and it_tid:
+                matched = (clean_tid == it_tid)
+            elif norm_wb:
+                it_wb = normalize_match_key(it.get('ws_base') or it.get('query'))
+                if it_wb and it_wb == norm_wb:
+                    matched = True
+                else:
+                    cands = _extract_candidate_names(it)
+                    if norm_wb in cands:
+                        matched = True
+
+            if matched:
+                s_info = it.get('series_info') or {}
+                for code in s_info.get('watched_episodes', []):
+                    watched_set.add(code)
+                if it.get('is_watched', True):
+                    code = it.get('episode_code')
+                    if code:
+                        watched_set.add(code)
+                    s = it.get('season')
+                    e = it.get('episode')
+                    if s is not None and e is not None:
+                        watched_set.add(f"S{int(s):02d}E{int(e):02d}")
+    except Exception as e:
+        xbmc.log(f"StreamContinuum History: Error in get_watched_episodes_set: {e}", xbmc.LOGWARNING)
+    return watched_set
+
+
 def _save_history(history_list, tombstones=None):
     try:
         if not os.path.exists(PROFILE_DIR):
@@ -1080,7 +1131,7 @@ def set_watched_status(query, is_watched):
     now = int(time.time())
     norm_q = str(query).strip().lower()
     q_match = normalize_match_key(query)
-    _, q_season, q_episode, q_ep_code = parse_episode_info(query)
+    q_ws_base, q_season, q_episode, q_ep_code = parse_episode_info(query)
     q_is_tv = is_series(query) or (q_season is not None and q_episode is not None)
 
     target_tmdb_id = None
@@ -1091,11 +1142,20 @@ def set_watched_status(query, is_watched):
             target_tmdb_id = it.get('tmdb_id')
             it['is_watched'] = bool(is_watched)
             it['updated_at'] = now
+            s_info = it.get('series_info')
             if is_watched:
                 it['last_played_at'] = now
+                if isinstance(s_info, dict):
+                    if q_ep_code:
+                        w_eps = set(s_info.get('watched_episodes', []))
+                        w_eps.add(q_ep_code)
+                        s_info['watched_episodes'] = sorted(w_eps)
+                    if q_season is not None:
+                        s_info['last_watched_season'] = q_season
+                    if q_episode is not None:
+                        s_info['last_watched_episode'] = q_episode
             else:
                 # Pokud uživatel ručně odznačil epizodu jako nezhlédnutou, odebrat ji ze seznamu watched_episodes
-                s_info = it.get('series_info')
                 if isinstance(s_info, dict) and q_ep_code and q_ep_code in s_info.get('watched_episodes', []):
                     s_info['watched_episodes'] = [c for c in s_info['watched_episodes'] if c != q_ep_code]
             exact_matched = True
@@ -1109,18 +1169,69 @@ def set_watched_status(query, is_watched):
             item_tmdb_id = item.get('tmdb_id')
 
             matches = (item_query == norm_q)
-            if not matches:
-                if target_tmdb_id and item_tmdb_id:
-                    matches = (target_tmdb_id == item_tmdb_id)
-                elif q_match and item_match and q_match == item_match and (q_is_tv == item_is_tv):
-                    matches = True
+            if not matches and q_is_tv and item_is_tv:
+                if target_tmdb_id and item_tmdb_id and target_tmdb_id == item_tmdb_id:
+                    if q_ep_code and item.get('episode_code') == q_ep_code:
+                        matches = True
+                elif q_match and item_match and q_match == item_match:
+                    if q_ep_code and item.get('episode_code') == q_ep_code:
+                        matches = True
 
             if matches:
                 item['is_watched'] = bool(is_watched)
                 item['updated_at'] = now
+                s_info = item.get('series_info')
                 if is_watched:
                     item['last_played_at'] = now
+                    if isinstance(s_info, dict):
+                        if q_ep_code:
+                            w_eps = set(s_info.get('watched_episodes', []))
+                            w_eps.add(q_ep_code)
+                            s_info['watched_episodes'] = sorted(w_eps)
+                        if q_season is not None:
+                            s_info['last_watched_season'] = q_season
+                        if q_episode is not None:
+                            s_info['last_watched_episode'] = q_episode
+                else:
+                    if isinstance(s_info, dict) and q_ep_code and q_ep_code in s_info.get('watched_episodes', []):
+                        s_info['watched_episodes'] = [c for c in s_info['watched_episodes'] if c != q_ep_code]
                 updated = True
+
+    if not updated and is_watched:
+        new_item = {
+            'query': str(query).strip(),
+            'title': None,
+            'year': None,
+            'plot': '',
+            'genres': [],
+            'rating': None,
+            'runtime': None,
+            'poster': None,
+            'fanart': None,
+            'tmdb_id': target_tmdb_id,
+            'media_type': 'tvshow' if q_is_tv else 'movie',
+            'ws_base': q_ws_base,
+            'season': q_season if q_is_tv else None,
+            'episode': q_episode if q_is_tv else None,
+            'episode_code': q_ep_code if q_is_tv else None,
+            'identified_at': None,
+            'is_watched': True,
+            'last_played_at': now,
+            'updated_at': now,
+            'added_at': now
+        }
+        if q_is_tv:
+            new_item['series_info'] = {
+                'ws_base': q_ws_base,
+                'season': q_season,
+                'episode': q_episode,
+                'episode_code': q_ep_code,
+                'last_watched_season': q_season,
+                'last_watched_episode': q_episode,
+                'watched_episodes': [q_ep_code] if q_ep_code else []
+            }
+        history_items.insert(0, new_item)
+        updated = True
 
     if updated:
         _save_history(history_items)
@@ -1340,30 +1451,10 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
         if not all_items:
             return False
 
-        # Přesné sledování rozkoukaných seriálů již přítomných ve watchlistu
-        unwatched_tmdb_ids = set()
-        unwatched_names = set()
-        for item in all_items:
-            is_unwatched_tv = (
-                not item.get('is_watched', True)
-                and (item.get('media_type') in ('tvshow', 'tv', 'show') or is_series(item.get('query')))
-            )
-            if is_unwatched_tv:
-                tid = item.get('tmdb_id')
-                if tid:
-                    try:
-                        unwatched_tmdb_ids.add(int(tid))
-                    except (ValueError, TypeError):
-                        pass
-                else:
-                    wb = normalize_match_key(item.get('ws_base') or item.get('query'))
-                    if wb:
-                        unwatched_names.add(wb)
-                    for cn in _extract_candidate_names(item):
-                        unwatched_names.add(cn)
-
         today = datetime.date.today()
         new_watchlist_entries = []
+        generated_tmdb_ids = set()
+        generated_names = set()
         items_modified_meta = False
 
         for item in all_items:
@@ -1401,20 +1492,51 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
                 except (ValueError, TypeError):
                     continue
 
-            # Kontrola, zda již seriál má nezhlédnutou epizodu ve watchlistu
+            # Kontrola, zda již seriál má nezhlédnutou navazující epizodu ve watchlistu
             already_in_watchlist = False
-            if tmdb_id:
-                if tmdb_id in unwatched_tmdb_ids:
-                    already_in_watchlist = True
-            else:
-                s_key_name = normalize_match_key(ws_base) if ws_base else None
-                if s_key_name and s_key_name in unwatched_names:
-                    already_in_watchlist = True
+            watched_codes_check = set(s_info.get('watched_episodes', []))
+            for u_cand in all_items:
+                if u_cand.get('is_watched', True):
+                    continue
+                u_is_tv = u_cand.get('media_type') in ('tvshow', 'tv', 'show') or is_series(u_cand.get('query'))
+                if not u_is_tv:
+                    continue
+
+                u_tid = u_cand.get('tmdb_id')
+                try:
+                    u_tid = int(u_tid) if u_tid and str(u_tid).strip().lower() not in ('none', '', '0') else None
+                except (ValueError, TypeError):
+                    u_tid = None
+
+                is_same_series = False
+                if tmdb_id and u_tid:
+                    is_same_series = (tmdb_id == u_tid)
                 else:
-                    for cn in _extract_candidate_names(item):
-                        if cn in unwatched_names:
+                    u_wb = normalize_match_key(u_cand.get('ws_base') or u_cand.get('query'))
+                    s_wb = normalize_match_key(ws_base) if ws_base else None
+                    if u_wb and s_wb and u_wb == s_wb:
+                        is_same_series = True
+                    else:
+                        u_cands = set(_extract_candidate_names(u_cand))
+                        s_cands = set(_extract_candidate_names(item))
+                        if u_cands.intersection(s_cands):
+                            is_same_series = True
+
+                if is_same_series:
+                    u_s = u_cand.get('season')
+                    u_e = u_cand.get('episode')
+                    u_code = u_cand.get('episode_code')
+                    if u_s is not None and u_e is not None:
+                        # Nezhlédnutá epizoda je skutečně navazující pouze pokud je > (last_s, last_e) a dosud nebyla zhlédnuta
+                        if (u_s, u_e) > (last_s, last_e) and (not u_code or u_code not in watched_codes_check):
                             already_in_watchlist = True
                             break
+                    elif not u_code or u_code not in watched_codes_check:
+                        already_in_watchlist = True
+                        break
+
+            if (tmdb_id and tmdb_id in generated_tmdb_ids) or (ws_base and normalize_match_key(ws_base) in generated_names):
+                already_in_watchlist = True
 
             if already_in_watchlist:
                 continue
@@ -1587,7 +1709,11 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
                         }
                         new_watchlist_entries.append((next_query, tmdb_data))
                         if tmdb_id:
-                            unwatched_tmdb_ids.add(tmdb_id)
+                            generated_tmdb_ids.add(tmdb_id)
+                        if ws_base:
+                            wb = normalize_match_key(ws_base)
+                            if wb:
+                                generated_names.add(wb)
             except Exception as check_e:
                 xbmc.log(f"StreamContinuum History: Error checking next episode for {ws_base}: {check_e}", xbmc.LOGWARNING)
 

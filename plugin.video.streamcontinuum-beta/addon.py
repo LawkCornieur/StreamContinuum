@@ -78,8 +78,16 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
     info_tag.setMediaType(media_type)
     if is_watched:
         info_tag.setPlaycount(1)
+        try:
+            list_item.setInfo('video', {'playcount': 1, 'overlay': 7})
+        except Exception:
+            pass
     else:
         info_tag.setPlaycount(0)
+        try:
+            list_item.setInfo('video', {'playcount': 0, 'overlay': 0})
+        except Exception:
+            pass
     if plot:
         info_tag.setPlot(str(plot))
     if year:
@@ -439,7 +447,7 @@ def play(ident, query=None, title=None, is_autoplay=False):
                         if t_id:
                             trakt.mark_watched(m_type, t_id)
                 try:
-                    history.check_and_update_next_episodes()
+                    history.check_and_update_next_episodes(force=True)
                 except Exception:
                     pass
                 try:
@@ -461,7 +469,6 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     target_episode = episode + 1
                     import history
                     ws_base = cleaned_base if cleaned_base else history.get_base_name(current_query)
-                    next_ep_query = f"{ws_base} S{target_season:02d}E{target_episode:02d}"
 
                     hist_item = history.get_history_item(current_query)
                     clean_tmdb_id = hist_item.get('tmdb_id') if hist_item else None
@@ -485,9 +492,31 @@ def play(ident, query=None, title=None, is_autoplay=False):
                                 if curr_s_obj:
                                     max_eps = curr_s_obj.get('episode_count', 0)
                                     if max_eps > 0 and target_episode > max_eps:
-                                        has_next_ep = False
+                                        # Konec aktuální série - ověřit existenci a odvysílání navazující řady
+                                        higher_seasons = [s for s in seasons if (s.get('season_number') or 0) > season and (s.get('season_number') or 0) > 0]
+                                        higher_seasons.sort(key=lambda x: x.get('season_number') or 0)
+                                        if higher_seasons:
+                                            target_season = higher_seasons[0].get('season_number')
+                                            target_episode = 1
+                                            next_s_eps = tmdb_module.get_season_episodes(clean_tmdb_id, target_season) or []
+                                            if next_s_eps:
+                                                first_ep = next_s_eps[0]
+                                                if first_ep.get('episode_number'):
+                                                    target_episode = first_ep.get('episode_number')
+                                                air_date = first_ep.get('air_date')
+                                                if air_date:
+                                                    try:
+                                                        dt = datetime.datetime.strptime(str(air_date)[:10], '%Y-%m-%d').date()
+                                                        if dt > datetime.date.today():
+                                                            has_next_ep = False
+                                                    except Exception:
+                                                        pass
+                                        else:
+                                            has_next_ep = False
                         except Exception as e:
                             xbmc.log(f"StreamContinuum: TMDb validation error in autoplay: {e}", xbmc.LOGWARNING)
+
+                    next_ep_query = f"{ws_base} S{target_season:02d}E{target_episode:02d}"
 
                     if has_next_ep:
                         dialog = xbmcgui.DialogProgress()
@@ -604,13 +633,27 @@ def show_watchlist():
         poster = item.get('poster')
         fanart = item.get('fanart')
         is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
-        media_type = 'tvshow' if is_tv else 'movie'
+        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+        s_num = None
+        e_num = None
+        ep_suffix = ""
+        if ep_match:
+            s_num = int(ep_match.group(1) or ep_match.group(3))
+            e_num = int(ep_match.group(2) or ep_match.group(4))
+            ep_suffix = f" S{s_num:02d}E{e_num:02d}"
+
+        if ep_match:
+            media_type = 'episode'
+        elif is_tv:
+            media_type = 'tvshow'
+        else:
+            media_type = 'movie'
 
         # Pokud u položky chybí délka (runtime), zkusit ji spolehlivě dohledat z TMDb
         if (not runtime or runtime == 0) and item.get('tmdb_id') and tmdb_module:
             try:
                 t_id = item.get('tmdb_id')
-                if media_type == 'tvshow':
+                if media_type in ('tvshow', 'episode'):
                     s_details = tmdb_module.get_show_seasons(t_id)
                     if s_details and s_details.get('runtime'):
                         runtime = s_details.get('runtime')
@@ -624,13 +667,6 @@ def show_watchlist():
                         items_meta_updated = True
             except Exception:
                 pass
-        
-        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
-        ep_suffix = ""
-        if ep_match:
-            s_num = int(ep_match.group(1) or ep_match.group(3))
-            e_num = int(ep_match.group(2) or ep_match.group(4))
-            ep_suffix = f" S{s_num:02d}E{e_num:02d}"
 
         if raw_title and not history.has_non_latin(raw_title):
             base_display = history.sanitize_title(raw_title)
@@ -644,6 +680,12 @@ def show_watchlist():
             rating=rating, runtime_min=runtime, poster=poster, fanart=fanart if fanart else get_asset('fa-watchlist.jpg'), media_type=media_type,
             is_watched=False
         )
+        if ep_match:
+            info_tag = list_item.getVideoInfoTag()
+            if s_num is not None:
+                info_tag.setSeason(s_num)
+            if e_num is not None:
+                info_tag.setEpisode(e_num)
         
         cm = [
             (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(query)}&watched=1&source=watchlist)'),
@@ -708,14 +750,22 @@ def show_history(force_list=False):
         fanart = item.get('fanart')
         is_watched = bool(item.get('is_watched', True))
         is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
-        media_type = 'tvshow' if is_tv else 'movie'
         
         ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+        s_num = None
+        e_num = None
         ep_suffix = ""
         if ep_match:
             s_num = int(ep_match.group(1) or ep_match.group(3))
             e_num = int(ep_match.group(2) or ep_match.group(4))
             ep_suffix = f" S{s_num:02d}E{e_num:02d}"
+
+        if ep_match:
+            media_type = 'episode'
+        elif is_tv:
+            media_type = 'tvshow'
+        else:
+            media_type = 'movie'
 
         if raw_title and not history.has_non_latin(raw_title):
             base_display = history.sanitize_title(raw_title)
@@ -735,6 +785,12 @@ def show_history(force_list=False):
             rating=rating, runtime_min=runtime, poster=poster, fanart=fanart, media_type=media_type,
             is_watched=is_watched
         )
+        if ep_match:
+            info_tag = list_item.getVideoInfoTag()
+            if s_num is not None:
+                info_tag.setSeason(s_num)
+            if e_num is not None:
+                info_tag.setEpisode(e_num)
         
         cm = []
         if not is_watched:
@@ -909,22 +965,45 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
 
     if ep_match and ws_base:
         has_next_ep = True
-        has_next_season = True
+        has_next_season = False
+        next_ep_season = season
+        next_ep_number = episode + 1
+        next_ep_obj = None
+
         if seasons_meta:
             curr_s_obj = next((s for s in seasons_meta if s.get('season_number') == season), None)
             if curr_s_obj:
                 max_eps = curr_s_obj.get('episode_count', 0)
                 if max_eps > 0 and episode + 1 > max_eps:
-                    has_next_ep = False
-            has_next_season = any(s.get('season_number') == season + 1 for s in seasons_meta)
+                    # Konec aktuální série - vyhledat první epizodu následující řady
+                    higher_seasons = [s for s in seasons_meta if (s.get('season_number') or 0) > season and (s.get('season_number') or 0) > 0]
+                    higher_seasons.sort(key=lambda x: x.get('season_number') or 0)
+                    if higher_seasons:
+                        next_s_obj = higher_seasons[0]
+                        next_ep_season = next_s_obj.get('season_number')
+                        next_ep_number = 1
+                        if clean_tmdb_id and tmdb_module:
+                            try:
+                                cached_episodes_next = tmdb_module.get_season_episodes(clean_tmdb_id, next_ep_season) or []
+                                next_ep_obj = next((e for e in cached_episodes_next if e.get('episode_number') == 1), None) or (cached_episodes_next[0] if cached_episodes_next else None)
+                                if next_ep_obj and next_ep_obj.get('episode_number'):
+                                    next_ep_number = next_ep_obj.get('episode_number')
+                            except Exception:
+                                pass
+                    else:
+                        has_next_ep = False
+            has_next_season = any((s.get('season_number') or 0) > season and (s.get('season_number') or 0) > 0 for s in seasons_meta)
 
         n_lbl = n_still = n_plot = n_yr = n_rt = n_dur = None
         if has_next_ep:
-            next_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == episode + 1), None)
-            n_lbl, n_still, n_plot, n_yr, n_rt, n_dur = _format_ep_info(next_ep_obj, f'{ADDON.getLocalizedString(30068)} (E+{episode+1:02d})', ADDON.getLocalizedString(30068))
+            if next_ep_season == season:
+                next_ep_obj = next((e for e in cached_episodes_curr if e.get('episode_number') == next_ep_number), None)
+                n_lbl, n_still, n_plot, n_yr, n_rt, n_dur = _format_ep_info(next_ep_obj, f'{ADDON.getLocalizedString(30068)} (E+{next_ep_number:02d})', ADDON.getLocalizedString(30068))
+            else:
+                n_lbl, n_still, n_plot, n_yr, n_rt, n_dur = _format_ep_info(next_ep_obj, f'{ADDON.getLocalizedString(30068)} (S{next_ep_season:02d}E{next_ep_number:02d})', ADDON.getLocalizedString(30068))
             items.append({
                 'label': n_lbl,
-                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{season:02d}E{episode+1:02d}")}',
+                'action': f'search&query={urllib.parse.quote_plus(f"{ws_base} S{next_ep_season:02d}E{next_ep_number:02d}")}',
                 'icon': n_still or 'DefaultVideoEpisodes.png',
                 'thumb': n_still or poster or 'DefaultVideoEpisodes.png',
                 'poster': poster,
@@ -955,11 +1034,12 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             })
 
         ns_lbl = ns_still = ns_plot = ns_yr = ns_rt = ns_dur = None
-        if has_next_season:
+        if has_next_season and next_ep_season == season:
             next_s_first_ep = None
             if clean_tmdb_id and tmdb_module:
                 try:
-                    cached_episodes_next = tmdb_module.get_season_episodes(clean_tmdb_id, season + 1) or []
+                    if not cached_episodes_next:
+                        cached_episodes_next = tmdb_module.get_season_episodes(clean_tmdb_id, season + 1) or []
                     next_s_first_ep = next((e for e in cached_episodes_next if e.get('episode_number') == 1), None)
                 except Exception:
                     pass
@@ -1727,6 +1807,8 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         
     today = datetime.date.today()
     search_base = ws_base if (ws_base and ws_base.strip()) else show_title
+    import history
+    watched_ep_codes = history.get_watched_episodes_set(tmdb_id=tmdb_id, ws_base=search_base)
 
     for ep in episodes:
         ep_num = ep.get('episode_number', 0)
@@ -1779,6 +1861,22 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         info_tag.setMediaType('episode')
         info_tag.setSeason(season_num)
         info_tag.setEpisode(ep_num)
+
+        ep_code = f"S{season_num:02d}E{ep_num:02d}"
+        is_ep_watched = (ep_code in watched_ep_codes)
+        if is_ep_watched:
+            info_tag.setPlaycount(1)
+            try:
+                li.setInfo('video', {'playcount': 1, 'overlay': 7})
+            except Exception:
+                pass
+        else:
+            info_tag.setPlaycount(0)
+            try:
+                li.setInfo('video', {'playcount': 0, 'overlay': 0})
+            except Exception:
+                pass
+
         if overview:
             info_tag.setPlot(overview)
         if rating:
@@ -1803,6 +1901,10 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         cm = [
             (ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)})")
         ]
+        if is_ep_watched:
+            cm.append((ADDON.getLocalizedString(30073), f"RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(ws_query)}&watched=0)"))
+        else:
+            cm.append((ADDON.getLocalizedString(30072), f"RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(ws_query)}&watched=1)"))
         li.addContextMenuItems(cm)
 
         url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
@@ -1958,6 +2060,8 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
 
     today = datetime.date.today()
     search_base = ws_base if (ws_base and ws_base.strip()) else show_title
+    import history
+    watched_ep_codes = history.get_watched_episodes_set(ws_base=search_base)
 
     for episode in episodes:
         ep_num = episode.get('number', 0)
@@ -2011,6 +2115,22 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
         info_tag.setMediaType('episode')
         info_tag.setSeason(season_num)
         info_tag.setEpisode(ep_num)
+
+        ep_code = f"S{season_num:02d}E{ep_num:02d}"
+        is_ep_watched = (ep_code in watched_ep_codes)
+        if is_ep_watched:
+            info_tag.setPlaycount(1)
+            try:
+                li.setInfo('video', {'playcount': 1, 'overlay': 7})
+            except Exception:
+                pass
+        else:
+            info_tag.setPlaycount(0)
+            try:
+                li.setInfo('video', {'playcount': 0, 'overlay': 0})
+            except Exception:
+                pass
+
         if overview:
             info_tag.setPlot(overview)
         if rating:
@@ -2035,6 +2155,10 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
         cm = [
             (ADDON.getLocalizedString(30057), f"Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)})")
         ]
+        if is_ep_watched:
+            cm.append((ADDON.getLocalizedString(30073), f"RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(ws_query)}&watched=0)"))
+        else:
+            cm.append((ADDON.getLocalizedString(30072), f"RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(ws_query)}&watched=1)"))
         li.addContextMenuItems(cm)
 
         url = f"{sys.argv[0]}?action=search&query={urllib.parse.quote_plus(ws_query)}"
@@ -2356,9 +2480,9 @@ def history_mark_watched(query, watched, source=None):
                 else:
                     trakt.mark_unwatched(media_type, trakt_id)
                     
-    if is_watched and source != 'watchlist':
+    if is_watched:
         try:
-            history.check_and_update_next_episodes()
+            history.check_and_update_next_episodes(force=True)
         except Exception:
             pass
 
