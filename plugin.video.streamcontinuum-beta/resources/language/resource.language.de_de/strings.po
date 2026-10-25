@@ -607,3 +607,44 @@ msgctxt "#30180"
 msgid "Automatic history synchronization"
 msgstr "Automatische Synchronisierung des Verlaufs"
 
+msgctxt "#30181"
+msgid "Watchlist new episodes check interval"
+msgstr "Intervall für die Suche nach neuen Episoden"
+
+msgctxt "#30182"
+msgid "On every open (not recommended)"
+msgstr "Bei jedem Öffnen (nicht empfohlen)"
+
+msgctxt "#30183"
+msgid "6 hours"
+msgstr "6 Stunden"
+
+msgctxt "#30184"
+msgid "12 hours"
+msgstr "12 Stunden"
+
+msgctxt "#30185"
+msgid "24 hours (recommended)"
+msgstr "24 Stunden (empfohlen)"
+
+msgctxt "#30186"
+msgid "Background service / manual only"
+msgstr "Nur Hintergrunddienst / manuell"
+
+msgctxt "#30187"
+msgid "Refresh watchlist"
+msgstr "Watchlist aktualisieren"
+
+msgctxt "#30188"
+msgid "New episodes found and added to watchlist."
+msgstr "Neue Episoden gefunden und hinzugefügt."
+
+msgctxt "#30189"
+msgid "Checking for new episodes..."
+msgstr "Suche nach neuen Episoden..."
+
+msgctxt "#30190"
+msgid "Watchlist is up to date."
+msgstr "Watchlist ist aktuell."
+
+

@@ -36,7 +36,7 @@ def check_webshare_vip_bg():
 def check_new_episodes_bg():
     try:
         xbmc.log("StreamContinuum Service: Checking for new aired episodes in history on background...", xbmc.LOGINFO)
-        updated = history.check_and_update_next_episodes()
+        updated = history.check_and_update_next_episodes(force=True)
         if updated:
             xbmc.log("StreamContinuum Service: New episodes detected and added to watchlist.", xbmc.LOGINFO)
     except Exception as e:

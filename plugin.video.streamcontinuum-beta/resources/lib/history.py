@@ -319,6 +319,7 @@ def normalize_history_item(item, default_ts=None):
         'last_played_at': last_played_at,
         'updated_at': updated_at,
         'added_at': added_at,
+        'is_series_completed': bool(item.get('is_series_completed', False)),
         '_raw_title_hint': str(item.get('title') or '')
     }
 
@@ -372,11 +373,11 @@ def _merge_metadata(target, source):
     """Doplní chybějící TMDb metadata ze source do target."""
     if not source:
         return target
-    for k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'identified_at']:
+    for k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'identified_at', 'is_series_completed']:
         t_val = target.get(k)
         s_val = source.get(k)
         if s_val is not None and s_val != '' and s_val != [] and s_val != 0:
-            if t_val is None or t_val == '' or t_val == [] or t_val == 0:
+            if t_val is None or t_val == '' or t_val == [] or t_val == 0 or (k == 'is_series_completed' and s_val is True):
                 target[k] = s_val
     return target
 
@@ -583,6 +584,8 @@ def consolidate_history_items(raw_items):
                 'watched_episodes': sorted(all_watched_codes)
             }
             best_watched.pop('_raw_title_hint', None)
+            if any(it.get('is_series_completed') for it in s_group):
+                best_watched['is_series_completed'] = True
             result_items.append(best_watched)
 
         # Nezhlédnutá epizoda (Watchlist): pouze pokud je > max_w_tuple a nemá budoucí rok vydání
@@ -1435,15 +1438,82 @@ def update_history_with_tmdb_data(original_query, tmdb_data):
 _last_check_next_episodes_time = 0
 
 
+def _get_watchlist_check_interval():
+    try:
+        val = ADDON.getSetting('watchlist_check_interval')
+        idx = int(val) if str(val).isdigit() else 3
+        if idx == 0:
+            return 60
+        elif idx == 1:
+            return 6 * 3600
+        elif idx == 2:
+            return 12 * 3600
+        elif idx == 3:
+            return 24 * 3600
+        elif idx == 4:
+            return 1000000000
+    except Exception:
+        pass
+    return 24 * 3600
+
+
+def _get_last_watchlist_check_ts():
+    try:
+        ts_str = ADDON.getSetting('watchlist_last_check_ts')
+        if ts_str and str(ts_str).isdigit():
+            return int(ts_str)
+    except Exception:
+        pass
+    try:
+        state_file = os.path.join(PROFILE_DIR, 'history_state.json')
+        if os.path.exists(state_file):
+            with open(state_file, 'r', encoding='utf-8') as f:
+                st = json.load(f)
+                return int(st.get('watchlist_last_check_ts', 0))
+    except Exception:
+        pass
+    return 0
+
+
+def _set_last_watchlist_check_ts(ts):
+    global _last_check_next_episodes_time
+    _last_check_next_episodes_time = int(ts)
+    try:
+        ADDON.setSetting('watchlist_last_check_ts', str(int(ts)))
+    except Exception:
+        pass
+    try:
+        state_file = os.path.join(PROFILE_DIR, 'history_state.json')
+        st = {}
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, 'r', encoding='utf-8') as f:
+                    st = json.load(f)
+            except Exception:
+                st = {}
+        st['watchlist_last_check_ts'] = int(ts)
+        temp_file = f"{state_file}.{os.getpid()}.tmp"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(st, f)
+        os.replace(temp_file, state_file)
+    except Exception:
+        pass
+
+
 def check_and_update_next_episodes(force=False, target_tmdb_id=None):
     global _last_check_next_episodes_time
     if tmdb is None:
         return False
 
     now_ts = int(time.time())
-    # Throttling: pokud nejde o vynucenou kontrolu ani o konkrétní ID, nespouštět častěji než 1x za 5 minut
+    # Throttling / mezipaměť: pokud nejde o vynucenou kontrolu ani o konkrétní ID, nespouštět častěji než zvolený interval
     if not force and target_tmdb_id is None:
-        if now_ts - _last_check_next_episodes_time < 300:
+        last_check_ts = _get_last_watchlist_check_ts()
+        if last_check_ts <= 0:
+            last_check_ts = _last_check_next_episodes_time
+        interval = _get_watchlist_check_interval()
+        if (now_ts - last_check_ts) < interval:
+            xbmc.log(f"StreamContinuum History: Watchlist check throttled by cache (last check: {now_ts - last_check_ts}s ago, interval: {interval}s)", xbmc.LOGDEBUG)
             return False
 
     try:
@@ -1464,6 +1534,10 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
                 or (item.get('season') is not None and item.get('episode') is not None)
             )
             if not is_tv or not item.get('is_watched', True):
+                continue
+
+            # Přeskočit již kompletně ukončené a dokoukané seriály
+            if item.get('is_series_completed'):
                 continue
 
             last_s = item.get('season')
@@ -1627,6 +1701,12 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
                             target_episode = next_ep_obj.get('episode_number') or 1
                             break
 
+                if not next_ep_obj:
+                    show_status = str(show_details.get('status') or '').strip().lower()
+                    if show_status in ('ended', 'canceled', 'ukončeno'):
+                        item['is_series_completed'] = True
+                        items_modified_meta = True
+
                 if next_ep_obj:
                     air_date_str = next_ep_obj.get('air_date')
                     is_aired = False
@@ -1748,23 +1828,32 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
                 }
                 current_history.insert(0, item_obj)
             _save_history(current_history)
-            _last_check_next_episodes_time = now_ts
+            if target_tmdb_id is None:
+                _set_last_watchlist_check_ts(now_ts)
+            else:
+                _last_check_next_episodes_time = now_ts
             return True
         elif items_modified_meta:
             try:
                 current_saved = get_history(deduplicate=False)
                 for c_it in current_saved:
                     for a_it in all_items:
-                        if c_it.get('query') == a_it.get('query') and a_it.get('tmdb_id') and not c_it.get('tmdb_id'):
-                            c_it['tmdb_id'] = a_it.get('tmdb_id')
-                            c_it['identified_at'] = a_it.get('identified_at')
+                        if c_it.get('query') == a_it.get('query'):
+                            if a_it.get('tmdb_id') and not c_it.get('tmdb_id'):
+                                c_it['tmdb_id'] = a_it.get('tmdb_id')
+                                c_it['identified_at'] = a_it.get('identified_at')
                             if a_it.get('title') and not c_it.get('title'):
                                 c_it['title'] = a_it.get('title')
+                            if a_it.get('is_series_completed'):
+                                c_it['is_series_completed'] = True
                 _save_history(current_saved)
             except Exception:
                 pass
 
-        _last_check_next_episodes_time = now_ts
+        if target_tmdb_id is None:
+            _set_last_watchlist_check_ts(now_ts)
+        else:
+            _last_check_next_episodes_time = now_ts
         return False
     except Exception as e:
         xbmc.log(f"StreamContinuum History: check_and_update_next_episodes failed: {e}", xbmc.LOGERROR)

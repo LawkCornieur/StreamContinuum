@@ -106,7 +106,9 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
             pass
     if runtime_min:
         try:
-            info_tag.setDuration(int(runtime_min) * 60)
+            rt_val = int(runtime_min)
+            if rt_val > 0:
+                info_tag.setDuration(rt_val * 60)
         except (ValueError, TypeError):
             pass
     return list_item
@@ -650,7 +652,7 @@ def show_watchlist():
             media_type = 'movie'
 
         # Pokud u položky chybí délka (runtime), zkusit ji spolehlivě dohledat z TMDb
-        if (not runtime or runtime == 0) and item.get('tmdb_id') and tmdb_module:
+        if (runtime is None or runtime == 0) and item.get('tmdb_id') and tmdb_module:
             try:
                 t_id = item.get('tmdb_id')
                 if media_type in ('tvshow', 'episode'):
@@ -659,11 +661,17 @@ def show_watchlist():
                         runtime = s_details.get('runtime')
                         item['runtime'] = runtime
                         items_meta_updated = True
+                    else:
+                        item['runtime'] = -1
+                        items_meta_updated = True
                 else:
                     m_details = tmdb_module.get_movie_details(t_id) if hasattr(tmdb_module, 'get_movie_details') else None
                     if m_details and m_details.get('runtime'):
                         runtime = m_details.get('runtime')
                         item['runtime'] = runtime
+                        items_meta_updated = True
+                    else:
+                        item['runtime'] = -1
                         items_meta_updated = True
             except Exception:
                 pass
@@ -677,7 +685,7 @@ def show_watchlist():
 
         list_item = _make_media_list_item(
             label=label, year=year, plot=plot, genres_str=', '.join(genres) if genres else '',
-            rating=rating, runtime_min=runtime, poster=poster, fanart=fanart if fanart else get_asset('fa-watchlist.jpg'), media_type=media_type,
+            rating=rating, runtime_min=runtime if (runtime and int(runtime) > 0) else None, poster=poster, fanart=fanart if fanart else get_asset('fa-watchlist.jpg'), media_type=media_type,
             is_watched=False
         )
         if ep_match:
@@ -690,6 +698,7 @@ def show_watchlist():
         cm = [
             (ADDON.getLocalizedString(30072), f'RunPlugin({sys.argv[0]}?action=history_mark&query={urllib.parse.quote_plus(query)}&watched=1&source=watchlist)'),
             (ADDON.getLocalizedString(30134), f'RunPlugin({sys.argv[0]}?action=watchlist_remove&query={urllib.parse.quote_plus(query)})'),
+            (ADDON.getLocalizedString(30187), f'RunPlugin({sys.argv[0]}?action=watchlist_refresh)'),
             (ADDON.getLocalizedString(30120), f'Container.Update({sys.argv[0]}?action=history_tmdb_identify_search&original_query={urllib.parse.quote_plus(query)})'),
             (ADDON.getLocalizedString(30065), f'RunPlugin({sys.argv[0]}?action=history_edit&query={urllib.parse.quote_plus(query)})'),
         ]
@@ -703,6 +712,12 @@ def show_watchlist():
     cat_item.setArt({'icon': 'DefaultAddonVideo.png', 'thumb': 'DefaultAddonVideo.png', 'fanart': get_asset('fa-watchlist.jpg')})
     cat_url = f"{sys.argv[0]}?action=tmdb_menu"
     xbmcplugin.addDirectoryItem(HANDLE, cat_url, cat_item, isFolder=True)
+
+    refresh_label = f"[COLOR #01b4e4]⟳ {ADDON.getLocalizedString(30187)}[/COLOR]"
+    refresh_item = xbmcgui.ListItem(label=refresh_label)
+    refresh_item.setArt({'icon': 'DefaultAddonService.png', 'thumb': 'DefaultAddonService.png', 'fanart': get_asset('fa-watchlist.jpg')})
+    refresh_url = f"{sys.argv[0]}?action=watchlist_refresh"
+    xbmcplugin.addDirectoryItem(HANDLE, refresh_url, refresh_item, isFolder=False)
         
     if items_meta_updated:
         try:
@@ -2707,6 +2722,25 @@ def run():
             pass
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
+        return
+    elif action == 'watchlist_refresh':
+        import history
+        p_dialog = xbmcgui.DialogProgressBG()
+        try:
+            p_dialog.create("StreamContinuum", ADDON.getLocalizedString(30189))
+            updated = history.check_and_update_next_episodes(force=True)
+            p_dialog.close()
+            if updated:
+                xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30188), xbmcgui.NOTIFICATION_INFO, 2500)
+            else:
+                xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30190), xbmcgui.NOTIFICATION_INFO, 2000)
+        except Exception as e:
+            try:
+                p_dialog.close()
+            except Exception:
+                pass
+            xbmc.log(f"StreamContinuum: Manual watchlist refresh error: {e}", xbmc.LOGWARNING)
+        xbmc.executebuiltin("Container.Refresh")
         return
     elif action == 'trakt_mark' or action == 'media_mark':
         media_type = params.get('type')
