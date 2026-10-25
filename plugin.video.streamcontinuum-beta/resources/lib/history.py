@@ -11,14 +11,18 @@ import threading
 
 try:
     import tmdb
-except Exception:
-    tmdb = None
+except ImportError:
+    try:
+        import resources.lib.tmdb as tmdb
+    except Exception:
+        tmdb = None
 
 ADDON = xbmcaddon.Addon()
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
 HISTORY_FILE = os.path.join(PROFILE_DIR, 'history.json')
 TOMBSTONES_FILE = os.path.join(PROFILE_DIR, 'history_tombstones.json')
 TOMBSTONE_EXPIRATION_DAYS = 30
+_history_file_lock = threading.Lock()
 
 _EPISODE_PATTERN = re.compile(
     r'^(.*?)(?:[\s._\-]+|(?<=[^\W\d_]))(?:S(\d+)\s*E(\d+)\b|\b(\d+)x(\d+)\b|\b(?:série|serie|season)\s*(\d+)\s*(?:epizoda|díl|dil|ep|e)\s*(\d+)\b)',
@@ -1030,28 +1034,29 @@ def get_watched_episodes_set(tmdb_id=None, ws_base=None):
 
 
 def _save_history(history_list, tombstones=None):
-    try:
-        if not os.path.exists(PROFILE_DIR):
-            try:
-                os.makedirs(PROFILE_DIR)
-            except Exception:
-                pass
-        current_tombstones = load_tombstones()
-        if tombstones:
-            current_tombstones = merge_tombstones(current_tombstones, tombstones)
-            save_tombstones(current_tombstones)
+    with _history_file_lock:
+        try:
+            if not os.path.exists(PROFILE_DIR):
+                try:
+                    os.makedirs(PROFILE_DIR)
+                except Exception:
+                    pass
+            current_tombstones = load_tombstones()
+            if tombstones:
+                current_tombstones = merge_tombstones(current_tombstones, tombstones)
+                save_tombstones(current_tombstones)
 
-        raw_active = [it for it in (history_list or []) if isinstance(it, dict) and not it.get('is_deleted') and str(it.get('query', '')).strip()]
-        filtered = filter_items_by_tombstones(raw_active, current_tombstones)
-        consolidated = consolidate_history_items(filtered)
+            raw_active = [it for it in (history_list or []) if isinstance(it, dict) and not it.get('is_deleted') and str(it.get('query', '')).strip()]
+            filtered = filter_items_by_tombstones(raw_active, current_tombstones)
+            consolidated = consolidate_history_items(filtered)
 
-        full_output = consolidated + current_tombstones
-        temp_file = f"{HISTORY_FILE}.{os.getpid()}.{threading.get_ident()}.tmp"
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(full_output, f, ensure_ascii=False, indent=4)
-        os.replace(temp_file, HISTORY_FILE)
-    except Exception as e:
-        xbmc.log(f"StreamContinuum History: Error saving history.json: {e}", xbmc.LOGERROR)
+            full_output = consolidated + current_tombstones
+            temp_file = f"{HISTORY_FILE}.{os.getpid()}.{threading.get_ident()}.tmp"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(full_output, f, ensure_ascii=False, indent=4)
+            os.replace(temp_file, HISTORY_FILE)
+        except Exception as e:
+            xbmc.log(f"StreamContinuum History: Error saving history.json: {e}", xbmc.LOGERROR)
 
 
 def add_to_history(query):
@@ -1098,6 +1103,21 @@ def add_to_watchlist_local(query, tmdb_data=None):
     history_items = get_history(deduplicate=True)
     now = int(time.time())
     ws_base, season, episode, ep_code = parse_episode_info(query_str)
+    
+    if tmdb_data and (season is None or episode is None):
+        if tmdb_data.get('season') is not None and tmdb_data.get('episode') is not None:
+            try:
+                season = int(tmdb_data['season'])
+                episode = int(tmdb_data['episode'])
+                ep_code = f"S{season:02d}E{episode:02d}"
+            except (ValueError, TypeError):
+                pass
+        elif tmdb_data.get('season') is not None:
+            try:
+                season = int(tmdb_data['season'])
+            except (ValueError, TypeError):
+                pass
+
     query_is_series = is_series(query_str) or (tmdb_data and tmdb_data.get('media_type') in ('tvshow', 'tv', 'show')) or (season is not None and episode is not None)
 
     target_tmdb_id = tmdb_data.get('tmdb_id') if tmdb_data else None
@@ -1106,10 +1126,12 @@ def add_to_watchlist_local(query, tmdb_data=None):
     except (ValueError, TypeError):
         target_tmdb_id = None
 
-    if query_is_series and (season is None or episode is None):
+    max_watched_s = -1
+    max_watched_e = -1
+    all_watched_codes = set()
+
+    if query_is_series:
         match_base_key = normalize_match_key(ws_base or (tmdb_data.get('title') if tmdb_data else None) or query_str)
-        max_watched_s = -1
-        max_watched_e = -1
         existing_ws_base = None
 
         for it in history_items:
@@ -1147,24 +1169,40 @@ def add_to_watchlist_local(query, tmdb_data=None):
                 if it.get('is_series_completed'):
                     it['is_series_completed'] = False
 
+                s_info = it.get('series_info') or {}
+                for wc in s_info.get('watched_episodes', []):
+                    all_watched_codes.add(wc)
+
                 if it.get('is_watched', True):
                     s_num = it.get('season')
                     e_num = it.get('episode')
-                    s_info = it.get('series_info') or {}
                     if s_num is None and s_info.get('last_watched_season') is not None:
                         s_num = s_info.get('last_watched_season')
                     if e_num is None and s_info.get('last_watched_episode') is not None:
                         e_num = s_info.get('last_watched_episode')
                     if s_num is not None and e_num is not None:
+                        all_watched_codes.add(f"S{int(s_num):02d}E{int(e_num):02d}")
                         if (s_num, e_num) > (max_watched_s, max_watched_e):
                             max_watched_s = s_num
                             max_watched_e = e_num
 
-        target_s = 1
-        target_e = 1
         ep_meta_obj = None
 
-        if max_watched_s > 0 and max_watched_e > 0:
+        if season is not None and episode is not None:
+            target_s = season
+            target_e = episode
+        elif season is not None and episode is None:
+            target_s = season
+            target_e = 1
+            if target_tmdb_id and tmdb:
+                try:
+                    s_eps = tmdb.get_season_episodes(target_tmdb_id, target_s) or []
+                    unwatched_eps = [e for e in s_eps if f"S{target_s:02d}E{int(e.get('episode_number', 0)):02d}" not in all_watched_codes]
+                    if unwatched_eps:
+                        target_e = unwatched_eps[0].get('episode_number', 1)
+                except Exception:
+                    pass
+        elif max_watched_s > 0 and max_watched_e > 0:
             target_s = max_watched_s
             target_e = max_watched_e + 1
             if target_tmdb_id and tmdb:
@@ -1247,6 +1285,16 @@ def add_to_watchlist_local(query, tmdb_data=None):
         'updated_at': now,
         'added_at': now
     }
+    if query_is_series:
+        item_to_add['series_info'] = {
+            'ws_base': ws_base,
+            'season': season,
+            'episode': episode,
+            'episode_code': ep_code,
+            'last_watched_season': max_watched_s if max_watched_s > 0 else None,
+            'last_watched_episode': max_watched_e if max_watched_e > 0 else None,
+            'watched_episodes': sorted(all_watched_codes) if all_watched_codes else []
+        }
     remove_matching_tombstones(item_to_add)
 
     replaced = False
@@ -1281,11 +1329,6 @@ def add_to_watchlist_local(query, tmdb_data=None):
         history_items.insert(0, item_to_add)
 
     _save_history(history_items)
-    if target_tmdb_id:
-        try:
-            check_and_update_next_episodes(force=True, target_tmdb_id=target_tmdb_id)
-        except Exception:
-            pass
 
 
 def set_watched_status(query, is_watched):

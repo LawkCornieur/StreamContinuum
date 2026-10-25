@@ -294,6 +294,12 @@ def sync_history(silent=False, force=False, reason=""):
             # 5. Uložit historii i s platnými náhrobky lokálně
             history._save_history(final_history, tombstones=all_tombstones)
 
+            # 5b. Vyhodnotit a doplnit nově navazující epizody ve watchlistu na základě synchronizovaného stavu před uploadem
+            try:
+                history.check_and_update_next_episodes(force=True)
+            except Exception as ep_err:
+                xbmc.log(f"StreamContinuum: check_and_update_next_episodes in sync error: {ep_err}", xbmc.LOGWARNING)
+
             # 6. Smazat původní soubory historie na Webshare a ověřit jejich smazání před uploadem
             purged = webshare.purge_sync_files('streamcontinuum_history')
             if not purged:
@@ -312,12 +318,6 @@ def sync_history(silent=False, force=False, reason=""):
                 ADDON.setSetting('ws_last_sync_ts', str(int(now)))
             except Exception:
                 pass
-
-            # 8. Vyhodnotit a doplnit nově navazující epizody ve watchlistu na základě synchronizovaného stavu
-            try:
-                history.check_and_update_next_episodes(force=True)
-            except Exception as ep_err:
-                xbmc.log(f"StreamContinuum: check_and_update_next_episodes after sync error: {ep_err}", xbmc.LOGWARNING)
 
             xbmc.log(f"StreamContinuum: History sync completed successfully (reason='{reason}')", xbmc.LOGINFO)
             return True
