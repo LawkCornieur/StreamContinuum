@@ -56,6 +56,12 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.5.4** - 2026-10-25
+- Spuštění automatické synchronizace historie na webshare
+- Implementace ověřeného smazání a vyčištění původní historie
+- Vytvoření zámku pro zamezení dvojího spuštění synchronizace
+- Synchronizace se automaticky spouští po spuštění doplňku a po shlédnutí dílu nebo filmu
+
 **Verze 1.5.3** - 2026-10-24
 - Chronologické řazení historie podle data shlédnutí
 - Oprava zobrazení délky epizod a filmů v listu historie
