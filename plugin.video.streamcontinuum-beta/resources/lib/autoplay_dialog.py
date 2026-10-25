@@ -123,7 +123,7 @@ def run_autoplay_countdown(heading, line1, line2, seconds, show_continue_btn=Tru
             btn_cancel = ADDON.getLocalizedString(30194) or "Zrušit"
 
             dialog = AutoplayCountdownDialog(
-                'autoplay_dialog.xml', addon_path, 'Default', '720p',
+                'autoplay_dialog.xml', addon_path, 'Default', '1080i',
                 heading=heading, line1=line1, line2=line2,
                 btn_play=btn_play, btn_cancel=btn_cancel,
                 seconds=seconds

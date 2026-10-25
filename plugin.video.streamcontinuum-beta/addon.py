@@ -101,7 +101,16 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
             info_tag.setGenres(genres_list)
     if rating:
         try:
-            info_tag.setRating(float(rating))
+            r_val = float(rating)
+            if r_val > 0:
+                try:
+                    info_tag.setRating(r_val, default=True)
+                except TypeError:
+                    info_tag.setRating(r_val)
+                try:
+                    list_item.setInfo('video', {'rating': r_val})
+                except Exception:
+                    pass
         except (ValueError, TypeError):
             pass
     if runtime_min:
@@ -606,14 +615,15 @@ def play(ident, query=None, title=None, is_autoplay=False):
                                     if wb and c_wb and history.normalize_match_key(wb) == history.normalize_match_key(c_wb):
                                         target_wl_query = cand.get('query')
                                         break
-                            if not target_wl_query and wl_items:
-                                target_wl_query = wl_items[0].get('query')
                         except Exception:
                             target_wl_query = None
 
                         if target_wl_query:
                             safe_wl_query = urllib.parse.quote_plus(target_wl_query)
                             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={safe_wl_query}&source=watchlist,replace)')
+                        elif current_query:
+                            # Fallback do detailu v historii pro právě zhlédnutou položku
+                            xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=history_menu&query={safe_query}&source=history,replace)')
                         else:
                             xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
                     else:
@@ -726,11 +736,14 @@ def show_watchlist():
             base_name = history.get_base_name(query)
             label = f"{base_name}{ep_suffix}" if ep_suffix else (base_name or query)
 
+        still = item.get('still')
         list_item = _make_media_list_item(
             label=label, year=year, plot=plot, genres_str=', '.join(genres) if genres else '',
             rating=rating, runtime_min=runtime if (runtime and int(runtime) > 0) else None, poster=poster, fanart=fanart if fanart else get_asset('fa-watchlist.jpg'), media_type=media_type,
             is_watched=False
         )
+        if still:
+            list_item.setArt({'still': still, 'thumb': still})
         if ep_match:
             info_tag = list_item.getVideoInfoTag()
             if s_num is not None:
@@ -756,7 +769,7 @@ def show_watchlist():
     cat_url = f"{sys.argv[0]}?action=tmdb_menu"
     xbmcplugin.addDirectoryItem(HANDLE, cat_url, cat_item, isFolder=True)
 
-    refresh_label = f"[COLOR #01b4e4]⟳ {ADDON.getLocalizedString(30187)}[/COLOR]"
+    refresh_label = f"[COLOR #01b4e4]• {ADDON.getLocalizedString(30187)}[/COLOR]"
     refresh_item = xbmcgui.ListItem(label=refresh_label)
     refresh_item.setArt({'icon': 'DefaultAddonService.png', 'thumb': 'DefaultAddonService.png', 'fanart': get_asset('fa-watchlist.jpg')})
     refresh_url = f"{sys.argv[0]}?action=watchlist_refresh"
@@ -1251,7 +1264,16 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                     pass
             if rt:
                 try:
-                    info_tag.setRating(float(rt))
+                    r_val = float(rt)
+                    if r_val > 0:
+                        try:
+                            info_tag.setRating(r_val, default=True)
+                        except TypeError:
+                            info_tag.setRating(r_val)
+                        try:
+                            list_item.setInfo('video', {'rating': r_val})
+                        except Exception:
+                            pass
                 except (ValueError, TypeError):
                     pass
             if dur:
@@ -1902,22 +1924,28 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         else:
             date_label = ""
 
+        rating_raw = float(rating) if rating else 0
+        rating_percent = int(rating_raw * 10) if rating_raw > 0 else 0
+        r_prefix = f"[{rating_percent}%] " if rating_percent > 0 else ""
+
         ws_query = f"{search_base} S{season_num:02d}E{ep_num:02d}"
-        label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
+        label = f"{r_prefix}S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
 
         li = xbmcgui.ListItem(label=label)
         art = {}
         if still:
             art['thumb'] = still
             art['icon'] = still
+            art['still'] = still
+            art['poster'] = still
         elif poster:
             art['thumb'] = poster
             art['icon'] = poster
+            art['poster'] = poster
         else:
             art['icon'] = 'DefaultTVShows.png'
             art['thumb'] = 'DefaultTVShows.png'
         if poster:
-            art['poster'] = poster
             art['season.poster'] = poster
             art['tvshow.poster'] = poster
         art['fanart'] = fanart if fanart else get_asset('fa.png')
@@ -1946,10 +1974,16 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
 
         if overview:
             info_tag.setPlot(overview)
-        if rating:
+        if rating_raw > 0:
             try:
-                info_tag.setRating(float(rating))
-            except (ValueError, TypeError):
+                info_tag.setRating(rating_raw, default=True)
+            except TypeError:
+                info_tag.setRating(rating_raw)
+            except Exception:
+                pass
+            try:
+                li.setInfo('video', {'rating': rating_raw})
+            except Exception:
                 pass
         if runtime:
             try:
@@ -2070,6 +2104,7 @@ def show_seasons(show_title, trakt_id, poster='', fanart='', ws_base=None):
         season_meta = get_trakt_localized(trakt_id, 'season', season_num=season_num)
         ep_count = season_meta.get('episode_count') or season.get('episode_count', 0)
         rating = season_meta.get('rating') or season.get('rating', 0)
+        rating_raw = float(rating) if rating else 0
         overview = season_meta.get('overview') or season.get('overview', '')
         season_title = season_meta.get('title') or f"{ADDON.getLocalizedString(30105)} {season_num}"
 
@@ -2089,10 +2124,16 @@ def show_seasons(show_title, trakt_id, poster='', fanart='', ws_base=None):
         info_tag.setSeason(season_num)
         if overview:
             info_tag.setPlot(overview)
-        if rating:
+        if rating_raw > 0:
             try:
-                info_tag.setRating(float(rating))
-            except (ValueError, TypeError):
+                info_tag.setRating(rating_raw, default=True)
+            except TypeError:
+                info_tag.setRating(rating_raw)
+            except Exception:
+                pass
+            try:
+                li.setInfo('video', {'rating': rating_raw})
+            except Exception:
                 pass
         if ep_count:
             try:
@@ -2136,6 +2177,9 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
         ep_title = episode_meta.get('title') or episode.get('title', ADDON.getLocalizedString(30108).format(ep_num))
         overview = episode_meta.get('overview') or episode.get('overview', '')
         rating = episode_meta.get('rating') or episode.get('rating', 0)
+        rating_raw = float(rating) if rating else 0
+        rating_percent = int(rating_raw * 10) if rating_raw > 0 else 0
+        r_prefix = f"[{rating_percent}%] " if rating_percent > 0 else ""
         runtime = episode_meta.get('runtime') or episode.get('runtime', 0)
         air_date = episode_meta.get('air_date') or episode.get('first_aired', '')
 
@@ -2156,25 +2200,27 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
             date_label = ""
 
         ws_query = f"{search_base} S{season_num:02d}E{ep_num:02d}"
-        label = f"S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
+        label = f"{r_prefix}S{season_num:02d}E{ep_num:02d} - {ep_title}{date_label}"
 
         li = xbmcgui.ListItem(label=label)
         art = {}
-        if poster:
-            art['poster'] = poster
-            art['season.poster'] = poster
-            art['tvshow.poster'] = poster
-        art['fanart'] = fanart if fanart else get_asset('fa.png')
         ep_still = episode_meta.get('still') or episode_meta.get('thumb') or episode_meta.get('screenshot')
         if ep_still:
             art['thumb'] = ep_still
             art['icon'] = ep_still
+            art['still'] = ep_still
+            art['poster'] = ep_still
         elif poster:
             art['thumb'] = poster
             art['icon'] = poster
+            art['poster'] = poster
         else:
             art['icon'] = 'DefaultTVShows.png'
             art['thumb'] = 'DefaultTVShows.png'
+        if poster:
+            art['season.poster'] = poster
+            art['tvshow.poster'] = poster
+        art['fanart'] = fanart if fanart else get_asset('fa.png')
         li.setArt(art)
 
         info_tag = li.getVideoInfoTag()
@@ -2200,10 +2246,16 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
 
         if overview:
             info_tag.setPlot(overview)
-        if rating:
+        if rating_raw > 0:
             try:
-                info_tag.setRating(float(rating))
-            except (ValueError, TypeError):
+                info_tag.setRating(rating_raw, default=True)
+            except TypeError:
+                info_tag.setRating(rating_raw)
+            except Exception:
+                pass
+            try:
+                li.setInfo('video', {'rating': rating_raw})
+            except Exception:
                 pass
         if runtime:
             try:
@@ -2718,6 +2770,24 @@ def run():
                 try:
                     tmdb_id_val = int(item_id)
                 except (ValueError, TypeError):
+                    pass
+            elif id_type == 'trakt' and item_id:
+                try:
+                    trakt_meta = get_trakt_localized(item_id, media_type)
+                    if trakt_meta and trakt_meta.get('tmdb_id'):
+                        tmdb_id_val = int(trakt_meta['tmdb_id'])
+                except Exception:
+                    pass
+
+            if not tmdb_id_val and title and tmdb_module:
+                try:
+                    search_res = tmdb_module.search_tmdb(title)
+                    for s_item in search_res:
+                        expected_type = 'show' if media_type in ('show', 'tv', 'tvshow') else 'movie'
+                        if s_item.get('type') == expected_type and s_item.get('id'):
+                            tmdb_id_val = int(s_item.get('id'))
+                            break
+                except Exception:
                     pass
             tmdb_data = {
                 'tmdb_id': tmdb_id_val,

@@ -3,8 +3,8 @@
     <defaultcontrol always="true">200</defaultcontrol>
     <coordinates>
         <system>1</system>
-        <posx>320</posx>
-        <posy>235</posy>
+        <posx>640</posx>
+        <posy>415</posy>
         <width>640</width>
         <height>250</height>
     </coordinates>

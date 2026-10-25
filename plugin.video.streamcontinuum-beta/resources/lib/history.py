@@ -306,6 +306,7 @@ def normalize_history_item(item, default_ts=None):
         'rating': rating,
         'runtime': runtime,
         'poster': item.get('poster') or None,
+        'still': item.get('still') or None,
         'fanart': item.get('fanart') or None,
         'tmdb_id': tmdb_id,
         'media_type': media_type,
@@ -373,7 +374,7 @@ def _merge_metadata(target, source):
     """Doplní chybějící TMDb metadata ze source do target."""
     if not source:
         return target
-    for k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'fanart', 'identified_at', 'is_series_completed']:
+    for k in ['tmdb_id', 'title', 'year', 'plot', 'genres', 'rating', 'runtime', 'poster', 'still', 'fanart', 'identified_at', 'is_series_completed']:
         t_val = target.get(k)
         s_val = source.get(k)
         if s_val is not None and s_val != '' and s_val != [] and s_val != 0:
@@ -1094,11 +1095,134 @@ def add_to_watchlist_local(query, tmdb_data=None):
     if not query:
         return
     query_str = str(query).strip()
-    remove_matching_tombstones(query_str)
     history_items = get_history(deduplicate=True)
     now = int(time.time())
     ws_base, season, episode, ep_code = parse_episode_info(query_str)
     query_is_series = is_series(query_str) or (tmdb_data and tmdb_data.get('media_type') in ('tvshow', 'tv', 'show')) or (season is not None and episode is not None)
+
+    target_tmdb_id = tmdb_data.get('tmdb_id') if tmdb_data else None
+    try:
+        target_tmdb_id = int(target_tmdb_id) if target_tmdb_id and str(target_tmdb_id).strip().lower() not in ('none', '', '0') else None
+    except (ValueError, TypeError):
+        target_tmdb_id = None
+
+    if query_is_series and (season is None or episode is None):
+        match_base_key = normalize_match_key(ws_base or (tmdb_data.get('title') if tmdb_data else None) or query_str)
+        max_watched_s = -1
+        max_watched_e = -1
+        existing_ws_base = None
+
+        for it in history_items:
+            it_is_tv = (
+                it.get('media_type') in ('tvshow', 'tv', 'show')
+                or is_series(it.get('query'))
+                or (it.get('season') is not None and it.get('episode') is not None)
+            )
+            if not it_is_tv:
+                continue
+
+            it_tmdb = it.get('tmdb_id')
+            try:
+                it_tmdb = int(it_tmdb) if it_tmdb and str(it_tmdb).strip().lower() not in ('none', '', '0') else None
+            except (ValueError, TypeError):
+                it_tmdb = None
+
+            is_match = False
+            if target_tmdb_id and it_tmdb and target_tmdb_id == it_tmdb:
+                is_match = True
+            else:
+                it_key = normalize_match_key(it.get('ws_base') or it.get('query'))
+                if match_base_key and it_key and match_base_key == it_key:
+                    is_match = True
+                else:
+                    cand_names = set(_extract_candidate_names(it))
+                    if match_base_key and match_base_key in cand_names:
+                        is_match = True
+
+            if is_match:
+                if not existing_ws_base and it.get('ws_base'):
+                    existing_ws_base = it.get('ws_base')
+                if not target_tmdb_id and it_tmdb:
+                    target_tmdb_id = it_tmdb
+                if it.get('is_series_completed'):
+                    it['is_series_completed'] = False
+
+                if it.get('is_watched', True):
+                    s_num = it.get('season')
+                    e_num = it.get('episode')
+                    s_info = it.get('series_info') or {}
+                    if s_num is None and s_info.get('last_watched_season') is not None:
+                        s_num = s_info.get('last_watched_season')
+                    if e_num is None and s_info.get('last_watched_episode') is not None:
+                        e_num = s_info.get('last_watched_episode')
+                    if s_num is not None and e_num is not None:
+                        if (s_num, e_num) > (max_watched_s, max_watched_e):
+                            max_watched_s = s_num
+                            max_watched_e = e_num
+
+        target_s = 1
+        target_e = 1
+        ep_meta_obj = None
+
+        if max_watched_s > 0 and max_watched_e > 0:
+            target_s = max_watched_s
+            target_e = max_watched_e + 1
+            if target_tmdb_id and tmdb:
+                try:
+                    show_details = tmdb.get_show_seasons(target_tmdb_id)
+                    if show_details and 'seasons' in show_details:
+                        seasons = show_details.get('seasons', [])
+                        curr_s_obj = next((s for s in seasons if s.get('season_number') == target_s), None)
+                        if curr_s_obj:
+                            max_eps = curr_s_obj.get('episode_count', 0)
+                            if max_eps > 0 and target_e > max_eps:
+                                higher_seasons = [s for s in seasons if (s.get('season_number') or 0) > target_s and (s.get('season_number') or 0) > 0]
+                                higher_seasons.sort(key=lambda x: x.get('season_number') or 0)
+                                if higher_seasons:
+                                    target_s = higher_seasons[0].get('season_number')
+                                    target_e = 1
+                except Exception as e:
+                    xbmc.log(f"StreamContinuum History: TMDb season calculation error in add_to_watchlist_local: {e}", xbmc.LOGWARNING)
+        else:
+            target_s = 1
+            target_e = 1
+
+        clean_base = sanitize_title(tmdb_data.get('title')) if (tmdb_data and tmdb_data.get('title')) else (existing_ws_base or ws_base or query_str)
+        ws_base = clean_base
+        season = target_s
+        episode = target_e
+        ep_code = f"S{target_s:02d}E{target_e:02d}"
+        query_str = f"{clean_base} {ep_code}"
+
+        if target_tmdb_id and tmdb:
+            try:
+                cached_eps = tmdb.get_season_episodes(target_tmdb_id, target_s) or []
+                ep_meta_obj = next((e for e in cached_eps if e.get('episode_number') == target_e), None)
+            except Exception:
+                ep_meta_obj = None
+
+        if ep_meta_obj:
+            if not tmdb_data:
+                tmdb_data = {}
+            if ep_meta_obj.get('overview'):
+                tmdb_data['plot'] = ep_meta_obj.get('overview')
+            if ep_meta_obj.get('rating'):
+                tmdb_data['rating'] = ep_meta_obj.get('rating')
+            if ep_meta_obj.get('runtime'):
+                tmdb_data['runtime'] = ep_meta_obj.get('runtime')
+            if ep_meta_obj.get('still'):
+                tmdb_data['still'] = ep_meta_obj.get('still')
+            if ep_meta_obj.get('air_date'):
+                try:
+                    tmdb_data['year'] = int(str(ep_meta_obj.get('air_date'))[:4])
+                except (ValueError, TypeError):
+                    pass
+
+    remove_matching_tombstones(query_str)
+    if ws_base:
+        remove_matching_tombstones(ws_base)
+    if tmdb_data and tmdb_data.get('title'):
+        remove_matching_tombstones(tmdb_data['title'])
 
     item_to_add = {
         'query': query_str,
@@ -1109,22 +1233,59 @@ def add_to_watchlist_local(query, tmdb_data=None):
         'rating': tmdb_data.get('rating') if tmdb_data else None,
         'runtime': tmdb_data.get('runtime') if tmdb_data else None,
         'poster': tmdb_data.get('poster') if tmdb_data else None,
+        'still': tmdb_data.get('still') if tmdb_data else None,
         'fanart': tmdb_data.get('fanart') if tmdb_data else None,
-        'tmdb_id': tmdb_data.get('tmdb_id') if tmdb_data else None,
+        'tmdb_id': target_tmdb_id if target_tmdb_id else (tmdb_data.get('tmdb_id') if tmdb_data else None),
         'media_type': tmdb_data.get('media_type') if (tmdb_data and tmdb_data.get('media_type')) else ('tvshow' if query_is_series else 'movie'),
         'ws_base': ws_base,
         'season': season if query_is_series else None,
         'episode': episode if query_is_series else None,
         'episode_code': ep_code if query_is_series else None,
-        'identified_at': now if (tmdb_data and tmdb_data.get('tmdb_id')) else None,
+        'identified_at': now if (target_tmdb_id or (tmdb_data and tmdb_data.get('tmdb_id'))) else None,
         'is_watched': False,
         'last_played_at': 0,
         'updated_at': now,
         'added_at': now
     }
+    remove_matching_tombstones(item_to_add)
 
-    history_items.insert(0, item_to_add)
+    replaced = False
+    for idx, cand in enumerate(history_items):
+        if cand.get('is_watched', True):
+            continue
+        c_is_tv = (
+            cand.get('media_type') in ('tvshow', 'tv', 'show')
+            or is_series(cand.get('query'))
+            or (cand.get('season') is not None and cand.get('episode') is not None)
+        )
+        if c_is_tv == query_is_series:
+            c_tmdb = cand.get('tmdb_id')
+            try:
+                c_tmdb = int(c_tmdb) if c_tmdb and str(c_tmdb).strip().lower() not in ('none', '', '0') else None
+            except (ValueError, TypeError):
+                c_tmdb = None
+            is_same = False
+            if target_tmdb_id and c_tmdb and target_tmdb_id == c_tmdb:
+                is_same = True
+            else:
+                c_key = normalize_match_key(cand.get('ws_base') or cand.get('query'))
+                q_key = normalize_match_key(ws_base or query_str)
+                if c_key and q_key and c_key == q_key:
+                    is_same = True
+            if is_same:
+                history_items[idx] = item_to_add
+                replaced = True
+                break
+
+    if not replaced:
+        history_items.insert(0, item_to_add)
+
     _save_history(history_items)
+    if target_tmdb_id:
+        try:
+            check_and_update_next_episodes(force=True, target_tmdb_id=target_tmdb_id)
+        except Exception:
+            pass
 
 
 def set_watched_status(query, is_watched):
@@ -1812,6 +1973,7 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
                             'year': int(str(air_date_str)[:4]) if (air_date_str and len(str(air_date_str)) >= 4) else show_details.get('year'),
                             'plot': plot_text,
                             'poster': show_details.get('poster') or item.get('poster'),
+                            'still': next_ep_obj.get('still') if next_ep_obj else None,
                             'fanart': show_details.get('fanart') or item.get('fanart'),
                             'rating': next_ep_obj.get('rating') or show_details.get('rating'),
                             'runtime': ep_runtime,
@@ -1843,6 +2005,7 @@ def check_and_update_next_episodes(force=False, target_tmdb_id=None):
                     'rating': t_data.get('rating') if t_data else None,
                     'runtime': t_data.get('runtime') if t_data else None,
                     'poster': t_data.get('poster') if t_data else None,
+                    'still': t_data.get('still') if t_data else None,
                     'fanart': t_data.get('fanart') if t_data else None,
                     'tmdb_id': t_data.get('tmdb_id') if t_data else None,
                     'media_type': 'tvshow',
