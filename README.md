@@ -56,6 +56,12 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.5.5** - 2026-10-25
+- Oprava přechodu na další díl na konci serie
+- Oprava aktualizování seznamu k zhlédnutí
+- Přidání dočasné paměti pro zobrazení dostupnosti nových dílů
+- Oprava příznaků zhlédnutých epizod a správné zobrazování "fajfek" místo "kostiček"
+
 **Verze 1.5.4** - 2026-10-25
 - Spuštění automatické synchronizace historie na webshare
 - Implementace ověřeného smazání a vyčištění původní historie
