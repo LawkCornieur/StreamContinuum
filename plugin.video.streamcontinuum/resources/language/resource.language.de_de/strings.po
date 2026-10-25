@@ -603,3 +603,7 @@ msgctxt "#30179"
 msgid "VIP subscription expired! Streams may not play."
 msgstr "VIP-Abonnement ist abgelaufen! Streams können nicht abgespielt werden."
 
+msgctxt "#30180"
+msgid "Automatic history synchronization"
+msgstr "Automatische Synchronisierung des Verlaufs"
+

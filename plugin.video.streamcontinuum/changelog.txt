@@ -1,3 +1,9 @@
+[B]Verze 1.5.4[/B] - 2026-10-25
+- Spuštění automatické synchronizace historie na webshare
+- Implementace ověřeného smazání a vyčištění původní historie
+- Vytvoření zámku pro zamezení dvojího spuštění synchronizace
+- Synchronizace se automaticky spouští po spuštění doplňku a po shlédnutí dílu nebo filmu
+
 [B]Verze 1.5.3[/B] - 2026-10-24
 - Chronologické řazení historie podle data shlédnutí
 - Oprava zobrazení délky epizod a filmů v listu historie

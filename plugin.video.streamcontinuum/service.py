@@ -13,6 +13,18 @@ import webshare
 
 ADDON = xbmcaddon.Addon()
 
+def check_sync_history_bg():
+    try:
+        if ADDON.getSettingBool('ws_auto_sync') and ADDON.getSetting('ws_username') and ADDON.getSetting('ws_password'):
+            xbmc.log("StreamContinuum Service: Syncing history with Webshare in background...", xbmc.LOGINFO)
+            import sync
+            synced = sync.sync_history(silent=True, force=True, reason="service_startup")
+            if synced:
+                xbmc.log("StreamContinuum Service: History sync finished, checking next episodes...", xbmc.LOGINFO)
+                history.check_and_update_next_episodes(force=True)
+    except Exception as e:
+        xbmc.log(f"StreamContinuum Service: Background history sync failed: {e}", xbmc.LOGWARNING)
+
 def check_webshare_vip_bg():
     try:
         if ADDON.getSetting('ws_username') and ADDON.getSetting('ws_password'):
@@ -54,11 +66,13 @@ if __name__ == '__main__':
             xbmc.executebuiltin(f'ActivateWindow(Videos, plugin://{addon_id}/, return)')
 
         if not monitor.waitForAbort(5):
+            check_sync_history_bg()
             check_new_episodes_bg()
             check_webshare_vip_bg()
 
         while not monitor.abortRequested():
             if monitor.waitForAbort(14400):
                 break
+            check_sync_history_bg()
             check_new_episodes_bg()
             check_webshare_vip_bg()

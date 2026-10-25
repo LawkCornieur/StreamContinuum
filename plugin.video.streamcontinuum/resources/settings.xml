@@ -23,7 +23,9 @@
         <setting id="ws_vip_days_num" type="text" label="" visible="false" default="0" />
         <setting id="ws_vip_is_active" type="bool" label="" visible="false" default="false" />
         <setting id="ws_vip_last_check_ts" type="text" label="" visible="false" default="0" />
+        <setting id="ws_last_sync_ts" type="text" label="" visible="false" default="0" />
         <setting id="ws_speedtest" type="action" label="30158" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=speedtest)" />
+        <setting id="ws_auto_sync" type="bool" label="30180" default="true" />
         <setting id="ws_sync_history" type="action" label="Synchronizovat historii na Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=sync_history)" />
         <setting id="ws_export_settings" type="action" label="Exportovat nastavení na Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=export_settings)" />
         <setting id="ws_import_settings" type="action" label="Importovat nastavení z Webshare" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=import_settings)" />
@@ -43,7 +45,7 @@
         <setting id="trakt_logout" type="action" label="30046" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=trakt_logout)" />
     </category>
     <category label="30040">
-        <setting id="about_version" type="text" label="30041" default="1.5.3" enable="false" />
+        <setting id="about_version" type="text" label="30041" default="1.5.4" enable="false" />
         <setting id="about_changelog" type="action" label="30042" action="RunPlugin(plugin://plugin.video.streamcontinuum/?action=show_changelog)" />
     </category>
 </settings>

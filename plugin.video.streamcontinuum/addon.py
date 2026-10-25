@@ -442,6 +442,11 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     history.check_and_update_next_episodes()
                 except Exception:
                     pass
+                try:
+                    import sync
+                    sync.sync_history_bg(silent=True, force=True, reason="played_to_end")
+                except Exception:
+                    pass
 
             next_ep_data = None
             autoplay_enabled = ADDON.getSettingBool('autoplay_next')
@@ -522,6 +527,11 @@ def play(ident, query=None, title=None, is_autoplay=False):
                 current_ident, current_query, current_title = next_ep_data
                 autoplay_loop = True
             else:
+                try:
+                    import sync
+                    sync.sync_history_bg(silent=True, force=True, reason="after_playback")
+                except Exception:
+                    pass
                 after = ADDON.getSetting('after_playback')
                 safe_query = urllib.parse.quote_plus(current_query) if current_query else ""
                 xbmc.sleep(400)
@@ -2305,6 +2315,11 @@ def assign_tmdb_data_to_history(original_query, tmdb_id, media_type):
             history.check_and_update_next_episodes(force=True, target_tmdb_id=target_id)
         except Exception as _sync_ep_err:
             xbmc.log(f"StreamContinuum: Error checking next episodes after TMDb identify: {_sync_ep_err}", xbmc.LOGWARNING)
+        try:
+            import sync
+            sync.sync_history_bg(silent=True, force=True, reason="tmdb_identified")
+        except Exception:
+            pass
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30126), xbmcgui.NOTIFICATION_INFO, 2000)
         if HANDLE >= 0:
             try:
@@ -2346,6 +2361,12 @@ def history_mark_watched(query, watched, source=None):
             history.check_and_update_next_episodes()
         except Exception:
             pass
+
+    try:
+        import sync
+        sync.sync_history_bg(silent=True, force=True, reason="history_mark_watched")
+    except Exception:
+        pass
             
     xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 1500)
     if source == 'watchlist':
@@ -2459,10 +2480,14 @@ def run():
         return
     elif action == 'sync_history':
         import sync
-        if sync.sync_history():
+        if sync.sync_history(silent=False, force=True, reason="manual_settings"):
             xbmcgui.Dialog().notification("StreamContinuum", "Historie synchronizována", xbmcgui.NOTIFICATION_INFO)
         else:
             xbmcgui.Dialog().notification("StreamContinuum", "Chyba synchronizace", xbmcgui.NOTIFICATION_ERROR)
+        return
+    elif action == 'sync_history_silent':
+        import sync
+        sync.sync_history_bg(silent=True, force=True, reason="action_silent")
         return
     elif action == 'export_settings':
         keyboard = xbmc.Keyboard('', 'Zadejte PIN pro šifrování')
@@ -2533,6 +2558,12 @@ def run():
         if ADDON.getSetting('trakt_token'):
             trakt.add_to_watchlist(media_type, item_id, id_type=id_type)
             
+        try:
+            import sync
+            sync.sync_history_bg(silent=True, force=True, reason="watchlist_add")
+        except Exception:
+            pass
+
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
         return
     elif action == 'watchlist_remove':
@@ -2545,6 +2576,11 @@ def run():
             history.set_watched_status(query, True)
         if ADDON.getSetting('trakt_token') and item_id:
             trakt.remove_from_watchlist(media_type, item_id, id_type=id_type)
+        try:
+            import sync
+            sync.sync_history_bg(silent=True, force=True, reason="watchlist_remove")
+        except Exception:
+            pass
         xbmcgui.Dialog().notification("StreamContinuum", ADDON.getLocalizedString(30085), xbmcgui.NOTIFICATION_INFO, 2000)
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=watchlist,replace)')
         return
@@ -2573,6 +2609,11 @@ def run():
     elif action == 'history_delete':
         import history
         history.delete_from_history(params.get('query'))
+        try:
+            import sync
+            sync.sync_history_bg(silent=True, force=True, reason="history_delete")
+        except Exception:
+            pass
         src = params.get('source')
         target_action = 'watchlist' if src == 'watchlist' else 'history'
         xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action={target_action},replace)')
@@ -2654,6 +2695,11 @@ def run():
 
     if not action:
         check_vip_warning()
+        try:
+            import sync
+            sync.sync_history_bg(silent=True, force=False, reason="addon_startup")
+        except Exception:
+            pass
         list_categories()
     elif action == 'watchlist':
         show_watchlist()
