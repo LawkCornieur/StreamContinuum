@@ -2,6 +2,8 @@
 <settings>
     <category label="30020">
         <setting id="autoplay_next" type="bool" label="30022" default="true" />
+        <setting id="autoplay_countdown" type="number" label="30191" default="10" subsetting="true" enable="eq(-1,true)" />
+        <setting id="autoplay_continue_btn" type="bool" label="30192" default="true" subsetting="true" enable="eq(-2,true)" />
         <setting id="optimize_results" type="bool" label="30088" default="true" />
         <setting id="after_playback" type="enum" label="30090" lvalues="30091|30092|30093|30094|30095" default="2" />
         <setting id="open_last_history" type="bool" label="30132" default="false" />

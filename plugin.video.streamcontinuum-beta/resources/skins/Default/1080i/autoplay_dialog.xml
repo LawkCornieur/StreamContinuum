@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window type="dialog">
+    <defaultcontrol always="true">200</defaultcontrol>
+    <coordinates>
+        <system>1</system>
+        <posx>320</posx>
+        <posy>235</posy>
+        <width>640</width>
+        <height>250</height>
+    </coordinates>
+    <controls>
+        <!-- Background panel -->
+        <control type="image" id="1">
+            <posx>0</posx>
+            <posy>0</posy>
+            <width>640</width>
+            <height>250</height>
+            <texture border="8" colordiffuse="FA121924">bg.png</texture>
+        </control>
+        <!-- Border outline -->
+        <control type="image" id="2">
+            <posx>0</posx>
+            <posy>0</posy>
+            <width>640</width>
+            <height>250</height>
+            <texture border="8" colordiffuse="33FFFFFF">border.png</texture>
+        </control>
+
+        <!-- Header / Title -->
+        <control type="label" id="100">
+            <posx>25</posx>
+            <posy>16</posy>
+            <width>590</width>
+            <height>30</height>
+            <font>font13_title</font>
+            <textcolor>FF00B0FF</textcolor>
+            <align>left</align>
+            <label>$INFO[Window.Property(heading)]</label>
+        </control>
+
+        <!-- Next Episode Title -->
+        <control type="label" id="101">
+            <posx>25</posx>
+            <posy>52</posy>
+            <width>590</width>
+            <height>26</height>
+            <font>font12</font>
+            <textcolor>FFFFFFFF</textcolor>
+            <align>left</align>
+            <label>$INFO[Window.Property(line1)]</label>
+        </control>
+
+        <!-- File info -->
+        <control type="label" id="102">
+            <posx>25</posx>
+            <posy>80</posy>
+            <width>590</width>
+            <height>22</height>
+            <font>font10</font>
+            <textcolor>FFAAAAAA</textcolor>
+            <align>left</align>
+            <label>$INFO[Window.Property(line2)]</label>
+        </control>
+
+        <!-- Progress bar -->
+        <control type="progress" id="103">
+            <posx>25</posx>
+            <posy>112</posy>
+            <width>590</width>
+            <height>8</height>
+            <texturebg colordiffuse="33FFFFFF">white.png</texturebg>
+            <midtexture colordiffuse="FF0084FF">white.png</midtexture>
+            <info>Window.Property(percent)</info>
+        </control>
+
+        <!-- Countdown label -->
+        <control type="label" id="104">
+            <posx>25</posx>
+            <posy>128</posy>
+            <width>590</width>
+            <height>24</height>
+            <font>font11</font>
+            <textcolor>FFDDDDDD</textcolor>
+            <align>center</align>
+            <label>$INFO[Window.Property(countdown_text)]</label>
+        </control>
+
+        <!-- Buttons -->
+        <!-- 200: Play now -->
+        <control type="button" id="200">
+            <posx>130</posx>
+            <posy>172</posy>
+            <width>180</width>
+            <height>46</height>
+            <font>font12</font>
+            <align>center</align>
+            <aligny>center</aligny>
+            <textcolor>FFFFFFFF</textcolor>
+            <focusedcolor>FFFFFFFF</focusedcolor>
+            <texturefocus border="6" colordiffuse="FF0084FF">button.png</texturefocus>
+            <texturenofocus border="6" colordiffuse="33FFFFFF">button.png</texturenofocus>
+            <label>$INFO[Window.Property(btn_play_label)]</label>
+            <onleft>201</onleft>
+            <onright>201</onright>
+            <onup>200</onup>
+            <ondown>200</ondown>
+        </control>
+
+        <!-- 201: Cancel -->
+        <control type="button" id="201">
+            <posx>330</posx>
+            <posy>172</posy>
+            <width>180</width>
+            <height>46</height>
+            <font>font12</font>
+            <align>center</align>
+            <aligny>center</aligny>
+            <textcolor>FFFFFFFF</textcolor>
+            <focusedcolor>FFFFFFFF</focusedcolor>
+            <texturefocus border="6" colordiffuse="FFE53935">button.png</texturefocus>
+            <texturenofocus border="6" colordiffuse="33FFFFFF">button.png</texturenofocus>
+            <label>$INFO[Window.Property(btn_cancel_label)]</label>
+            <onleft>200</onleft>
+            <onright>200</onright>
+            <onup>201</onup>
+            <ondown>201</ondown>
+        </control>
+    </controls>
+</window>

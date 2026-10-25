@@ -523,36 +523,50 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     if has_next_ep:
                         dialog = xbmcgui.DialogProgress()
                         dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_ep_query}")
+                        matched_results = []
+                        search_canceled = False
                         try:
                             dialog.update(0, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\nVyhledávání na Webshare...")
                             results = webshare.search(next_ep_query)
-                            matched_results = [r for r in results if _matches_season_episode(r.get('name', ''), target_season, target_episode)] if results else []
-                            
-                            if matched_results and not dialog.iscanceled() and not monitor.abortRequested():
-                                selected_item = matched_results[0]
-                                item_name = selected_item.get('name', next_ep_query)
-                                seconds = 10
-                                canceled = False
-                                for i in range(seconds * 10):
-                                    if dialog.iscanceled() or monitor.abortRequested():
-                                        canceled = True
-                                        break
-                                    percent = int(100 - (i / (seconds * 10) * 100))
-                                    dialog.update(percent, f"{ADDON.getLocalizedString(30068)}: {next_ep_query}\n{item_name}\nSpuštění za {seconds - (i // 10)} s...")
-                                    xbmc.sleep(100)
-
-                                if not canceled and not monitor.abortRequested():
-                                    next_ep_data = (selected_item["ident"], next_ep_query, item_name)
-                            elif not matched_results and not dialog.iscanceled() and not monitor.abortRequested():
-                                xbmcgui.Dialog().notification("StreamContinuum", "Automaticky se nepovedlo vybrat správný díl, zkuste to ručně.", xbmcgui.NOTIFICATION_WARNING, 4000)
-                                xbmc.sleep(300)
-                                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(next_ep_query)},replace)')
-                                return
+                            if dialog.iscanceled() or monitor.abortRequested():
+                                search_canceled = True
+                            elif results:
+                                matched_results = [r for r in results if _matches_season_episode(r.get('name', ''), target_season, target_episode)]
                         finally:
                             try:
                                 dialog.close()
                             except Exception:
                                 pass
+
+                        if not search_canceled and not monitor.abortRequested():
+                            if matched_results:
+                                selected_item = matched_results[0]
+                                item_name = selected_item.get('name', next_ep_query)
+
+                                try:
+                                    cnt_val = ADDON.getSetting('autoplay_countdown')
+                                    seconds = int(cnt_val) if cnt_val != '' else 10
+                                except (ValueError, TypeError):
+                                    seconds = 10
+                                seconds = max(0, min(seconds, 120))
+                                show_continue_btn = ADDON.getSettingBool('autoplay_continue_btn')
+
+                                import autoplay_dialog
+                                should_play = autoplay_dialog.run_autoplay_countdown(
+                                    heading=ADDON.getLocalizedString(30022),
+                                    line1=f"{ADDON.getLocalizedString(30068)}: {next_ep_query}",
+                                    line2=item_name,
+                                    seconds=seconds,
+                                    show_continue_btn=show_continue_btn
+                                )
+
+                                if should_play and not monitor.abortRequested():
+                                    next_ep_data = (selected_item["ident"], next_ep_query, item_name)
+                            else:
+                                xbmcgui.Dialog().notification("StreamContinuum", "Automaticky se nepovedlo vybrat správný díl, zkuste to ručně.", xbmcgui.NOTIFICATION_WARNING, 4000)
+                                xbmc.sleep(300)
+                                xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(next_ep_query)},replace)')
+                                return
 
             if next_ep_data:
                 current_ident, current_query, current_title = next_ep_data

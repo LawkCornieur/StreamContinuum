@@ -647,4 +647,24 @@ msgctxt "#30190"
 msgid "Watchlist is up to date."
 msgstr "Seznam k zhlédnutí je aktuální."
 
+msgctxt "#30191"
+msgid "Autoplay countdown (seconds)"
+msgstr "Doba odpočtu před spuštěním (vteřiny)"
+
+msgctxt "#30192"
+msgid "Show continue button during countdown"
+msgstr "Zobrazit tlačítko pro okamžité spuštění (Pokračovat)"
+
+msgctxt "#30193"
+msgid "Play now"
+msgstr "Přehrát nyní"
+
+msgctxt "#30194"
+msgid "Cancel"
+msgstr "Zrušit"
+
+msgctxt "#30195"
+msgid "Starting in {0} s..."
+msgstr "Spuštění za {0} s..."
+
 
