@@ -2,6 +2,7 @@
 import os
 import json
 import time
+import datetime
 import random
 import requests
 import re
@@ -18,6 +19,110 @@ except Exception:
 
 _tmdb_warning_shown = False
 ADDON = xbmcaddon.Addon()
+
+TMDB_CACHE_FILE = None
+_tmdb_cache_data = None
+_tmdb_cache_dirty = False
+
+def _get_cache_file():
+    global TMDB_CACHE_FILE
+    if TMDB_CACHE_FILE is None:
+        try:
+            profile = xbmcvfs.translatePath(ADDON.getAddonInfo('profile'))
+            if not os.path.exists(profile):
+                try:
+                    os.makedirs(profile, exist_ok=True)
+                except Exception:
+                    pass
+            TMDB_CACHE_FILE = os.path.join(profile, 'tmdb_cache.json')
+        except Exception:
+            return None
+    return TMDB_CACHE_FILE
+
+def _load_tmdb_cache():
+    global _tmdb_cache_data
+    if _tmdb_cache_data is not None:
+        return _tmdb_cache_data
+    cache_path = _get_cache_file()
+    if not cache_path or not os.path.exists(cache_path):
+        _tmdb_cache_data = {}
+        return _tmdb_cache_data
+    try:
+        with open(cache_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                _tmdb_cache_data = data
+                return _tmdb_cache_data
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error loading TMDb cache: {e}", xbmc.LOGWARNING)
+    _tmdb_cache_data = {}
+    return _tmdb_cache_data
+
+def _save_tmdb_cache():
+    global _tmdb_cache_data, _tmdb_cache_dirty
+    if not _tmdb_cache_dirty or _tmdb_cache_data is None:
+        return
+    cache_path = _get_cache_file()
+    if not cache_path:
+        return
+    try:
+        now = int(time.time())
+        cleaned = {}
+        for k, v in _tmdb_cache_data.items():
+            if isinstance(v, dict):
+                ts = v.get('ts', 0)
+                ttl = v.get('ttl', 0)
+                if (ts + ttl) > now:
+                    cleaned[k] = v
+        if len(cleaned) > 1500:
+            sorted_keys = sorted(cleaned.keys(), key=lambda x: cleaned[x].get('ts', 0), reverse=True)
+            cleaned = {k: cleaned[k] for k in sorted_keys[:1500]}
+        _tmdb_cache_data = cleaned
+
+        temp_file = f"{cache_path}.{os.getpid()}.tmp"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(_tmdb_cache_data, f, ensure_ascii=False)
+        os.replace(temp_file, cache_path)
+        _tmdb_cache_dirty = False
+    except Exception as e:
+        xbmc.log(f"StreamContinuum: Error saving TMDb cache: {e}", xbmc.LOGWARNING)
+
+def get_cached_tmdb(key):
+    cache = _load_tmdb_cache()
+    entry = cache.get(str(key))
+    if entry and isinstance(entry, dict):
+        ts = entry.get('ts', 0)
+        ttl = entry.get('ttl', 0)
+        now = int(time.time())
+        if (ts + ttl) > now:
+            return entry.get('data')
+    return None
+
+def set_cached_tmdb(key, data, ttl):
+    global _tmdb_cache_dirty
+    if data is None:
+        return
+    cache = _load_tmdb_cache()
+    now = int(time.time())
+    cache[str(key)] = {
+        'ts': now,
+        'ttl': int(ttl),
+        'data': data
+    }
+    _tmdb_cache_dirty = True
+    _save_tmdb_cache()
+
+def clear_tmdb_cache():
+    global _tmdb_cache_data, _tmdb_cache_dirty
+    _tmdb_cache_data = {}
+    _tmdb_cache_dirty = False
+    cache_path = _get_cache_file()
+    if cache_path and os.path.exists(cache_path):
+        try:
+            os.remove(cache_path)
+        except Exception:
+            pass
+
 
 def get_ssl_verify():
     try:
@@ -169,6 +274,11 @@ def _format_item(item, default_media_type=None, default_info=""):
     }
 
 def get_tv_tips(day_offset=0):
+    cache_key = f"tv_tips_{day_offset}"
+    cached = get_cached_tmdb(cache_key)
+    if cached is not None:
+        return cached
+
     xbmc.log(f"StreamContinuum: Loading TV tips (Trending) from TMDb", xbmc.LOGINFO)
     url_template = "https://api.themoviedb.org/3/trending/all/day?api_key={api_key}&language=cs-CZ"
     
@@ -186,6 +296,7 @@ def get_tv_tips(day_offset=0):
                 formatted = _format_item(item, media_type, info_label)
                 if formatted:
                     items.append(formatted)
+            set_cached_tmdb(cache_key, items, 6 * 3600)
             return items
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching TV Tips from TMDb: {e}", xbmc.LOGERROR)
@@ -193,6 +304,11 @@ def get_tv_tips(day_offset=0):
     return []
 
 def get_vod_premieres(page=1):
+    cache_key = f"vod_premieres_{page}"
+    cached = get_cached_tmdb(cache_key)
+    if cached is not None:
+        return cached
+
     xbmc.log(f"StreamContinuum: Loading VOD Premieres from TMDb (Page {page})", xbmc.LOGINFO)
     url_template = f"https://api.themoviedb.org/3/movie/now_playing?api_key={{api_key}}&language=cs-CZ&page={page}"
     
@@ -206,6 +322,7 @@ def get_vod_premieres(page=1):
                 formatted = _format_item(item, 'movie', 'Kino / VOD Premiéra')
                 if formatted:
                     items.append(formatted)
+            set_cached_tmdb(cache_key, items, 6 * 3600)
             return items
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching VOD Premieres from TMDb: {e}", xbmc.LOGERROR)
@@ -213,6 +330,11 @@ def get_vod_premieres(page=1):
     return []
 
 def get_disk_premieres(month, year):
+    cache_key = f"disk_premieres_{month}_{year}"
+    cached = get_cached_tmdb(cache_key)
+    if cached is not None:
+        return cached
+
     xbmc.log(f"StreamContinuum: Loading upcoming novinky from TMDb", xbmc.LOGINFO)
     url_template = "https://api.themoviedb.org/3/movie/upcoming?api_key={api_key}&language=cs-CZ&page=1"
     
@@ -226,6 +348,7 @@ def get_disk_premieres(month, year):
                 formatted = _format_item(item, 'movie', 'Novinka / Disk')
                 if formatted:
                     items.append(formatted)
+            set_cached_tmdb(cache_key, items, 12 * 3600)
             return items
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching Upcoming movies from TMDb: {e}", xbmc.LOGERROR)
@@ -233,6 +356,11 @@ def get_disk_premieres(month, year):
     return []
 
 def get_top_rated(media_type='movie', page=1):
+    cache_key = f"top_rated_{media_type}_{page}"
+    cached = get_cached_tmdb(cache_key)
+    if cached is not None:
+        return cached
+
     xbmc.log(f"StreamContinuum: Loading top rated {media_type} from TMDb (page {page})", xbmc.LOGINFO)
     endpoint = 'movie' if media_type == 'movie' else 'tv'
     url_template = f"https://api.themoviedb.org/3/{endpoint}/top_rated?api_key={{api_key}}&language=cs-CZ&page={page}"
@@ -248,12 +376,18 @@ def get_top_rated(media_type='movie', page=1):
                 formatted = _format_item(item, media_type, info_label)
                 if formatted:
                     items.append(formatted)
+            set_cached_tmdb(cache_key, items, 24 * 3600)
             return items
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error loading top rated {media_type}: {e}", xbmc.LOGERROR)
     return []
 
 def get_discover_by_genre(media_type, genre_id, page=1):
+    cache_key = f"discover_{media_type}_{genre_id}_{page}"
+    cached = get_cached_tmdb(cache_key)
+    if cached is not None:
+        return cached
+
     xbmc.log(f"StreamContinuum: Discovering {media_type} for genre {genre_id} (page {page})", xbmc.LOGINFO)
     endpoint = 'movie' if media_type == 'movie' else 'tv'
     url_template = f"https://api.themoviedb.org/3/discover/{endpoint}?api_key={{api_key}}&language=cs-CZ&sort_by=popularity.desc&with_genres={genre_id}&page={page}"
@@ -269,6 +403,7 @@ def get_discover_by_genre(media_type, genre_id, page=1):
                 formatted = _format_item(item, media_type, info_label)
                 if formatted:
                     items.append(formatted)
+            set_cached_tmdb(cache_key, items, 24 * 3600)
             return items
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error discovering genre {genre_id}: {e}", xbmc.LOGERROR)
@@ -304,6 +439,12 @@ def get_random_tips():
 def search_tmdb(query):
     if not query:
         return []
+    clean_q = str(query).strip().lower()
+    cache_key = f"search_{clean_q}"
+    cached = get_cached_tmdb(cache_key)
+    if cached is not None:
+        return cached
+
     xbmc.log(f"StreamContinuum: Searching TMDb for '{query}'", xbmc.LOGINFO)
     safe_query = urllib.parse.quote(str(query))
     url_template = f"https://api.themoviedb.org/3/search/multi?api_key={{api_key}}&language=cs-CZ&query={safe_query}&page=1"
@@ -322,6 +463,7 @@ def search_tmdb(query):
                 formatted = _format_item(item, media_type, info_label)
                 if formatted:
                     items.append(formatted)
+            set_cached_tmdb(cache_key, items, 7 * 86400)
             return items
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error searching TMDb: {e}", xbmc.LOGERROR)
@@ -331,6 +473,11 @@ def search_tmdb(query):
 def get_show_seasons(tmdb_id):
     if not tmdb_id or str(tmdb_id).strip().lower() in ('none', '', '0'):
         return None
+    cache_key = f"tv_{tmdb_id}"
+    cached = get_cached_tmdb(cache_key)
+    if cached is not None:
+        return cached
+
     xbmc.log(f"StreamContinuum: Fetching show details and seasons for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
     url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
     try:
@@ -386,7 +533,7 @@ def get_show_seasons(tmdb_id):
                     'air_date': s.get('air_date', ''),
                     'rating': s.get('vote_average', 0)
                 })
-            return {
+            result = {
                 'id': data.get('id'),
                 'title': title,
                 'year': year,
@@ -400,6 +547,10 @@ def get_show_seasons(tmdb_id):
                 'first_air_date': data.get('first_air_date', ''),
                 'seasons': seasons
             }
+            status_lower = str(status or '').strip().lower()
+            ttl = (30 * 86400) if status_lower in ('ended', 'canceled', 'ukončeno') else (24 * 86400)
+            set_cached_tmdb(cache_key, result, ttl)
+            return result
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching TMDb show details for ID {tmdb_id}: {e}", xbmc.LOGERROR)
     return None
@@ -407,6 +558,11 @@ def get_show_seasons(tmdb_id):
 def get_movie_details(tmdb_id):
     if not tmdb_id or str(tmdb_id).strip().lower() in ('none', '', '0'):
         return None
+    cache_key = f"movie_{tmdb_id}"
+    cached = get_cached_tmdb(cache_key)
+    if cached is not None:
+        return cached
+
     xbmc.log(f"StreamContinuum: Fetching movie details for TMDb ID '{tmdb_id}'", xbmc.LOGINFO)
     url_template = f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={{api_key}}&language=cs-CZ"
     try:
@@ -437,7 +593,7 @@ def get_movie_details(tmdb_id):
                 year = int(year_str) if year_str and year_str.isdigit() else None
             except (ValueError, TypeError):
                 year = None
-            return {
+            result = {
                 'id': data.get('id'),
                 'title': title,
                 'clean_title': _extract_title(data, 'movie'),
@@ -452,6 +608,8 @@ def get_movie_details(tmdb_id):
                 'media_type': 'movie',
                 'type': 'movie'
             }
+            set_cached_tmdb(cache_key, result, 30 * 86400)
+            return result
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching movie details for ID {tmdb_id}: {e}", xbmc.LOGERROR)
     return None
@@ -459,6 +617,11 @@ def get_movie_details(tmdb_id):
 def get_season_episodes(tmdb_id, season_number):
     if not tmdb_id or str(tmdb_id).strip().lower() in ('none', '', '0'):
         return []
+    cache_key = f"tv_s_{tmdb_id}_{season_number}"
+    cached = get_cached_tmdb(cache_key)
+    if cached is not None:
+        return cached
+
     xbmc.log(f"StreamContinuum: Fetching episodes for TMDb ID '{tmdb_id}', season {season_number}", xbmc.LOGINFO)
     url_template = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_number}?api_key={{api_key}}&language=cs-CZ"
     try:
@@ -476,6 +639,9 @@ def get_season_episodes(tmdb_id, season_number):
                     break
                     
             episodes = []
+            today_str = datetime.date.today().isoformat()
+            all_aired = True if raw_episodes else False
+
             for ep in raw_episodes:
                 still_path = ep.get('still_path')
                 still = f"https://image.tmdb.org/t/p/w500{still_path}" if still_path else ''
@@ -492,6 +658,10 @@ def get_season_episodes(tmdb_id, season_number):
                 if ep_rt <= 0 and known_runtime > 0:
                     ep_rt = known_runtime
 
+                air_date_val = ep.get('air_date', '') or ''
+                if not air_date_val or air_date_val > today_str:
+                    all_aired = False
+
                 episodes.append({
                     'episode_number': ep.get('episode_number', 0),
                     'season_number': ep.get('season_number', season_number),
@@ -500,8 +670,11 @@ def get_season_episodes(tmdb_id, season_number):
                     'runtime': ep_rt,
                     'still': still,
                     'rating': ep.get('vote_average', 0),
-                    'air_date': ep.get('air_date', '')
+                    'air_date': air_date_val
                 })
+
+            ttl = (30 * 86400) if all_aired else (24 * 86400)
+            set_cached_tmdb(cache_key, episodes, ttl)
             return episodes
     except Exception as e:
         xbmc.log(f"StreamContinuum: Error fetching TMDb season episodes for ID {tmdb_id}, S{season_number}: {e}", xbmc.LOGERROR)

@@ -607,3 +607,44 @@ msgctxt "#30180"
 msgid "Automatic history synchronization"
 msgstr "Automatická synchronizace historie"
 
+msgctxt "#30181"
+msgid "Watchlist new episodes check interval"
+msgstr "Interval kontroly nových dílů ve watchlistu"
+
+msgctxt "#30182"
+msgid "On every open (not recommended)"
+msgstr "Při každém otevření (nedoporučeno)"
+
+msgctxt "#30183"
+msgid "6 hours"
+msgstr "6 hodin"
+
+msgctxt "#30184"
+msgid "12 hours"
+msgstr "12 hodin"
+
+msgctxt "#30185"
+msgid "24 hours (recommended)"
+msgstr "24 hodin (doporučeno)"
+
+msgctxt "#30186"
+msgid "Background service / manual only"
+msgstr "Pouze na pozadí / ručně"
+
+msgctxt "#30187"
+msgid "Refresh watchlist"
+msgstr "Aktualizovat seznam k zhlédnutí"
+
+msgctxt "#30188"
+msgid "New episodes found and added to watchlist."
+msgstr "Nové díly byly vyhledány a přidány do seznamu."
+
+msgctxt "#30189"
+msgid "Checking for new episodes..."
+msgstr "Kontrola nových dílů..."
+
+msgctxt "#30190"
+msgid "Watchlist is up to date."
+msgstr "Seznam k zhlédnutí je aktuální."
+
+
