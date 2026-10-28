@@ -56,6 +56,9 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.5.8** - 2026-10-28
+- Oprava a vylepšení uklání a zobrazování položek seznamu k zhlédnutí.
+
 **Verze 1.5.7** - 2026-10-28
 - Změna zobrazení ze tří na dva sloupce v detailech položek
 - Oprava funkce automatického přehrávání pro filmy
