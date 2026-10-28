@@ -495,8 +495,6 @@ def get_localized_metadata(item_id, media_type, season_num=None, episode_num=Non
         result['still'] = f"https://image.tmdb.org/t/p/w500{final_still_path}" if final_still_path else ''
         if media_type == 'episode' and result['still']:
             result['thumb'] = result['still']
-            if not result['poster']:
-                result['poster'] = result['still']
         
         if media_type in ('movie', 'show'):
             result['genres'] = [g.get('name') for g in tmdb_data_cs.get('genres', []) if g.get('name')] or \

@@ -748,20 +748,23 @@ def show_watchlist():
         still = item.get('still')
         list_item = _make_media_list_item(
             label=label, year=year, plot=plot, genres_str=', '.join(genres) if genres else '',
-            rating=rating, runtime_min=runtime if (runtime and int(runtime) > 0) else None, poster=still if still else poster, fanart=fanart if fanart else get_asset('fa-watchlist.jpg'), media_type=media_type,
+            rating=rating, runtime_min=runtime if (runtime and int(runtime) > 0) else None, poster=poster if poster else still, fanart=fanart if fanart else get_asset('fa-watchlist.jpg'), media_type=media_type,
             is_watched=False
         )
         art_dict = {}
+        if poster:
+            art_dict['poster'] = poster
+            art_dict['season.poster'] = poster
+            art_dict['tvshow.poster'] = poster
+        elif still:
+            art_dict['poster'] = still
         if still:
             art_dict['still'] = still
             art_dict['thumb'] = still
-            art_dict['poster'] = still
         elif poster:
-            art_dict['poster'] = poster
             art_dict['thumb'] = poster
-        if poster:
-            art_dict['season.poster'] = poster
-            art_dict['tvshow.poster'] = poster
+        if fanart:
+            art_dict['fanart'] = fanart
         if art_dict:
             list_item.setArt(art_dict)
         if ep_match:
@@ -874,20 +877,23 @@ def show_history(force_list=False):
         still = item.get('still')
         list_item = _make_media_list_item(
             label=label, year=year, plot=plot, genres_str=', '.join(genres) if genres else '',
-            rating=rating, runtime_min=runtime, poster=still if still else poster, fanart=fanart, media_type=media_type,
+            rating=rating, runtime_min=runtime, poster=poster if poster else still, fanart=fanart, media_type=media_type,
             is_watched=is_watched
         )
         art_dict = {}
+        if poster:
+            art_dict['poster'] = poster
+            art_dict['season.poster'] = poster
+            art_dict['tvshow.poster'] = poster
+        elif still:
+            art_dict['poster'] = still
         if still:
             art_dict['still'] = still
             art_dict['thumb'] = still
-            art_dict['poster'] = still
         elif poster:
-            art_dict['poster'] = poster
             art_dict['thumb'] = poster
-        if poster:
-            art_dict['season.poster'] = poster
-            art_dict['tvshow.poster'] = poster
+        if fanart:
+            art_dict['fanart'] = fanart
         if art_dict:
             list_item.setArt(art_dict)
         if ep_match:
@@ -1053,7 +1059,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             'icon': s_still or poster or 'DefaultAddonsSearch.png',
             'thumb': s_still or poster or 'DefaultAddonsSearch.png',
             'still': s_still,
-            'poster': s_still or poster,
+            'poster': poster,
             'fanart': fanart,
             'plot': s_plot,
             'year': s_year,
@@ -1134,7 +1140,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'icon': n_still or poster or 'DefaultVideoEpisodes.png',
                 'thumb': n_still or poster or 'DefaultVideoEpisodes.png',
                 'still': n_still,
-                'poster': n_still or poster,
+                'poster': poster,
                 'fanart': fanart,
                 'plot': n_plot,
                 'year': n_yr,
@@ -1155,7 +1161,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'icon': p_still or poster or 'DefaultVideoEpisodes.png',
                 'thumb': p_still or poster or 'DefaultVideoEpisodes.png',
                 'still': p_still,
-                'poster': p_still or poster,
+                'poster': poster,
                 'fanart': fanart,
                 'plot': p_plot,
                 'year': p_yr,
@@ -1183,7 +1189,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'icon': ns_still or poster or 'DefaultVideoEpisodes.png',
                 'thumb': ns_still or poster or 'DefaultVideoEpisodes.png',
                 'still': ns_still,
-                'poster': ns_still or poster,
+                'poster': poster,
                 'fanart': fanart,
                 'plot': ns_plot,
                 'year': ns_yr,
@@ -1210,7 +1216,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'icon': ps_still or poster or 'DefaultVideoEpisodes.png',
                 'thumb': ps_still or poster or 'DefaultVideoEpisodes.png',
                 'still': ps_still,
-                'poster': ps_still or poster,
+                'poster': poster,
                 'fanart': fanart,
                 'plot': ps_plot,
                 'year': ps_yr,
@@ -1321,13 +1327,14 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         art = {'icon': icn, 'thumb': thm, 'fanart': fan}
         if pos:
             art['poster'] = pos
+        elif stl:
+            art['poster'] = stl
         if poster:
             art['season.poster'] = poster
             art['tvshow.poster'] = poster
         if stl:
             art['still'] = stl
             art['thumb'] = stl
-            art['poster'] = stl
         list_item.setArt(art)
         
         info_tag = list_item.getVideoInfoTag()
@@ -1975,6 +1982,17 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
+
+    if (not poster or not fanart) and tmdb_id and tmdb_module:
+        try:
+            s_details = tmdb_module.get_show_seasons(tmdb_id)
+            if s_details:
+                if not poster:
+                    poster = s_details.get('poster') or ''
+                if not fanart:
+                    fanart = s_details.get('fanart') or ''
+        except Exception:
+            pass
         
     episodes = tmdb_module.get_season_episodes(tmdb_id, season_num)
     if not episodes:
@@ -2021,21 +2039,24 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
 
         li = xbmcgui.ListItem(label=label)
         art = {}
+        if poster:
+            art['poster'] = poster
+            art['season.poster'] = poster
+            art['tvshow.poster'] = poster
+        elif still:
+            art['poster'] = still
+
         if still:
             art['thumb'] = still
             art['icon'] = still
             art['still'] = still
-            art['poster'] = still
         elif poster:
             art['thumb'] = poster
             art['icon'] = poster
-            art['poster'] = poster
         else:
             art['icon'] = 'DefaultTVShows.png'
             art['thumb'] = 'DefaultTVShows.png'
-        if poster:
-            art['season.poster'] = poster
-            art['tvshow.poster'] = poster
+
         art['fanart'] = fanart if fanart else get_asset('fa.png')
         li.setArt(art)
 
@@ -2254,6 +2275,18 @@ def show_seasons(show_title, trakt_id, poster='', fanart='', ws_base=None):
 def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_base=None):
     season_num = int(season_num)
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)} {season_num}")
+
+    if (not poster or not fanart) and trakt_id:
+        try:
+            show_meta = get_trakt_localized(trakt_id, 'show')
+            if show_meta:
+                if not poster:
+                    poster = show_meta.get('poster') or ''
+                if not fanart:
+                    fanart = show_meta.get('fanart') or ''
+        except Exception:
+            pass
+
     episodes = trakt.get_episodes(trakt_id, season_num)
     if not episodes:
         xbmcgui.Dialog().notification('StreamContinuum', ADDON.getLocalizedString(30107), xbmcgui.NOTIFICATION_ERROR, 3000)
@@ -2299,21 +2332,24 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
         li = xbmcgui.ListItem(label=label)
         art = {}
         ep_still = episode_meta.get('still') or episode_meta.get('thumb') or episode_meta.get('screenshot')
+        if poster:
+            art['poster'] = poster
+            art['season.poster'] = poster
+            art['tvshow.poster'] = poster
+        elif ep_still:
+            art['poster'] = ep_still
+
         if ep_still:
             art['thumb'] = ep_still
             art['icon'] = ep_still
             art['still'] = ep_still
-            art['poster'] = ep_still
         elif poster:
             art['thumb'] = poster
             art['icon'] = poster
-            art['poster'] = poster
         else:
             art['icon'] = 'DefaultTVShows.png'
             art['thumb'] = 'DefaultTVShows.png'
-        if poster:
-            art['season.poster'] = poster
-            art['tvshow.poster'] = poster
+
         art['fanart'] = fanart if fanart else get_asset('fa.png')
         li.setArt(art)
 
