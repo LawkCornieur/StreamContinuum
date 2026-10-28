@@ -370,7 +370,9 @@ def search(query=None):
             xbmcplugin.endOfDirectory(HANDLE)
 
 def _matches_season_episode(file_name, target_season, target_episode):
-    if not file_name:
+    if not file_name or target_season is None or target_episode is None:
+        return False
+    if target_season >= 100:
         return False
     fn = str(file_name).lower()
     patterns = [
@@ -422,6 +424,14 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     break
                 xbmc.sleep(100)
 
+            # Vyčistit zbývající položky z video playlistu, aby Kodi po dohrání
+            # nezačalo automaticky přehrávat alternativní streamy ze seznamu výsledků hledání
+            if player.isPlayingVideo():
+                try:
+                    xbmc.PlayList(xbmc.PLAYLIST_VIDEO).clear()
+                except Exception as e:
+                    xbmc.log(f"StreamContinuum: Error clearing video playlist on start: {e}", xbmc.LOGDEBUG)
+
             total_time = 0
             last_pos = 0
             while not monitor.abortRequested() and player.isPlayingVideo():
@@ -440,6 +450,11 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     break
                 xbmc.sleep(100)
             xbmc.sleep(400)
+
+            try:
+                xbmc.PlayList(xbmc.PLAYLIST_VIDEO).clear()
+            except Exception:
+                pass
 
             played_to_end = False
             if total_time > 0 and (last_pos / total_time) >= 0.85:
@@ -466,18 +481,19 @@ def play(ident, query=None, title=None, is_autoplay=False):
             next_ep_data = None
             autoplay_enabled = ADDON.getSettingBool('autoplay_next')
             if played_to_end and autoplay_enabled and current_query and not monitor.abortRequested():
-                ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', current_query, re.IGNORECASE)
-                if ep_match:
-                    raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
-                    cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
-                    season = int(ep_match.group(2) or ep_match.group(4))
-                    episode = int(ep_match.group(3) or ep_match.group(5))
+                import history
+                hist_item = history.get_history_item(current_query)
+                media_type = hist_item.get('media_type') if hist_item else None
+                ws_base, s_num, e_num, ep_code = history.parse_episode_info(current_query)
+                is_series_media = (media_type in ('tvshow', 'tv', 'show')) or (s_num is not None and e_num is not None) or history.is_series(current_query)
+
+                if is_series_media and s_num is not None and e_num is not None:
+                    season = s_num
+                    episode = e_num
                     target_season = season
                     target_episode = episode + 1
-                    import history
-                    ws_base = cleaned_base if cleaned_base else history.get_base_name(current_query)
+                    ws_base = ws_base if ws_base else history.get_base_name(current_query)
 
-                    hist_item = history.get_history_item(current_query)
                     clean_tmdb_id = hist_item.get('tmdb_id') if hist_item else None
                     if not clean_tmdb_id and tmdb_module and ws_base:
                         try:
@@ -572,6 +588,53 @@ def play(ident, query=None, title=None, is_autoplay=False):
                                 xbmc.sleep(300)
                                 xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(next_ep_query)},replace)')
                                 return
+                elif not is_series_media:
+                    # Přehrávání filmů: Autoplay je povolen POUZE pro vícedílné filmy (CD1/CD2, Část 1/2...)
+                    # a to jedině tehdy, pokud má uživatel zapnutou explicitní volbu v nastavení.
+                    allow_multipart = ADDON.getSettingBool('autoplay_multipart_movies')
+                    if allow_multipart:
+                        curr_part, next_part, next_part_query = history.get_next_movie_part_query(current_query, current_title)
+                        if curr_part and next_part and next_part_query:
+                            dialog = xbmcgui.DialogProgress()
+                            dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_part_query}")
+                            matched_results = []
+                            search_canceled = False
+                            try:
+                                dialog.update(0, f"{ADDON.getLocalizedString(30068)}: {next_part_query}\nVyhledávání na Webshare...")
+                                results = webshare.search(next_part_query)
+                                if dialog.iscanceled() or monitor.abortRequested():
+                                    search_canceled = True
+                                elif results:
+                                    matched_results = [r for r in results if history.matches_movie_part(r.get('name', ''), next_part)]
+                            finally:
+                                try:
+                                    dialog.close()
+                                except Exception:
+                                    pass
+
+                            if not search_canceled and not monitor.abortRequested() and matched_results:
+                                selected_item = matched_results[0]
+                                item_name = selected_item.get('name', next_part_query)
+
+                                try:
+                                    cnt_val = ADDON.getSetting('autoplay_countdown')
+                                    seconds = int(cnt_val) if cnt_val != '' else 10
+                                except (ValueError, TypeError):
+                                    seconds = 10
+                                seconds = max(0, min(seconds, 120))
+                                show_continue_btn = ADDON.getSettingBool('autoplay_continue_btn')
+
+                                import autoplay_dialog
+                                should_play = autoplay_dialog.run_autoplay_countdown(
+                                    heading=ADDON.getLocalizedString(30022),
+                                    line1=f"{ADDON.getLocalizedString(30068)}: {next_part_query}",
+                                    line2=item_name,
+                                    seconds=seconds,
+                                    show_continue_btn=show_continue_btn
+                                )
+
+                                if should_play and not monitor.abortRequested():
+                                    next_ep_data = (selected_item["ident"], next_part_query, item_name)
 
             if next_ep_data:
                 current_ident, current_query, current_title = next_ep_data
@@ -694,7 +757,7 @@ def show_watchlist():
         poster = item.get('poster')
         fanart = item.get('fanart')
         is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
-        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b([0-9]{1,2})x([0-9]{1,3})\b)', query, re.IGNORECASE)
         s_num = None
         e_num = None
         ep_suffix = ""
@@ -843,7 +906,7 @@ def show_history(force_list=False):
         is_watched = bool(item.get('is_watched', True))
         is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
         
-        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b([0-9]{1,2})x([0-9]{1,3})\b)', query, re.IGNORECASE)
         s_num = None
         e_num = None
         ep_suffix = ""
@@ -984,7 +1047,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'is_folder': False
             })
 
-    ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+    ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b([0-9]{1,2})x([0-9]{1,3})\b)', query, re.IGNORECASE)
     season = None
     episode = None
     ws_base = None

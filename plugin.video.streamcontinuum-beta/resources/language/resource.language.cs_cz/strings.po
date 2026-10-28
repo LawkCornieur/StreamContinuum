@@ -667,4 +667,9 @@ msgctxt "#30195"
 msgid "Starting in {0} s..."
 msgstr "Spuštění za {0} s..."
 
+msgctxt "#30196"
+msgid "Autoplay multi-part movies"
+msgstr "Povolit automatické přehrávání pro vícedílné filmy"
+
+
 

@@ -117,6 +117,7 @@ def export_settings(pin):
             'ws_username', 'ws_password', 'trakt_token', 'trakt_username', 
             'trakt_client_id', 'trakt_client_secret', 'tmdb_api_key',
             'autoplay_next', 'autoplay_countdown', 'autoplay_continue_btn',
+            'autoplay_multipart_movies',
             'optimize_results', 'after_playback', 
             'open_last_history', 'enable_welcome_melody', 'auto_start', 
             'ssl_verify', 'enable_trakt_menu', 'ws_auto_sync'
