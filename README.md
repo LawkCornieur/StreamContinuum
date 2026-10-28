@@ -56,6 +56,10 @@ Vyvinuto pro Kodi 19+ (Matrix, Nexus, Omega).
 
 ## Seznam změn
 
+**Verze 1.5.7** - 2026-10-28
+- Změna zobrazení ze tří na dva sloupce v detailech položek
+- Oprava funkce automatického přehrávání pro filmy
+
 **Verze 1.5.6** - 2026-10-25
 - Oprava zobrazování seznamu ke zhlédnut před synchronizací historie
 - Změna zobrazení plakátů a obrázků epizody a dalších informací v podrobnostech či při procházení sérií
