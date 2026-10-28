@@ -25,14 +25,26 @@ TOMBSTONE_EXPIRATION_DAYS = 30
 _history_file_lock = threading.Lock()
 
 _EPISODE_PATTERN = re.compile(
-    r'^(.*?)(?:[\s._\-]+|(?<=[^\W\d_]))(?:S(\d+)\s*E(\d+)\b|\b(\d+)x(\d+)\b|\b(?:série|serie|season)\s*(\d+)\s*(?:epizoda|díl|dil|ep|e)\s*(\d+)\b)',
+    r'^(.*?)(?:[\s._\-]+|(?<=[^\W\d_]))(?:S(\d+)\s*E(\d+)\b|\b([0-9]{1,2})x([0-9]{1,3})\b|\b(?:série|serie|season)\s*(\d+)\s*(?:epizoda|díl|dil|ep|e)\s*(\d+)\b)',
     re.IGNORECASE
 )
 
 _SERIES_DETECT_PATTERN = re.compile(
-    r'(?:^|[\s._\-]|(?<=[^\W\d_]))(?:s\d+\s*e\d+\b|\bseason\s*\d+\b|\bsérie\s*\d+\b|\bserie\s*\d+\b|\bs\d+\b|\be\d+\b|\b\d+x\d+\b)',
+    r'(?:^|[\s._\-]|(?<=[^\W\d_]))(?:s\d+\s*e\d+\b|\bseason\s*\d+\b|\bsérie\s*\d+\b|\bserie\s*\d+\b|\bs\d+\b|\be\d+\b|\b[0-9]{1,2}x[0-9]{1,3}\b)',
     re.IGNORECASE
 )
+
+_MULTIPART_PATTERNS = [
+    # CD1, CD 1, Disc 1, Disk 2
+    (re.compile(r'\b(cd|disc|disk)[\s._-]*0*([1-9]\d*)\b', re.IGNORECASE),
+     lambda m, next_num: f"{m.group(1)}{next_num}"),
+    # Part 1, Část 1, Díl 1, Vol. 1, Volume 1
+    (re.compile(r'\b(part|[cč][aá]st|[dď][ií]l|volume|vol\.?)[\s._-]*0*([1-9]\d*)\b', re.IGNORECASE),
+     lambda m, next_num: f"{m.group(1)} {next_num}"),
+    # 1. část, 1. díl, 1.díl
+    (re.compile(r'\b0*([1-9]\d*)[\s._-]*(\.\s*(?:[cč][aá]st|[dď][ií]l))\b', re.IGNORECASE),
+     lambda m, next_num: f"{next_num}{m.group(2)}"),
+]
 
 _VIDEO_EXT_PATTERN = re.compile(r'\.(mkv|avi|mp4|m4v|mov|wmv|ts|flv)$', re.IGNORECASE)
 
@@ -109,13 +121,66 @@ def parse_episode_info(query):
     return get_base_name(q_str), None, None, None
 
 
+def parse_movie_part_info(text):
+    """
+    Pokud text obsahuje označení části vícedílného filmu (CD1, Část 1, Part 1, 1.díl),
+    vrátí (part_number, pattern_index, match_obj). Jinak (None, None, None).
+    """
+    if not text:
+        return None, None, None
+    s = str(text).strip()
+    for idx, (pat, _) in enumerate(_MULTIPART_PATTERNS):
+        m = pat.search(s)
+        if m:
+            part_num = int(m.group(1) if idx == 2 else m.group(2))
+            return part_num, idx, m
+    return None, None, None
+
+
+def matches_movie_part(file_name, target_part):
+    """
+    Ověří, zda název souboru na Webshare odpovídá požadované části vícedílného filmu.
+    """
+    if not file_name or target_part is None:
+        return False
+    part_num, _, _ = parse_movie_part_info(file_name)
+    return part_num == target_part
+
+
+def get_next_movie_part_query(query, title=None):
+    """
+    Vygeneruje dotaz pro navazující část vícedílného filmu.
+    Pokud query nebo title obsahuje označení části (např. 'Část 1' nebo 'CD1'),
+    vrátí (current_part, next_part, next_query). Jinak (None, None, None).
+    """
+    part_num, idx, m = parse_movie_part_info(query)
+    if not part_num and title:
+        p_t, idx_t, m_t = parse_movie_part_info(title)
+        if p_t:
+            part_num, idx, m = p_t, idx_t, m_t
+            repl_fn = _MULTIPART_PATTERNS[idx][1]
+            replacement = repl_fn(m, part_num + 1)
+            clean_base = get_base_name(query) or query
+            next_query = f"{clean_base} {replacement}".strip()
+            return part_num, part_num + 1, next_query
+
+    if not part_num or idx is None or not m:
+        return None, None, None
+
+    next_num = part_num + 1
+    repl_fn = _MULTIPART_PATTERNS[idx][1]
+    replacement = repl_fn(m, next_num)
+    next_query = query[:m.start()] + replacement + query[m.end():]
+    return part_num, next_num, next_query.strip()
+
+
 def get_base_name(query):
     if not query:
         return ""
     q = str(query)
     q = _VIDEO_EXT_PATTERN.sub('', q)
     q = re.sub(r'[._]', ' ', q)
-    q = re.sub(r'(?:[\s._\-]+|(?<=[^\W\d_]))(?:s\d+\s*e\d+|\bseason\s*\d+|\bsérie\s*\d+|\bserie\s*\d+|\bs\d+\b|\be\d+\b|\b\d+x\d+\b).*$', '', q, flags=re.IGNORECASE).strip()
+    q = re.sub(r'(?:[\s._\-]+|(?<=[^\W\d_]))(?:s\d+\s*e\d+|\bseason\s*\d+|\bsérie\s*\d+|\bserie\s*\d+|\bs\d+\b|\be\d+\b|\b[0-9]{1,2}x[0-9]{1,3}\b).*$', '', q, flags=re.IGNORECASE).strip()
     q = re.sub(r'\b(2160p|1080p|720p|480p|4k|uhd|hd|hdtv|web-?dl|bluray|blu-?ray|bdrip|brrip|dvdrip|dvd|laserdisk|laserdisc|cd|vhs|remux|x264|x265|h264|hevc|aac|ac3|dts)\b.*$', '', q, flags=re.IGNORECASE).strip()
     q = re.sub(r'\b(cz|sk|en|de|czech|czdab|skdab|dabing|dab|czsub|sksub|sub|titulky|tit|cztit|sktit|repack|proper|extended|unrated)\b.*$', '', q, flags=re.IGNORECASE).strip()
     q = re.sub(r'\s*\(?\d{4}\)?$', '', q).strip()

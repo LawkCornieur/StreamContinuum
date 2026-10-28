@@ -65,7 +65,8 @@ def _make_media_list_item(label, year, plot, genres_str, rating, runtime_min, po
     list_item = xbmcgui.ListItem(label=label)
     art = {}
     if poster:
-        art['poster'] = poster
+        if media_type != 'episode':
+            art['poster'] = poster
         art['thumb'] = poster
         art['icon'] = poster
     else:
@@ -369,7 +370,9 @@ def search(query=None):
             xbmcplugin.endOfDirectory(HANDLE)
 
 def _matches_season_episode(file_name, target_season, target_episode):
-    if not file_name:
+    if not file_name or target_season is None or target_episode is None:
+        return False
+    if target_season >= 100:
         return False
     fn = str(file_name).lower()
     patterns = [
@@ -421,6 +424,14 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     break
                 xbmc.sleep(100)
 
+            # Vyčistit zbývající položky z video playlistu, aby Kodi po dohrání
+            # nezačalo automaticky přehrávat alternativní streamy ze seznamu výsledků hledání
+            if player.isPlayingVideo():
+                try:
+                    xbmc.PlayList(xbmc.PLAYLIST_VIDEO).clear()
+                except Exception as e:
+                    xbmc.log(f"StreamContinuum: Error clearing video playlist on start: {e}", xbmc.LOGDEBUG)
+
             total_time = 0
             last_pos = 0
             while not monitor.abortRequested() and player.isPlayingVideo():
@@ -439,6 +450,11 @@ def play(ident, query=None, title=None, is_autoplay=False):
                     break
                 xbmc.sleep(100)
             xbmc.sleep(400)
+
+            try:
+                xbmc.PlayList(xbmc.PLAYLIST_VIDEO).clear()
+            except Exception:
+                pass
 
             played_to_end = False
             if total_time > 0 and (last_pos / total_time) >= 0.85:
@@ -465,18 +481,19 @@ def play(ident, query=None, title=None, is_autoplay=False):
             next_ep_data = None
             autoplay_enabled = ADDON.getSettingBool('autoplay_next')
             if played_to_end and autoplay_enabled and current_query and not monitor.abortRequested():
-                ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', current_query, re.IGNORECASE)
-                if ep_match:
-                    raw_base = ep_match.group(1).strip() if ep_match.group(1) else ""
-                    cleaned_base = re.sub(r'[\s._-]+$', '', raw_base).strip()
-                    season = int(ep_match.group(2) or ep_match.group(4))
-                    episode = int(ep_match.group(3) or ep_match.group(5))
+                import history
+                hist_item = history.get_history_item(current_query)
+                media_type = hist_item.get('media_type') if hist_item else None
+                ws_base, s_num, e_num, ep_code = history.parse_episode_info(current_query)
+                is_series_media = (media_type in ('tvshow', 'tv', 'show')) or (s_num is not None and e_num is not None) or history.is_series(current_query)
+
+                if is_series_media and s_num is not None and e_num is not None:
+                    season = s_num
+                    episode = e_num
                     target_season = season
                     target_episode = episode + 1
-                    import history
-                    ws_base = cleaned_base if cleaned_base else history.get_base_name(current_query)
+                    ws_base = ws_base if ws_base else history.get_base_name(current_query)
 
-                    hist_item = history.get_history_item(current_query)
                     clean_tmdb_id = hist_item.get('tmdb_id') if hist_item else None
                     if not clean_tmdb_id and tmdb_module and ws_base:
                         try:
@@ -571,6 +588,53 @@ def play(ident, query=None, title=None, is_autoplay=False):
                                 xbmc.sleep(300)
                                 xbmc.executebuiltin(f'Container.Update({sys.argv[0]}?action=search&query={urllib.parse.quote_plus(next_ep_query)},replace)')
                                 return
+                elif not is_series_media:
+                    # Přehrávání filmů: Autoplay je povolen POUZE pro vícedílné filmy (CD1/CD2, Část 1/2...)
+                    # a to jedině tehdy, pokud má uživatel zapnutou explicitní volbu v nastavení.
+                    allow_multipart = ADDON.getSettingBool('autoplay_multipart_movies')
+                    if allow_multipart:
+                        curr_part, next_part, next_part_query = history.get_next_movie_part_query(current_query, current_title)
+                        if curr_part and next_part and next_part_query:
+                            dialog = xbmcgui.DialogProgress()
+                            dialog.create(ADDON.getLocalizedString(30022), f"{ADDON.getLocalizedString(30068)}: {next_part_query}")
+                            matched_results = []
+                            search_canceled = False
+                            try:
+                                dialog.update(0, f"{ADDON.getLocalizedString(30068)}: {next_part_query}\nVyhledávání na Webshare...")
+                                results = webshare.search(next_part_query)
+                                if dialog.iscanceled() or monitor.abortRequested():
+                                    search_canceled = True
+                                elif results:
+                                    matched_results = [r for r in results if history.matches_movie_part(r.get('name', ''), next_part)]
+                            finally:
+                                try:
+                                    dialog.close()
+                                except Exception:
+                                    pass
+
+                            if not search_canceled and not monitor.abortRequested() and matched_results:
+                                selected_item = matched_results[0]
+                                item_name = selected_item.get('name', next_part_query)
+
+                                try:
+                                    cnt_val = ADDON.getSetting('autoplay_countdown')
+                                    seconds = int(cnt_val) if cnt_val != '' else 10
+                                except (ValueError, TypeError):
+                                    seconds = 10
+                                seconds = max(0, min(seconds, 120))
+                                show_continue_btn = ADDON.getSettingBool('autoplay_continue_btn')
+
+                                import autoplay_dialog
+                                should_play = autoplay_dialog.run_autoplay_countdown(
+                                    heading=ADDON.getLocalizedString(30022),
+                                    line1=f"{ADDON.getLocalizedString(30068)}: {next_part_query}",
+                                    line2=item_name,
+                                    seconds=seconds,
+                                    show_continue_btn=show_continue_btn
+                                )
+
+                                if should_play and not monitor.abortRequested():
+                                    next_ep_data = (selected_item["ident"], next_part_query, item_name)
 
             if next_ep_data:
                 current_ident, current_query, current_title = next_ep_data
@@ -693,7 +757,7 @@ def show_watchlist():
         poster = item.get('poster')
         fanart = item.get('fanart')
         is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
-        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b([0-9]{1,2})x([0-9]{1,3})\b)', query, re.IGNORECASE)
         s_num = None
         e_num = None
         ep_suffix = ""
@@ -755,13 +819,17 @@ def show_watchlist():
         if still:
             art_dict['still'] = still
             art_dict['thumb'] = still
-            art_dict['poster'] = still
+            art_dict['icon'] = still
+            if media_type != 'episode':
+                art_dict['poster'] = poster or still
         elif poster:
             art_dict['poster'] = poster
             art_dict['thumb'] = poster
         if poster:
             art_dict['season.poster'] = poster
             art_dict['tvshow.poster'] = poster
+        if fanart:
+            art_dict['fanart'] = fanart
         if art_dict:
             list_item.setArt(art_dict)
         if ep_match:
@@ -838,7 +906,7 @@ def show_history(force_list=False):
         is_watched = bool(item.get('is_watched', True))
         is_tv = item.get('media_type') in ('tvshow', 'tv', 'show') or history.is_series(query)
         
-        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+        ep_match = re.search(r'\b(?:S(\d+)\s*E(\d+)|\b([0-9]{1,2})x([0-9]{1,3})\b)', query, re.IGNORECASE)
         s_num = None
         e_num = None
         ep_suffix = ""
@@ -881,13 +949,17 @@ def show_history(force_list=False):
         if still:
             art_dict['still'] = still
             art_dict['thumb'] = still
-            art_dict['poster'] = still
+            art_dict['icon'] = still
+            if media_type != 'episode':
+                art_dict['poster'] = poster or still
         elif poster:
             art_dict['poster'] = poster
             art_dict['thumb'] = poster
         if poster:
             art_dict['season.poster'] = poster
             art_dict['tvshow.poster'] = poster
+        if fanart:
+            art_dict['fanart'] = fanart
         if art_dict:
             list_item.setArt(art_dict)
         if ep_match:
@@ -944,7 +1016,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
 
     display_title = history.sanitize_title(raw_title) or history.get_base_name(query) or query
     xbmcplugin.setPluginCategory(HANDLE, f"{ADDON.getLocalizedString(30064)}: {display_title}")
-    xbmcplugin.setContent(HANDLE, 'movies' if media_type == 'movie' else 'tvshows')
+    xbmcplugin.setContent(HANDLE, 'episodes' if is_tv else 'videos')
     trakt_token = ADDON.getSetting('trakt_token')
     enable_trakt_menu = ADDON.getSettingBool('enable_trakt_menu')
 
@@ -975,7 +1047,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'is_folder': False
             })
 
-    ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b(\d+)x(\d+)\b)', query, re.IGNORECASE)
+    ep_match = re.search(r'^(.*?)(?:[\s._-]+)?(?:S(\d+)\s*E(\d+)|\b([0-9]{1,2})x([0-9]{1,3})\b)', query, re.IGNORECASE)
     season = None
     episode = None
     ws_base = None
@@ -1053,7 +1125,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             'icon': s_still or poster or 'DefaultAddonsSearch.png',
             'thumb': s_still or poster or 'DefaultAddonsSearch.png',
             'still': s_still,
-            'poster': s_still or poster,
+            'poster': poster,
             'fanart': fanart,
             'plot': s_plot,
             'year': s_year,
@@ -1134,7 +1206,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'icon': n_still or poster or 'DefaultVideoEpisodes.png',
                 'thumb': n_still or poster or 'DefaultVideoEpisodes.png',
                 'still': n_still,
-                'poster': n_still or poster,
+                'poster': poster,
                 'fanart': fanart,
                 'plot': n_plot,
                 'year': n_yr,
@@ -1155,7 +1227,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'icon': p_still or poster or 'DefaultVideoEpisodes.png',
                 'thumb': p_still or poster or 'DefaultVideoEpisodes.png',
                 'still': p_still,
-                'poster': p_still or poster,
+                'poster': poster,
                 'fanart': fanart,
                 'plot': p_plot,
                 'year': p_yr,
@@ -1183,7 +1255,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'icon': ns_still or poster or 'DefaultVideoEpisodes.png',
                 'thumb': ns_still or poster or 'DefaultVideoEpisodes.png',
                 'still': ns_still,
-                'poster': ns_still or poster,
+                'poster': poster,
                 'fanart': fanart,
                 'plot': ns_plot,
                 'year': ns_yr,
@@ -1210,7 +1282,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
                 'icon': ps_still or poster or 'DefaultVideoEpisodes.png',
                 'thumb': ps_still or poster or 'DefaultVideoEpisodes.png',
                 'still': ps_still,
-                'poster': ps_still or poster,
+                'poster': poster,
                 'fanart': fanart,
                 'plot': ps_plot,
                 'year': ps_yr,
@@ -1306,7 +1378,7 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
         stl = it.get('still')
         pos = it.get('poster') or poster
         fan = it.get('fanart') or fanart
-        plt = it.get('plot') or (plot if not is_utility else '')
+        plt = it.get('plot') or plot
         yr = it.get('year') or (year if not is_utility else None)
         rt = it.get('rating') or (rating if not is_utility else None)
         dur = it.get('runtime') or (runtime if not is_utility else None)
@@ -1319,27 +1391,27 @@ def history_menu(query, title=None, show_full_history_link=False, source=None):
             url = f"{sys.argv[0]}?action={act}"
         list_item = xbmcgui.ListItem(label=lbl)
         art = {'icon': icn, 'thumb': thm, 'fanart': fan}
-        if pos:
+        if stl:
+            art['still'] = stl
+            art['thumb'] = stl
+            art['icon'] = stl
+        elif pos:
             art['poster'] = pos
         if poster:
             art['season.poster'] = poster
             art['tvshow.poster'] = poster
-        if stl:
-            art['still'] = stl
-            art['thumb'] = stl
-            art['poster'] = stl
         list_item.setArt(art)
         
         info_tag = list_item.getVideoInfoTag()
         info_tag.setTitle(lbl)
+        if plt:
+            info_tag.setPlot(str(plt))
         if it.get('season') is not None:
             info_tag.setSeason(int(it['season']))
         if it.get('episode') is not None:
             info_tag.setEpisode(int(it['episode']))
         if not is_utility:
             info_tag.setMediaType('episode' if (it.get('episode') is not None) else ('movie' if media_type == 'movie' else 'tvshow'))
-            if plt:
-                info_tag.setPlot(str(plt))
             if yr:
                 try:
                     info_tag.setYear(int(str(yr)[:4]))
@@ -1975,6 +2047,17 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         xbmcgui.Dialog().notification('TMDb', ADDON.getLocalizedString(30103), xbmcgui.NOTIFICATION_ERROR, 3000)
         xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
         return
+
+    if (not poster or not fanart) and tmdb_id and tmdb_module:
+        try:
+            s_details = tmdb_module.get_show_seasons(tmdb_id)
+            if s_details:
+                if not poster:
+                    poster = s_details.get('poster') or ''
+                if not fanart:
+                    fanart = s_details.get('fanart') or ''
+        except Exception:
+            pass
         
     episodes = tmdb_module.get_season_episodes(tmdb_id, season_num)
     if not episodes:
@@ -2025,7 +2108,6 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
             art['thumb'] = still
             art['icon'] = still
             art['still'] = still
-            art['poster'] = still
         elif poster:
             art['thumb'] = poster
             art['icon'] = poster
@@ -2033,9 +2115,11 @@ def show_tmdb_show_episodes(show_title, tmdb_id, season_num, poster='', fanart='
         else:
             art['icon'] = 'DefaultTVShows.png'
             art['thumb'] = 'DefaultTVShows.png'
+
         if poster:
             art['season.poster'] = poster
             art['tvshow.poster'] = poster
+
         art['fanart'] = fanart if fanart else get_asset('fa.png')
         li.setArt(art)
 
@@ -2254,6 +2338,18 @@ def show_seasons(show_title, trakt_id, poster='', fanart='', ws_base=None):
 def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_base=None):
     season_num = int(season_num)
     xbmcplugin.setPluginCategory(HANDLE, f"{show_title} - {ADDON.getLocalizedString(30105)} {season_num}")
+
+    if (not poster or not fanart) and trakt_id:
+        try:
+            show_meta = get_trakt_localized(trakt_id, 'show')
+            if show_meta:
+                if not poster:
+                    poster = show_meta.get('poster') or ''
+                if not fanart:
+                    fanart = show_meta.get('fanart') or ''
+        except Exception:
+            pass
+
     episodes = trakt.get_episodes(trakt_id, season_num)
     if not episodes:
         xbmcgui.Dialog().notification('StreamContinuum', ADDON.getLocalizedString(30107), xbmcgui.NOTIFICATION_ERROR, 3000)
@@ -2303,7 +2399,6 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
             art['thumb'] = ep_still
             art['icon'] = ep_still
             art['still'] = ep_still
-            art['poster'] = ep_still
         elif poster:
             art['thumb'] = poster
             art['icon'] = poster
@@ -2311,9 +2406,11 @@ def show_episodes(show_title, trakt_id, season_num, poster='', fanart='', ws_bas
         else:
             art['icon'] = 'DefaultTVShows.png'
             art['thumb'] = 'DefaultTVShows.png'
+
         if poster:
             art['season.poster'] = poster
             art['tvshow.poster'] = poster
+
         art['fanart'] = fanart if fanart else get_asset('fa.png')
         li.setArt(art)
 
